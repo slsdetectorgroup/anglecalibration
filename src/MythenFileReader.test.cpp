@@ -15,8 +15,7 @@
 
 using namespace aare;
 
-TEST_CASE("test mythenfile_reader", "[.mythenfilereader][.files]")
-{
+TEST_CASE("test mythenfile_reader", "[.mythenfilereader][.files]") {
 
     auto fpath = test_data_path() / "AngleCalibration_Test_Data";
 

@@ -6,12 +6,10 @@
 #include <string>
 #include <vector>
 
-namespace aare
-{
+namespace aare {
 
-  // TODO a lot to overload
-  class CustomMythenFile : public FileInterface
-  {
+// TODO a lot to overload
+class CustomMythenFile : public FileInterface {
 
   public:
     CustomMythenFile(const std::string &filename, const ssize_t rows,
@@ -57,5 +55,5 @@ namespace aare
     ssize_t m_cols{};
     static const Dtype m_dtype;
     static const DetectorType det_type = DetectorType::Mythen3;
-  };
+};
 } // namespace aare
