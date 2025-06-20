@@ -3,7 +3,7 @@
  * @short test case for angle calibration class
  ***********************************************/
 
-#include "aare/MythenFileReader.hpp"
+#include "MythenFileReader.hpp"
 
 #include <filesystem>
 
@@ -15,13 +15,14 @@
 
 using namespace aare;
 
-TEST_CASE("test mythenfile_reader", "[.mythenfilereader][.files]") {
+TEST_CASE("test mythenfile_reader", "[.mythenfilereader][.files]")
+{
 
     auto fpath = test_data_path() / "AngleCalibration_Test_Data";
 
     REQUIRE(std::filesystem::exists(fpath));
 
-        MythenFileReader file_reader(fpath, "ang1up_22keV_LaB60p3mm_48M_a_0");
+    MythenFileReader file_reader(fpath, "ang1up_22keV_LaB60p3mm_48M_a_0");
 
     auto frame = file_reader.read_frame(320);
 

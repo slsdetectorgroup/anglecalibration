@@ -1,0 +1,15 @@
+#pragma once
+#include <filesystem>
+#include <cstdlib>
+
+inline auto test_data_path()
+{
+    if (const char *env_p = std::getenv("AARE_TEST_DATA"))
+    {
+        return std::filesystem::path(env_p);
+    }
+    else
+    {
+        throw std::runtime_error("Path to test data: $AARE_TEST_DATA not set");
+    }
+}

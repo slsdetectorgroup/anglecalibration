@@ -9,7 +9,7 @@
 
 #include <H5Cpp.h>
 
-#include "aare/Hdf5FileReader.hpp"
+#include "Hdf5FileReader.hpp"
 #include "aare/NDArray.hpp"
 
 #include <catch2/catch_all.hpp>
@@ -18,7 +18,8 @@
 
 using namespace aare;
 
-TEST_CASE("read hdf5 file", "[.hdf5file][.files]") {
+TEST_CASE("read hdf5 file", "[.hdf5file][.files]")
+{
 
     // TODO generalize datasetpath
     std::string filename = test_data_path() / "AngleCalibration_Test_Data" /
@@ -42,7 +43,8 @@ TEST_CASE("read hdf5 file", "[.hdf5file][.files]") {
 
     CHECK(*type_info == typeid(uint32_t));
 
-    SECTION("read dataset into NDArray") {
+    SECTION("read dataset into NDArray")
+    {
 
         NDArray<uint32_t, 1> dataset_array =
             dataset.store_as_ndarray<uint32_t, 1>();
@@ -51,13 +53,15 @@ TEST_CASE("read hdf5 file", "[.hdf5file][.files]") {
         CHECK(dataset_array(61439) == 1436);
     }
 
-    SECTION("read dataset into Frame") {
+    SECTION("read dataset into Frame")
+    {
         Frame frame = dataset.store_as_frame();
         CHECK(*(reinterpret_cast<uint32_t *>(frame.pixel_ptr(0, 0))) == 866);
         CHECK(*(reinterpret_cast<uint32_t *>(frame.pixel_ptr(0, 61439))) ==
               1436);
     }
-    SECTION("read subset of dataset") {
+    SECTION("read subset of dataset")
+    {
         Frame frame(1, 10, Dtype(typeid(uint32_t)));
 
         Subset subset{std::vector<hsize_t>{10}, std::vector<hsize_t>{10}};
@@ -73,7 +77,8 @@ TEST_CASE("read hdf5 file", "[.hdf5file][.files]") {
     */
 }
 
-TEST_CASE("test datatypes", "[.hdf5file]") {
+TEST_CASE("test datatypes", "[.hdf5file]")
+{
 
     auto [dtype, expected_type_info] = GENERATE(
         std::make_tuple(H5::DataType(H5::PredType::NATIVE_INT), &typeid(int)),
