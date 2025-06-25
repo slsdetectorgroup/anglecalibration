@@ -125,7 +125,11 @@ TEST_CASE("read flatfield", "[anglecalibration][flatfield][.files]") {
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
         std::make_shared<MythenDetectorSpecifications>();
 
-    FlatField flatfield(mythen_detector_ptr);
+    std::shared_ptr<CustomMythenFile> custom_file_ptr =
+        std::make_shared<CustomMythenFile>(mythen_detector_ptr->num_strips(),
+                                           1);
+
+    FlatField flatfield(mythen_detector_ptr, custom_file_ptr);
 
     std::string flatfield_filename =
         test_data_path() / "AngleCalibration_Test_Data" /
@@ -133,7 +137,7 @@ TEST_CASE("read flatfield", "[anglecalibration][flatfield][.files]") {
 
     REQUIRE(std::filesystem::exists(flatfield_filename));
 
-    flatfield.read_flatfield_from_file<CustomMythenFile>(flatfield_filename);
+    flatfield.read_flatfield_from_file(flatfield_filename);
 
     auto flatfield_data = flatfield.get_flatfield();
 
@@ -196,8 +200,12 @@ TEST_CASE("compare result with python code", "[anglecalibration] [.files]") {
 
     mythen_detector_ptr->set_unconnected_modules(unconnected_modules);
 
+    std::shared_ptr<CustomMythenFile> custom_file_ptr =
+        std::make_shared<CustomMythenFile>(mythen_detector_ptr->num_strips(),
+                                           1);
+
     std::shared_ptr<FlatField> flat_field_ptr =
-        std::make_shared<FlatField>(mythen_detector_ptr);
+        std::make_shared<FlatField>(mythen_detector_ptr, custom_file_ptr);
 
     std::string flatfield_filename =
         fpath /
@@ -205,8 +213,7 @@ TEST_CASE("compare result with python code", "[anglecalibration] [.files]") {
 
     REQUIRE(std::filesystem::exists(flatfield_filename));
 
-    flat_field_ptr->read_flatfield_from_file<CustomMythenFile>(
-        flatfield_filename);
+    flat_field_ptr->read_flatfield_from_file(flatfield_filename);
 
     std::shared_ptr<MythenFileReader> mythen_file_reader_ptr =
         std::make_shared<MythenFileReader>(fpath,

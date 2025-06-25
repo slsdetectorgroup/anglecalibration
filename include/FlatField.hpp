@@ -11,18 +11,20 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
 
 #include "MythenDetectorSpecifications.hpp"
 #include "aare/File.hpp"
 #include "aare/NDArray.hpp"
+#include "helpers/FileInterface.hpp"
 
 namespace aare {
 
 template <class CustomFile> struct custom_file_compatibility {
     static constexpr bool value =
-        std::is_base_of<FileInterface, CustomFile>::value &&
+        std::is_base_of<DetectorFileInterface, CustomFile>::value &&
         std::is_constructible<CustomFile, std::string, ssize_t, ssize_t,
                               std::string>::value;
 };
@@ -34,8 +36,18 @@ constexpr bool custom_file_compatibility_v =
 class FlatField {
 
   public:
-    FlatField(std::shared_ptr<MythenDetectorSpecifications> mythen_detector_)
-        : mythen_detector(mythen_detector_) {
+    /**
+     * @tparam custom_file_ptr: Fileclass that inherits from
+     * DetectorFileInterface class needs to overload read_frame and constructor
+     * needs to have the signature Fileclass(std::string filename, ssize_t rows,
+     * ssize_t cols, std::string reading_mode) rows, and cols define the
+     * intended image size to read
+     */
+    FlatField(std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
+              std::optional<std::shared_ptr<DetectorFileInterface>>
+                  custom_file_ptr = std::nullopt)
+        : mythen_detector(mythen_detector_),
+          m_custom_detector_file_ptr(std::move(custom_file_ptr)) {
 
         flat_field = NDArray<uint32_t, 1>(
             std::array<ssize_t, 1>{mythen_detector->num_strips()}, 0);
@@ -103,60 +115,61 @@ class FlatField {
      * @param filelist: path to file that stores the file paths to the aquired
      * data the list should contain multiple acquisitions for different detector
      * angles
-     * @tparam CustomFile: Fileclass that inherits from aare::FileInterface
-     * class needs to overload read_frame and constructor needs to have the
-     * signature CustomFile(std::string filename, ssize_t rows, ssize_t cols,
-     * std::string reading_mode) rows, and cols define the intended image size
-     * to read
      */
-    template <class CustomFile,
-              typename = std::enable_if_t<
-                  custom_file_compatibility_v<CustomFile>, void>>
     void create_flatfield_from_filelist(const std::filesystem::path &filelist) {
-        std::ifstream file_filelist(filelist);
+        if (m_custom_detector_file_ptr.has_value()) {
+            std::ifstream file_filelist(filelist);
 
-        try {
-            std::string filename;
-            while (std::getline(file_filelist, filename)) {
-                CustomFile file(filename, mythen_detector->num_strips(), 1);
-                Frame frame = file.read_frame();
-                if (frame.rows() * frame.cols() !=
-                    mythen_detector->num_strips()) {
-                    throw std::runtime_error(
-                        fmt::format("sizes mismatch. Expect a size of "
-                                    "{} - frame has a size of {}",
-                                    mythen_detector->num_strips(),
-                                    frame.rows() * frame.cols()));
-                }
-                for (ssize_t row = 0; row < frame.rows(); ++row)
-                    for (ssize_t col = 0; col < frame.cols(); ++col) {
-                        flat_field(row * frame.cols() + col) +=
-                            *reinterpret_cast<uint32_t *>(frame.pixel_ptr(
-                                row,
-                                col)); // TODO inefficient as one has to copy
-                                       // twice into frame and into flat_field
+            try {
+                std::string filename;
+                while (std::getline(file_filelist, filename)) {
+                    m_custom_detector_file_ptr.value()->open(filename);
+                    Frame frame =
+                        m_custom_detector_file_ptr.value()->read_frame();
+                    if (frame.rows() * frame.cols() !=
+                        mythen_detector->num_strips()) {
+                        throw std::runtime_error(
+                            fmt::format("sizes mismatch. Expect a size of "
+                                        "{} - frame has a size of {}",
+                                        mythen_detector->num_strips(),
+                                        frame.rows() * frame.cols()));
                     }
+                    for (ssize_t row = 0; row < frame.rows(); ++row)
+                        for (ssize_t col = 0; col < frame.cols(); ++col) {
+                            flat_field(row * frame.cols() + col) +=
+                                *reinterpret_cast<uint32_t *>(frame.pixel_ptr(
+                                    row,
+                                    col)); // TODO inefficient as one has to
+                                           // copy twice into frame and into
+                                           // flat_field
+                        }
+                }
+                file_filelist.close();
+            } catch (const std::exception &e) {
+                std::cerr << "Error: " << e.what() << '\n';
             }
-            file_filelist.close();
-        } catch (const std::exception &e) {
-            std::cerr << "Error: " << e.what() << '\n';
+        } else {
+            throw std::runtime_error(
+                "pointer to CustomFile class needs to be provided");
+        }
+    }
+
+    void read_flatfield_from_file(const std::string &filename) {
+        if (m_custom_detector_file_ptr.has_value()) {
+            m_custom_detector_file_ptr.value()->open(filename);
+            m_custom_detector_file_ptr.value()->read_into(
+                reinterpret_cast<std::byte *>(flat_field.data()));
+        } else {
+            std::runtime_error(
+                "pointer to CustomFile class needs to be provided");
         }
     }
 
     /**
-     * @tparam CustomFile: Fileclass that inherits from aare::FileInterface
-     * class needs to overload read_frame and constructor needs to have the
-     * signature CustomFile(std::string filename, ssize_t rows, ssize_t cols,
-     * std::string reading_mode) rows, and cols define the intended image size
-     * to read
+     * set flatfield from NDArray
      */
-
-    template <class CustomFile,
-              typename = std::enable_if_t<
-                  custom_file_compatibility_v<CustomFile>, void>>
-    void read_flatfield_from_file(const std::string &filename) {
-        CustomFile file(filename, mythen_detector->num_strips(), 1);
-        file.read_into(reinterpret_cast<std::byte *>(flat_field.data()));
+    void set_flatfield(const NDArray<uint32_t, 1> &&flat_field_) {
+        flat_field = flat_field_;
     }
 
     NDView<uint32_t, 1> get_flatfield() const { return flat_field.view(); }
@@ -211,5 +224,7 @@ class FlatField {
   private:
     NDArray<uint32_t, 1> flat_field; // TODO: should be 2d
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector;
+    std::optional<std::shared_ptr<DetectorFileInterface>>
+        m_custom_detector_file_ptr{};
 };
 } // namespace aare

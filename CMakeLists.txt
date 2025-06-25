@@ -138,6 +138,7 @@ set(PUBLICHEADERS
     include/Hdf5FileReader.hpp
     include/MythenFileReader.hpp
     include/MythenDetectorSpecifications.hpp
+    include/helpers/FileInterface.hpp
 )
 
 set(SourceFiles 
