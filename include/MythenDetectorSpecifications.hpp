@@ -11,6 +11,12 @@
 
 namespace aare {
 
+// TODO needs read_into_array
+template <class CustomFile> struct badchannel_file_compatibility {
+    static constexpr bool value =
+        std::is_constructible<CustomFile, std::string>::value;
+};
+
 class MythenDetectorSpecifications {
 
   public:
@@ -19,13 +25,10 @@ class MythenDetectorSpecifications {
     MythenDetectorSpecifications() {
         num_strips_ = max_modules_ * strips_per_module_;
 
-        num_connected_modules_ = max_modules_;
-
         bad_channels =
             NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips_}, false);
 
-        connected_modules = NDArray<bool, 1>(
-            std::array<ssize_t, 1>{static_cast<ssize_t>(max_modules_)}, true);
+        m_unconnected_modules = NDArray<ssize_t, 1>{};
     }
 
     MythenDetectorSpecifications(const size_t max_modules,
@@ -36,77 +39,41 @@ class MythenDetectorSpecifications {
           exposure_time_(exposure_time), bloffset_(bloffset) {
         num_strips_ = max_modules_ * strips_per_module_;
 
-        num_connected_modules_ = max_modules_;
-
         bad_channels =
             NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips_}, false);
-
-        connected_modules = NDArray<bool, 1>(
-            std::array<ssize_t, 1>{static_cast<ssize_t>(max_modules_)}, true);
     }
 
-    // TODO templated on filereader
+    // TODO: will be impossible to create python bindings
+    template <class CustomFile,
+              typename = std::enable_if_t<
+                  badchannel_file_compatibility<CustomFile>::value, void>>
     void read_bad_channels_from_file(const std::string &filename) {
-        std::string line;
-
-        try {
-            std::ifstream file(filename, std::ios_base::in);
-            if (!file.good()) {
-                throw std::logic_error("file does not exist");
-            }
-
-            while (std::getline(file, line)) {
-                std::size_t pos = line.find("-");
-
-                if (pos == std::string::npos) {
-                    bad_channels(std::stoi(line)) = true;
-                } else {
-                    size_t line_size = line.size();
-                    for (int i = std::stoi(line.substr(0, pos));
-                         i <= std::stoi(line.substr(pos + 1, line_size - pos));
-                         ++i)
-                        bad_channels(i) = true;
-                }
-            }
-
-            file.close();
-        } catch (const std::exception &e) {
-            std::cerr << "Error: " << e.what() << std::endl;
-        }
+        CustomFile custom_file(filename);
+        custom_file.read_into_array(bad_channels.view());
     }
 
-    // TODO template on filereader
-    void read_unconnected_modules_from_file(const std::string &filename) {
-        std::string line;
+    void
+    set_unconnected_modules(const std::vector<ssize_t> &unconnected_modules) {
+        m_unconnected_modules = NDArray<ssize_t, 1>(std::array<ssize_t, 1>{
+            static_cast<ssize_t>(unconnected_modules.size())});
 
-        try {
-            std::ifstream file(filename, std::ios_base::in);
-            if (!file.good()) {
-                throw std::logic_error("file does not exist");
-            }
+        std::copy(unconnected_modules.begin(), unconnected_modules.end(),
+                  m_unconnected_modules.begin());
 
-            std::stringstream file_buffer;
-            file_buffer << file.rdbuf();
-
-            file_buffer >> line;
-            num_connected_modules_ -= std::stoi(line);
-
-            while (file_buffer >> line) {
-                size_t module = std::stoi(line);
-                connected_modules[module] = false;
-                for (size_t i = module * strips_per_module_;
-                     i < (module + 1) * strips_per_module_; ++i)
-                    bad_channels[i] = true;
-            }
-        } catch (const std::exception &e) {
-            std::cerr << "Error: " << e.what() << std::endl;
-        }
+        // update bad_channels
+        std::for_each(
+            m_unconnected_modules.begin(), m_unconnected_modules.end(),
+            [this](const auto &module_index) {
+                for (size_t i = module_index * this->strips_per_module_;
+                     i < (module_index + 1) * this->strips_per_module_; ++i)
+                    this->bad_channels[i] = true;
+            });
     }
 
     NDView<bool, 1> get_bad_channels() const { return bad_channels.view(); }
 
-    NDView<bool, 1> get_connected_modules() const {
-        return connected_modules.view();
+    NDView<ssize_t, 1> get_unconnected_modules() const {
+        return m_unconnected_modules.view();
     }
 
     static constexpr double pitch() { return pitch_; }
@@ -146,12 +113,10 @@ class MythenDetectorSpecifications {
                                  // maybe should be configurable
     double bloffset_ = 1.532; // what is this? detector offset relative to what?
 
-    size_t num_connected_modules_{};
-
     ssize_t num_strips_{};
 
-    NDArray<bool, 1> bad_channels;
-    NDArray<bool, 1> connected_modules; // connected modules
+    NDArray<bool, 1> bad_channels{};
+    NDArray<ssize_t, 1> m_unconnected_modules{}; // list of unconnected modules
 };
 
 } // namespace aare

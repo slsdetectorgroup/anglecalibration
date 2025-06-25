@@ -267,8 +267,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_bins(
         size_t module_index =
             strip_index / MythenDetectorSpecifications::strips_per_module();
 
-        if (mythen_detector->get_bad_channels()[strip_index] ||
-            !mythen_detector->get_connected_modules()[module_index])
+        if (mythen_detector->get_bad_channels()[strip_index])
             continue;
 
         double poisson_error = std::sqrt(frame.photon_counts(strip_index)) *

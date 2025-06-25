@@ -49,13 +49,13 @@ if(ANGCAL_FETCH_AARE)
         TARGETS aare_core
         EXPORT ${TARGETS_EXPORT_NAME}
     )
-    #maybe unset some options, cant specify make-format in here
     install(TARGETS aare_compiler_flags
     EXPORT ${TARGETS_EXPORT_NAME}
     ) #mmh is this the way to go I think I will define the same compiler options twice now? can directly use aare_compiler_flags instead of compiler_flags
     message(STATUS "target: aare")
 else()
-    find_package(aare REQUIRED) #maybe provide fetch option 
+    find_package(aare REQUIRED) 
+    message(STATUS "found aare: ${AARE_INCLUDE_DIRS}")
 endif()
 
 if(ANGCAL_FETCH_HDF5)

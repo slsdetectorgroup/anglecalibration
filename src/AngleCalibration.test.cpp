@@ -20,6 +20,34 @@
 
 using namespace aare;
 
+std::vector<ssize_t> read_unconnected_modules(const std::string &filename) {
+
+    std::string line;
+
+    std::vector<ssize_t> unconnected_modules;
+    unconnected_modules.reserve(48);
+
+    try {
+        std::ifstream file(filename, std::ios_base::in);
+        if (!file.good()) {
+            throw std::logic_error("file does not exist");
+        }
+
+        std::stringstream file_buffer;
+        file_buffer << file.rdbuf();
+
+        file_buffer >> line;
+
+        while (file_buffer >> line) {
+            size_t module = std::stoi(line);
+            unconnected_modules.push_back(module);
+        }
+    } catch (const std::exception &e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+    }
+    return unconnected_modules;
+}
+
 TEST_CASE("read initial angle calibration file",
           "[anglecalibration] [.files]") {
 
@@ -63,7 +91,8 @@ TEST_CASE("read bad channels",
 
     REQUIRE(std::filesystem::exists(bad_channels_filename));
 
-    mythen_detector.read_bad_channels_from_file(bad_channels_filename);
+    mythen_detector.read_bad_channels_from_file<CustomBadChannelsFile>(
+        bad_channels_filename);
 
     CHECK(mythen_detector.get_bad_channels().size() == 61440);
 
@@ -83,14 +112,12 @@ TEST_CASE("read unconnected modules",
 
     REQUIRE(std::filesystem::exists(unconnected_modules_filename));
 
-    mythen_detector.read_unconnected_modules_from_file(
-        unconnected_modules_filename);
+    auto unconnected_modules =
+        read_unconnected_modules(unconnected_modules_filename);
 
-    CHECK(mythen_detector.get_connected_modules().size() == 48);
+    mythen_detector.set_unconnected_modules(unconnected_modules);
 
-    CHECK(std::all_of(mythen_detector.get_connected_modules().begin(),
-                      mythen_detector.get_connected_modules().end(),
-                      [](const bool element) { return element; }));
+    CHECK(mythen_detector.get_unconnected_modules().size() == 0);
 }
 
 TEST_CASE("read flatfield", "[anglecalibration][flatfield][.files]") {
@@ -157,14 +184,17 @@ TEST_CASE("compare result with python code", "[anglecalibration] [.files]") {
 
     REQUIRE(std::filesystem::exists(bad_channels_filename));
 
-    mythen_detector_ptr->read_bad_channels_from_file(bad_channels_filename);
+    mythen_detector_ptr->read_bad_channels_from_file<CustomBadChannelsFile>(
+        bad_channels_filename);
 
     std::string unconnected_modules_filename = fpath / "ModOut.txt";
 
     REQUIRE(std::filesystem::exists(unconnected_modules_filename));
 
-    mythen_detector_ptr->read_unconnected_modules_from_file(
-        unconnected_modules_filename);
+    auto unconnected_modules =
+        read_unconnected_modules(unconnected_modules_filename);
+
+    mythen_detector_ptr->set_unconnected_modules(unconnected_modules);
 
     std::shared_ptr<FlatField> flat_field_ptr =
         std::make_shared<FlatField>(mythen_detector_ptr);
