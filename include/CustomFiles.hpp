@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace aare {
+namespace angcal {
 
 class CustomMythenFile : public DetectorFileInterface {
 
@@ -17,7 +17,7 @@ class CustomMythenFile : public DetectorFileInterface {
 
     ~CustomMythenFile();
 
-    Frame read_frame() override;
+    aare::Frame read_frame() override;
 
     void read_into(std::byte *image_buf) override;
 
@@ -27,50 +27,43 @@ class CustomMythenFile : public DetectorFileInterface {
 
   private:
     // uint8_t m_num_counts{}; TODO extend
-    static const Dtype m_dtype;
-    static const DetectorType m_det_type = DetectorType::Mythen3;
+    static const aare::Dtype m_dtype;
+    static const aare::DetectorType m_det_type = aare::DetectorType::Mythen3;
 };
 
-class CustomBadChannelsFile {
+class CustomBadChannelsFile : public SimpleFileInterface {
 
   public:
-    CustomBadChannelsFile(const std::string &filename) : m_filename(filename) {
-        try {
-            m_file = std::ifstream(filename, std::ios_base::in);
-            if (!m_file.good()) {
-                throw std::logic_error("file does not exist");
-            }
-        } catch (std::exception &e) {
-            LOG(TLogLevel::logERROR) << "file does not exist\n";
-        }
-    }
+    CustomBadChannelsFile() = default;
 
     ~CustomBadChannelsFile() { m_file.close(); }
 
-    void read_into_array(NDView<bool, 1> array) {
+    void read_into(std::byte *buffer, const ssize_t data_type_bytes = 1) {
         std::string line;
+
+        size_t index = 0;
         try {
             while (std::getline(m_file, line)) {
+
                 std::size_t pos = line.find("-");
 
                 if (pos == std::string::npos) {
-                    array(std::stoi(line)) = true;
+                    index = std::stoi(line) * data_type_bytes;
+                    buffer[index] = static_cast<std::byte>(true);
                 } else {
                     size_t line_size = line.size();
                     for (int i = std::stoi(line.substr(0, pos));
                          i <= std::stoi(line.substr(pos + 1, line_size - pos));
-                         ++i)
-                        array(i) = true;
+                         ++i) {
+                        index = i * data_type_bytes;
+                        buffer[index] = static_cast<std::byte>(true);
+                    }
                 }
             }
         } catch (const std::exception &e) {
-            LOG(TLogLevel::logERROR) << e.what();
+            LOG(aare::TLogLevel::logERROR) << e.what();
         }
     }
-
-  private:
-    std::string m_filename{};
-    std::ifstream m_file{};
 };
 
-} // namespace aare
+} // namespace angcal

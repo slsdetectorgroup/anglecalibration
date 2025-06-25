@@ -10,7 +10,8 @@
 #include "Hdf5FileReader.hpp"
 #include "aare/NDArray.hpp"
 
-namespace aare {
+using namespace aare;
+namespace angcal {
 
 struct MythenFrame {
     NDArray<uint32_t, 1> photon_counts;
@@ -25,7 +26,7 @@ class MythenFileReader : public HDF5FileReader {
   public:
     MythenFileReader(const std::filesystem::path &file_path_,
                      const std::string &file_prefix_)
-        : m_base_path(file_path_), file_prefix(file_prefix_){};
+        : m_base_path(file_path_), file_prefix(file_prefix_) {};
 
     MythenFrame read_frame(ssize_t frame_index) {
         // TODO not a good design fixed number of digits in file name for frame
@@ -79,4 +80,4 @@ class MythenFileReader : public HDF5FileReader {
     std::string file_prefix{};
 };
 
-} // namespace aare
+} // namespace angcal

@@ -1,6 +1,6 @@
 #include "AngleCalibration.hpp"
 
-namespace aare {
+namespace angcal {
 
 AngleCalibration::AngleCalibration(
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
@@ -373,4 +373,4 @@ void AngleCalibration::write_to_file(
     output_file.close();
 }
 
-} // namespace aare
+} // namespace angcal

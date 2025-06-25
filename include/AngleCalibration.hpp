@@ -16,7 +16,8 @@
 #include "MythenFileReader.hpp"
 #include "aare/NDArray.hpp"
 
-namespace aare {
+using namespace aare;
+namespace angcal {
 
 using parameters =
     std::tuple<std::vector<double>, std::vector<double>, std::vector<double>>;
@@ -161,4 +162,4 @@ class AngleCalibration {
         mythen_file_reader; // TODO replace by FileInterface ptr
 };
 
-} // namespace aare
+} // namespace angcal

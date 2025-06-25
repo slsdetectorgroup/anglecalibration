@@ -20,7 +20,8 @@
 #include "aare/NDArray.hpp"
 #include "helpers/FileInterface.hpp"
 
-namespace aare {
+using namespace aare;
+namespace angcal {
 
 template <class CustomFile> struct custom_file_compatibility {
     static constexpr bool value =
@@ -227,4 +228,4 @@ class FlatField {
     std::optional<std::shared_ptr<DetectorFileInterface>>
         m_custom_detector_file_ptr{};
 };
-} // namespace aare
+} // namespace angcal

@@ -17,6 +17,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 using namespace aare;
+using namespace angcal;
 
 TEST_CASE("read hdf5 file", "[.hdf5file][.files]") {
 

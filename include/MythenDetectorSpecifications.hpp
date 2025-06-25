@@ -4,12 +4,15 @@
 
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <string>
 
 #include "aare/NDArray.hpp"
+#include "helpers/FileInterface.hpp"
 
-namespace aare {
+using namespace aare;
+namespace angcal {
 
 // TODO needs read_into_array
 template <class CustomFile> struct badchannel_file_compatibility {
@@ -22,34 +25,38 @@ class MythenDetectorSpecifications {
   public:
     // TODO: constructor that reads from a config file
 
-    MythenDetectorSpecifications() {
+    MythenDetectorSpecifications(
+        std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr =
+            std::nullopt)
+        : m_custom_file_ptr(std::move(custom_file_ptr)) {
         num_strips_ = max_modules_ * strips_per_module_;
 
         bad_channels =
             NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips_}, false);
-
-        m_unconnected_modules = NDArray<ssize_t, 1>{};
     }
 
-    MythenDetectorSpecifications(const size_t max_modules,
-                                 const double exposure_time,
-                                 const double num_counters = 1,
-                                 double bloffset = 1.532)
+    MythenDetectorSpecifications(
+        const size_t max_modules, const double exposure_time,
+        const double num_counters = 1, double bloffset = 1.532,
+        std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr =
+            std::nullopt)
         : max_modules_(max_modules), num_counters_(num_counters),
-          exposure_time_(exposure_time), bloffset_(bloffset) {
+          exposure_time_(exposure_time), bloffset_(bloffset),
+          m_custom_file_ptr(std::move(custom_file_ptr)) {
         num_strips_ = max_modules_ * strips_per_module_;
 
         bad_channels =
             NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips_}, false);
     }
 
-    // TODO: will be impossible to create python bindings
-    template <class CustomFile,
-              typename = std::enable_if_t<
-                  badchannel_file_compatibility<CustomFile>::value, void>>
     void read_bad_channels_from_file(const std::string &filename) {
-        CustomFile custom_file(filename);
-        custom_file.read_into_array(bad_channels.view());
+        if (m_custom_file_ptr.has_value()) {
+            m_custom_file_ptr.value()->open(filename);
+            m_custom_file_ptr.value()->read_into(
+                reinterpret_cast<std::byte *>(bad_channels.data()));
+        } else {
+            std::runtime_error("provide ptr to CustomFile class");
+        }
     }
 
     void
@@ -71,6 +78,10 @@ class MythenDetectorSpecifications {
     }
 
     NDView<bool, 1> get_bad_channels() const { return bad_channels.view(); }
+
+    void set_bad_channels(const NDArray<bool, 1> &&bad_channels_) {
+        bad_channels = bad_channels_;
+    }
 
     NDView<ssize_t, 1> get_unconnected_modules() const {
         return m_unconnected_modules.view();
@@ -117,6 +128,8 @@ class MythenDetectorSpecifications {
 
     NDArray<bool, 1> bad_channels{};
     NDArray<ssize_t, 1> m_unconnected_modules{}; // list of unconnected modules
+
+    std::optional<std::shared_ptr<SimpleFileInterface>> m_custom_file_ptr{};
 };
 
-} // namespace aare
+} // namespace angcal

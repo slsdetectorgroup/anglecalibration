@@ -19,6 +19,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 using namespace aare;
+using namespace angcal;
 
 std::vector<ssize_t> read_unconnected_modules(const std::string &filename) {
 
@@ -83,7 +84,8 @@ TEST_CASE("read initial angle calibration file",
 TEST_CASE("read bad channels",
           "[anglecalibration][mythenspecifications][.files]") {
 
-    MythenDetectorSpecifications mythen_detector;
+    MythenDetectorSpecifications mythen_detector(
+        std::make_shared<CustomBadChannelsFile>());
 
     std::string bad_channels_filename = test_data_path() /
                                         "AngleCalibration_Test_Data" /
@@ -91,8 +93,7 @@ TEST_CASE("read bad channels",
 
     REQUIRE(std::filesystem::exists(bad_channels_filename));
 
-    mythen_detector.read_bad_channels_from_file<CustomBadChannelsFile>(
-        bad_channels_filename);
+    mythen_detector.read_bad_channels_from_file(bad_channels_filename);
 
     CHECK(mythen_detector.get_bad_channels().size() == 61440);
 
@@ -182,14 +183,14 @@ TEST_CASE("compare result with python code", "[anglecalibration] [.files]") {
     REQUIRE(std::filesystem::exists(fpath));
 
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
-        std::make_shared<MythenDetectorSpecifications>();
+        std::make_shared<MythenDetectorSpecifications>(
+            std::make_shared<CustomBadChannelsFile>());
 
     std::string bad_channels_filename = fpath / "bc2023_003_RING.chans";
 
     REQUIRE(std::filesystem::exists(bad_channels_filename));
 
-    mythen_detector_ptr->read_bad_channels_from_file<CustomBadChannelsFile>(
-        bad_channels_filename);
+    mythen_detector_ptr->read_bad_channels_from_file(bad_channels_filename);
 
     std::string unconnected_modules_filename = fpath / "ModOut.txt";
 

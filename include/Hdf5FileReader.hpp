@@ -12,7 +12,9 @@
 #include <cxxabi.h>
 #include <optional>
 
-namespace aare {
+namespace angcal {
+
+using namespace aare;
 
 // return std::type_info
 inline const std::type_info &deduce_cpp_type(const H5::DataType datatype) {
@@ -209,4 +211,4 @@ class HDF5FileReader {
     H5::H5File file;
 };
 
-} // namespace aare
+} // namespace angcal
