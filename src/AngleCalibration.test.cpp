@@ -55,9 +55,10 @@ TEST_CASE("read initial angle calibration file",
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
         std::make_shared<MythenDetectorSpecifications>();
 
-    AngleCalibration anglecalibration(mythen_detector_ptr,
-                                      std::shared_ptr<FlatField>{},
-                                      std::shared_ptr<MythenFileReader>{});
+    AngleCalibration anglecalibration(
+        mythen_detector_ptr, std::shared_ptr<FlatField>{},
+        std::shared_ptr<MythenFileReader>{},
+        std::make_shared<InitialAngCalParametersFile>());
 
     std::string filename = test_data_path() / "AngleCalibration_Test_Data" /
                            "Angcal_2E_Feb2023_P29.off";
@@ -66,19 +67,15 @@ TEST_CASE("read initial angle calibration file",
 
     anglecalibration.read_initial_calibration_from_file(filename);
 
-    auto centers = anglecalibration.get_centers();
-    auto conversions = anglecalibration.get_conversions();
-    auto offsets = anglecalibration.get_offsets();
+    auto parameters = anglecalibration.get_DGparameters();
 
     std::cout.precision(17);
 
-    CHECK(centers.size() == 48);
-    CHECK(conversions.size() == 48);
-    CHECK(offsets.size() == 48);
+    CHECK(parameters.parameters.size() == 48 * 3);
 
-    CHECK(centers[9] == Catch::Approx(660.342326));
-    CHECK(offsets[47] == Catch::Approx(5.8053312));
-    CHECK(conversions[27] == Catch::Approx(-0.6581179125e-4));
+    CHECK(parameters.centers(9) == Catch::Approx(660.342326));
+    CHECK(parameters.offsets(47) == Catch::Approx(5.8053312));
+    CHECK(parameters.conversions(27) == Catch::Approx(-0.6581179125e-4));
 }
 
 TEST_CASE("read bad channels",

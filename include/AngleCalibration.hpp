@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -15,12 +16,132 @@
 #include "MythenDetectorSpecifications.hpp"
 #include "MythenFileReader.hpp"
 #include "aare/NDArray.hpp"
+#include "helpers/FileInterface.hpp"
 
 using namespace aare;
+
 namespace angcal {
 
 using parameters =
     std::tuple<std::vector<double>, std::vector<double>, std::vector<double>>;
+
+// TODO: check if interpretation and units are correct
+// historical DG parameters
+/**
+ * historical Detector Group parameters
+ */
+struct DGParameters {
+
+    DGParameters() = default;
+
+    DGParameters(const ssize_t n_modules) {
+        parameters = NDArray<double, 2>(std::array<ssize_t, 2>{n_modules, 3});
+    }
+
+    double &operator()(const size_t module_index,
+                       const size_t parameter_index) {
+        return parameters(module_index, parameter_index);
+    }
+
+    double operator()(const size_t module_index,
+                      const size_t parameter_index) const {
+        return parameters(module_index, parameter_index);
+    }
+
+    /**
+     * orthogonal projection of sample onto
+     * detector (given in strip number) [mm]
+     * D/pitch
+     */
+    double &centers(const size_t module_index) {
+        return parameters(module_index, 0);
+    }
+
+    double centers(const size_t module_index) const {
+        return parameters(module_index, 0);
+    }
+
+    /**
+     * pitch/(normal distance from sample
+     * to detector (R)) [mm]
+     * used for easy conversion
+     */
+    double &conversions(const size_t module_index) {
+        return parameters(module_index, 1);
+    }
+
+    double conversions(const size_t module_index) const {
+        return parameters(module_index, 1);
+    }
+
+    /** position of strip zero relative to sample [degrees] phi
+     * 180/pi*D/R TODO: expected an arcsin(D/R)?
+     */
+    double &offsets(const size_t module_index) {
+        return parameters(module_index, 2);
+    }
+
+    double offsets(const size_t module_index) const {
+        return parameters(module_index, 2);
+    }
+
+    NDArray<double, 2> parameters{};
+};
+
+/**
+ * geometric parameters
+ */
+struct EEParameters {
+
+    EEParameters(const ssize_t n_modules) {
+        parameters = NDArray<double, 2>(std::array<ssize_t, 2>{n_modules, 3});
+    }
+
+    double &operator()(const size_t module_index,
+                       const size_t parameter_index) {
+        return parameters(module_index, parameter_index);
+    }
+
+    double operator()(const size_t module_index,
+                      const size_t parameter_index) const {
+        return parameters(module_index, parameter_index);
+    }
+
+    /**
+     * normal distance between sample and detector (R)
+     */
+    double &normal_distances(const size_t module_index) {
+        return parameters(module_index, 0);
+    }
+
+    double normal_distances(const size_t module_index) const {
+        return parameters(module_index, 0);
+    }
+
+    /**
+     * distances between intersection point of sample normal and module origin
+     * (D)
+     */
+    double &module_center_distances(const size_t module_index) {
+        return parameters(module_index, 1);
+    }
+    double module_center_distances(const size_t module_index) const {
+        return parameters(module_index, 1);
+    }
+
+    /** angles between undiffracted beam and orthogonal sample projection on
+     * detector (phi)
+     */
+    double &angles(const size_t module_index) {
+        return parameters(module_index, 2);
+    }
+
+    double angles(const size_t module_index) const {
+        return parameters(module_index, 2);
+    }
+
+    NDArray<double, 2> parameters{};
+};
 
 class AngleCalibration {
 
@@ -28,7 +149,9 @@ class AngleCalibration {
     AngleCalibration(
         std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
         std::shared_ptr<FlatField> flat_field_,
-        std::shared_ptr<MythenFileReader> mythen_file_reader_);
+        std::shared_ptr<MythenFileReader> mythen_file_reader_,
+        std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr_ =
+            std::nullopt);
 
     /** set the histogram bin width [degrees] */
     void set_histogram_bin_width(double bin_width);
@@ -40,10 +163,7 @@ class AngleCalibration {
     /** reads the historical Detector Group (DG) parameters from file **/
     void read_initial_calibration_from_file(const std::string &filename);
 
-    std::vector<double> get_centers() const;
-    std::vector<double> get_conversions() const;
-
-    std::vector<double> get_offsets() const;
+    const DGParameters &get_DGparameters() const;
 
     NDView<double, 1> get_new_photon_counts() const;
 
@@ -51,7 +171,7 @@ class AngleCalibration {
 
     /** converts DG parameters to easy EE parameters e.g.geometric
      * parameters */
-    parameters convert_to_EE_parameters() const;
+    EEParameters convert_to_EE_parameters() const;
 
     std::tuple<double, double, double>
     convert_to_EE_parameters(const size_t module_index) const;
@@ -60,9 +180,11 @@ class AngleCalibration {
     convert_to_EE_parameters(const double center, const double conversion,
                              const double offset) const;
 
-    /** converts DG parameters to BC parameters e.g. best computing
-     * parameters */
+    /*
+    //converts DG parameters to BC parameters e.g. best computing
+     parameters
     parameters convert_to_BC_parameters() const;
+    */
 
     /**
      * calculates new histogram with fixed sized angle bins
@@ -131,35 +253,23 @@ class AngleCalibration {
         NDView<double, 1> inverse_nromalized_flatfield) const;
 
   private:
-    // TODO: Design maybe have a struct with three vectors, store all three
-    // sets of parameters as member variables
+    DGParameters DGparameters;
 
-    // TODO: check if interpretation and units are correct
-    // historical DG parameters
-    // TODO change to NDArray
-    std::vector<double> centers;     // orthogonal projection of sample onto
-                                     // detector (given in strip number) [mm]
-                                     // D/pitch
-    std::vector<double> conversions; // pitch/(normal distance from sample
-                                     // to detector (R)) [mm]
-                                     // //used for easy conversion
-    std::vector<double>
-        offsets; // position of strip zero relative to sample [degrees] phi
-                 // - 180/pi*D/R TODO: expected an arcsin(D/R)?
+    std::shared_ptr<MythenDetectorSpecifications> mythen_detector{};
 
-    std::shared_ptr<MythenDetectorSpecifications> mythen_detector;
+    std::shared_ptr<FlatField> flat_field{};
 
-    std::shared_ptr<FlatField> flat_field;
-
-    NDArray<double, 1> new_photon_counts;
-    NDArray<double, 1> new_photon_count_errors;
+    NDArray<double, 1> new_photon_counts{};
+    NDArray<double, 1> new_photon_count_errors{};
 
     double histogram_bin_width = 0.0036; // [degrees]
 
     ssize_t num_bins{};
 
     std::shared_ptr<MythenFileReader>
-        mythen_file_reader; // TODO replace by FileInterface ptr
+        mythen_file_reader{}; // TODO replace by FileInterface ptr
+
+    std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr{};
 };
 
 } // namespace angcal

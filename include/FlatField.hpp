@@ -161,7 +161,7 @@ class FlatField {
             m_custom_detector_file_ptr.value()->read_into(
                 reinterpret_cast<std::byte *>(flat_field.data()));
         } else {
-            std::runtime_error(
+            throw std::runtime_error(
                 "pointer to CustomFile class needs to be provided");
         }
     }

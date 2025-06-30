@@ -66,4 +66,45 @@ class CustomBadChannelsFile : public SimpleFileInterface {
     }
 };
 
+class InitialAngCalParametersFile : public SimpleFileInterface {
+  public:
+    InitialAngCalParametersFile() = default;
+    ~InitialAngCalParametersFile() { m_file.close(); }
+
+    void read_into(std::byte *buffer, const ssize_t data_type_bytes = 8) {
+        std::string line;
+        uint32_t module_number{};
+
+        try {
+            size_t index = 0;
+
+            while (m_file >> line) {
+                if (line == "module") {
+                    m_file >> line;
+                    module_number = std::stoi(line);
+                    index = module_number * data_type_bytes * 3;
+                }
+                if (line == "center") {
+                    m_file >> line;
+
+                    *reinterpret_cast<double *>(&buffer[index]) =
+                        std::stod(line);
+                }
+                if (line == "conversion") {
+                    m_file >> line;
+                    *reinterpret_cast<double *>(
+                        &buffer[index + data_type_bytes]) = std::stod(line);
+                }
+                if (line == "offset") {
+                    m_file >> line;
+                    *reinterpret_cast<double *>(
+                        &buffer[index + 2 * data_type_bytes]) = std::stod(line);
+                }
+            }
+        } catch (const std::exception &e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+        }
+    }
+};
+
 } // namespace angcal

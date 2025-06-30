@@ -55,7 +55,7 @@ class MythenDetectorSpecifications {
             m_custom_file_ptr.value()->read_into(
                 reinterpret_cast<std::byte *>(bad_channels.data()));
         } else {
-            std::runtime_error("provide ptr to CustomFile class");
+            throw std::runtime_error("provide ptr to CustomFile class");
         }
     }
 
