@@ -118,7 +118,7 @@ class SimpleFileInterface {
     virtual void read_into(std::byte *image_buf,
                            const ssize_t data_type_bytes = 1) = 0;
 
-    virtual ~SimpleFileInterface() = default;
+    virtual ~SimpleFileInterface() { m_file.close(); }
 
   protected:
     std::string m_filename{};

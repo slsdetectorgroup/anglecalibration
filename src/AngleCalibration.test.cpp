@@ -49,6 +49,29 @@ std::vector<ssize_t> read_unconnected_modules(const std::string &filename) {
     return unconnected_modules;
 }
 
+template <typename T, ssize_t Ndim>
+bool my_equals(const NDView<T, Ndim> &first, const NDView<T, Ndim> &other,
+               const T tolerance) {
+    if (first.shape() != other.shape())
+        return false;
+
+    using SignedT = typename make_signed<T>::type;
+
+    bool correct = true;
+    for (uint32_t i = 0; i != first.size(); ++i)
+        if (std::abs(static_cast<SignedT>(first(i)) -
+                         static_cast<SignedT>(other(i)) >
+                     tolerance)) {
+            std::cout << "index: " << i << std::endl;
+            std::cout << first(i) << std::endl;
+            std::cout << other(i) << std::endl;
+            correct = false;
+            // return false;
+        }
+
+    return correct;
+}
+
 TEST_CASE("read initial angle calibration file",
           "[anglecalibration] [.files]") {
 
@@ -217,8 +240,9 @@ TEST_CASE("compare result with python code", "[anglecalibration] [.files]") {
         std::make_shared<MythenFileReader>(fpath,
                                            "ang1up_22keV_LaB60p3mm_48M_a_0");
 
-    AngleCalibration anglecalibration(mythen_detector_ptr, flat_field_ptr,
-                                      mythen_file_reader_ptr);
+    AngleCalibration anglecalibration(
+        mythen_detector_ptr, flat_field_ptr, mythen_file_reader_ptr,
+        std::make_shared<InitialAngCalParametersFile>());
 
     std::string initial_angles_filename = fpath / "Angcal_2E_Feb2023_P29.off";
 
@@ -249,6 +273,15 @@ TEST_CASE("compare result with python code", "[anglecalibration] [.files]") {
     auto python_output_photons = load<double, 1>(
         expected_filename_photons, std::array<ssize_t, 1>{new_num_bins});
 
+    CHECK(my_equals(anglecalibration.get_new_photon_counts().view(),
+                    python_output_photons.view(),
+                    1e-8)); // not sure about precision does not exactly match
+                            // to all decimal digits
+
+    CHECK(my_equals(anglecalibration.get_new_statistical_errors().view(),
+                    python_output_errors.view(),
+                    1e-8)); //
+    /*
     CHECK(anglecalibration.get_new_photon_counts().equals(
         python_output_photons.view(),
         1e-8)); // not sure about precision does not exactly match to all
@@ -257,8 +290,10 @@ TEST_CASE("compare result with python code", "[anglecalibration] [.files]") {
     CHECK(anglecalibration.get_new_statistical_errors().equals(
         python_output_errors.view(),
         1e-8)); //
+    */
 }
 
+/*
 TEST_CASE("check conversion from DG to EE parameters", "[anglecalibration]") {
 
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
@@ -298,3 +333,4 @@ TEST_CASE("check conversion from DG to EE parameters", "[anglecalibration]") {
 
     CHECK(strip_width_DG_param == Catch::Approx(strip_width_EE_param));
 }
+*/

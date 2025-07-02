@@ -36,10 +36,12 @@ include(FetchContent)
 option(ANGCAL_PYTHON_BINDINGS "Build python bindings" OFF)
 option(ANGCAL_TESTS "Build tests" OFF)
 option(ANGCAL_DOCS "Build documentation" OFF)
+option(ANGCAL_INSTALL_PYTHONEXT "Install the python extension in the install tree under CMAKE_INSTALL_PREFIX/angle_calibration/" OFF)
 #option(ASAN "Enable AddressSanitizer" OFF)
 option(ANGCAL_FETCH_HDF5 "Use FetchContent to download hdf5-devel" OFF)
 option(ANGCAL_FETCH_AARE "Use FetchContent to download aare from github" OFF)
 option(ANGCAL_FETCH_CATCH "Use FetchContent to download catch2" ON)
+option(ANGCAL_FETCH_PYBIND11 "Use FetchContent to download pybind11" ON)
 
 if(ANGCAL_FETCH_AARE)
     FetchContent_Declare(aare GIT_REPOSITORY https://github.com/slsdetectorgroup/aare
@@ -74,6 +76,12 @@ else()
             For MacOS: brew install hdf5")
     endif()
 endif()
+
+if(ANGCAL_PYTHON_BINDINGS)
+    add_subdirectory(python)
+endif()
+
+
 
 add_library(compiler_flags INTERFACE) #INTERFACE 
 target_compile_features(compiler_flags INTERFACE cxx_std_17)
@@ -131,6 +139,8 @@ else()
     endif()
 endif()
 
+
+
 set(PUBLICHEADERS
     include/AngleCalibration.hpp
     include/CustomFiles.hpp
@@ -163,7 +173,9 @@ if(ANGCAL_TESTS)
     target_sources(tests PRIVATE ${TestSources})
 endif()
 
-
+if(ANGCAL_PYTHON_BINDINGS)
+    set_property(TARGET angle_calibration PROPERTY POSITION_INDEPENDENT_CODE ON) #what is this doing
+endif()
 
 #only build library if not added in other cmake with add_subdirectory 
 if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
@@ -203,11 +215,8 @@ add_custom_target(
 )
 endif()
 
-if(false)
-if(ANGCAL_PYTHON_BINDINGS)
-    add_subdirectory(python)
-endif()
 
+if(false)
 if(ANGCAL_DOCS)
     add_subdirectory(docs)
 endif()

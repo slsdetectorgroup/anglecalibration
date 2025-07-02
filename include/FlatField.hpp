@@ -44,6 +44,7 @@ class FlatField {
      * ssize_t cols, std::string reading_mode) rows, and cols define the
      * intended image size to read
      */
+    // TODO use my custom files as default arguments
     FlatField(std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
               std::optional<std::shared_ptr<DetectorFileInterface>>
                   custom_file_ptr = std::nullopt)
@@ -126,7 +127,9 @@ class FlatField {
                 while (std::getline(file_filelist, filename)) {
                     m_custom_detector_file_ptr.value()->open(filename);
                     Frame frame =
-                        m_custom_detector_file_ptr.value()->read_frame();
+                        m_custom_detector_file_ptr.value()
+                            ->read_frame(); // get rid of this just have a
+                                            // simple file_ptr!!!
                     if (frame.rows() * frame.cols() !=
                         mythen_detector->num_strips()) {
                         throw std::runtime_error(
@@ -169,25 +172,11 @@ class FlatField {
     /**
      * set flatfield from NDArray
      */
-    void set_flatfield(const NDArray<uint32_t, 1> &&flat_field_) {
+    void set_flatfield(const NDArray<uint32_t, 1> &flat_field_) {
         flat_field = flat_field_;
     }
 
-    NDView<uint32_t, 1> get_flatfield() const { return flat_field.view(); }
-
-    // TODO: remove tolerance
-    double calculate_mean(double tolerance) const {
-        auto [sum, count] = std::accumulate(
-            flat_field.begin(), flat_field.end(),
-            std::make_pair<double, ssize_t>(0.0, 0),
-            [&tolerance](std::pair<double, ssize_t> acc, const auto &element) {
-                return element == 0 ? acc
-                                    : std::make_pair(acc.first + element,
-                                                     acc.second + 1);
-            });
-
-        return sum / count;
-    }
+    NDArray<uint32_t, 1> get_flatfield() const { return flat_field; }
 
     NDArray<double, 1>
     inverse_normalized_flatfield(double tolerance = 0.0001) const {
@@ -202,11 +191,7 @@ class FlatField {
                 mythen_detector->get_bad_channels()[i] = true;
         }
 
-        return inverse_normalized_flatfield; // TODO: better to have a copy in
-                                             // this context but unneccessary
-                                             // for angle calibration code
-        // maybe provide inplace and copy option
-        // maybe store as member variable access with view
+        return inverse_normalized_flatfield;
     }
 
     NDArray<double, 1> normalized_flatfield(double tolerance = 0.0001) const {
@@ -223,6 +208,20 @@ class FlatField {
     }
 
   private:
+    // TODO: remove tolerance
+    double calculate_mean(double tolerance) const {
+        auto [sum, count] = std::accumulate(
+            flat_field.begin(), flat_field.end(),
+            std::make_pair<double, ssize_t>(0.0, 0),
+            [&tolerance](std::pair<double, ssize_t> acc, const auto &element) {
+                return element == 0 ? acc
+                                    : std::make_pair(acc.first + element,
+                                                     acc.second + 1);
+            });
+
+        return sum / count;
+    }
+
     NDArray<uint32_t, 1> flat_field; // TODO: should be 2d
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector;
     std::optional<std::shared_ptr<DetectorFileInterface>>

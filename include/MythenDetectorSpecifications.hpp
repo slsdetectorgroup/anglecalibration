@@ -77,14 +77,14 @@ class MythenDetectorSpecifications {
             });
     }
 
-    NDView<bool, 1> get_bad_channels() const { return bad_channels.view(); }
+    NDArray<bool, 1> get_bad_channels() const { return bad_channels; }
 
-    void set_bad_channels(const NDArray<bool, 1> &&bad_channels_) {
+    void set_bad_channels(const NDArray<bool, 1> &bad_channels_) {
         bad_channels = bad_channels_;
     }
 
-    NDView<ssize_t, 1> get_unconnected_modules() const {
-        return m_unconnected_modules.view();
+    NDArray<ssize_t, 1> get_unconnected_modules() const {
+        return m_unconnected_modules;
     }
 
     static constexpr double pitch() { return pitch_; }

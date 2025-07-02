@@ -38,12 +38,12 @@ const DGParameters &AngleCalibration::get_DGparameters() const {
     return DGparameters;
 }
 
-NDView<double, 1> AngleCalibration::get_new_photon_counts() const {
-    return new_photon_counts.view();
+NDArray<double, 1> AngleCalibration::get_new_photon_counts() const {
+    return new_photon_counts;
 }
 
-NDView<double, 1> AngleCalibration::get_new_statistical_errors() const {
-    return new_photon_count_errors.view();
+NDArray<double, 1> AngleCalibration::get_new_statistical_errors() const {
+    return new_photon_count_errors;
 }
 
 void AngleCalibration::read_initial_calibration_from_file(
@@ -224,8 +224,9 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_bins(
         size_t module_index =
             strip_index / MythenDetectorSpecifications::strips_per_module();
 
-        if (mythen_detector->get_bad_channels()[strip_index])
+        if (mythen_detector->get_bad_channels()[strip_index]) {
             continue;
+        }
 
         double poisson_error = std::sqrt(frame.photon_counts(strip_index)) *
                                inverse_normalized_flatfield(strip_index) *

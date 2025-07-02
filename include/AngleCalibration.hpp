@@ -163,11 +163,12 @@ class AngleCalibration {
     /** reads the historical Detector Group (DG) parameters from file **/
     void read_initial_calibration_from_file(const std::string &filename);
 
-    const DGParameters &get_DGparameters() const;
+    const DGParameters &get_DGparameters() const; // TODO: do i want a
+                                                  // reference?
 
-    NDView<double, 1> get_new_photon_counts() const;
+    NDArray<double, 1> get_new_photon_counts() const;
 
-    NDView<double, 1> get_new_statistical_errors() const;
+    NDArray<double, 1> get_new_statistical_errors() const;
 
     /** converts DG parameters to easy EE parameters e.g.geometric
      * parameters */
@@ -201,6 +202,7 @@ class AngleCalibration {
                        const std::filesystem::path &filepath =
                            std::filesystem::current_path()) const;
 
+  private:
     /** calculates diffraction angle from EE module parameters (used in
      * Beer's Law)
      * @param strip_index local strip index of module
@@ -234,7 +236,6 @@ class AngleCalibration {
         const double module_center_distance, const double normal_distance,
         const double angle, const size_t local_strip_index) const;
 
-  protected:
     /** converts global strip index to local strip index of that module */
     size_t global_to_local_strip_index_conversion(
         const size_t global_strip_index) const;
