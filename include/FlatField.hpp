@@ -23,6 +23,7 @@
 using namespace aare;
 namespace angcal {
 
+/*
 template <class CustomFile> struct custom_file_compatibility {
     static constexpr bool value =
         std::is_base_of<DetectorFileInterface, CustomFile>::value &&
@@ -33,6 +34,7 @@ template <class CustomFile> struct custom_file_compatibility {
 template <class CustomFile>
 constexpr bool custom_file_compatibility_v =
     custom_file_compatibility<CustomFile>::value;
+*/
 
 class FlatField {
 
@@ -46,7 +48,7 @@ class FlatField {
      */
     // TODO use my custom files as default arguments
     FlatField(std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
-              std::optional<std::shared_ptr<DetectorFileInterface>>
+              std::optional<std::shared_ptr<SimpleFileInterface>>
                   custom_file_ptr = std::nullopt)
         : mythen_detector(mythen_detector_),
           m_custom_detector_file_ptr(std::move(custom_file_ptr)) {
@@ -126,10 +128,12 @@ class FlatField {
                 std::string filename;
                 while (std::getline(file_filelist, filename)) {
                     m_custom_detector_file_ptr.value()->open(filename);
-                    Frame frame =
-                        m_custom_detector_file_ptr.value()
-                            ->read_frame(); // get rid of this just have a
-                                            // simple file_ptr!!!
+                    Frame frame(mythen_detector->num_strips(), 1,
+                                aare::Dtype::TypeIndex::UINT32);
+
+                    m_custom_detector_file_ptr.value()->read_into(
+                        frame.data(), frame.dtype().bytes());
+
                     if (frame.rows() * frame.cols() !=
                         mythen_detector->num_strips()) {
                         throw std::runtime_error(
@@ -162,7 +166,7 @@ class FlatField {
         if (m_custom_detector_file_ptr.has_value()) {
             m_custom_detector_file_ptr.value()->open(filename);
             m_custom_detector_file_ptr.value()->read_into(
-                reinterpret_cast<std::byte *>(flat_field.data()));
+                reinterpret_cast<std::byte *>(flat_field.data()), 4);
         } else {
             throw std::runtime_error(
                 "pointer to CustomFile class needs to be provided");
@@ -224,7 +228,7 @@ class FlatField {
 
     NDArray<uint32_t, 1> flat_field; // TODO: should be 2d
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector;
-    std::optional<std::shared_ptr<DetectorFileInterface>>
+    std::optional<std::shared_ptr<SimpleFileInterface>>
         m_custom_detector_file_ptr{};
 };
 } // namespace angcal

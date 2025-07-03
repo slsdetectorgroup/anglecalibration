@@ -11,7 +11,7 @@ void define_FlatField_binding(py::module &m) {
 
     py::class_<FlatField, std::shared_ptr<FlatField>>(m, "FlatField")
         .def(py::init<std::shared_ptr<MythenDetectorSpecifications>,
-                      std::optional<std::shared_ptr<DetectorFileInterface>>>(),
+                      std::optional<std::shared_ptr<SimpleFileInterface>>>(),
              py::arg("MythenDetectorSpecifications"),
              py::arg("file_interface") = std::nullopt)
 

@@ -153,7 +153,6 @@ set(PUBLICHEADERS
 
 set(SourceFiles 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AngleCalibration.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/CustomFiles.cpp
 )
 
 add_library(angle_calibration STATIC ${SourceFiles}) 

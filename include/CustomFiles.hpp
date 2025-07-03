@@ -9,6 +9,7 @@
 
 namespace angcal {
 
+/*
 class CustomMythenFile : public DetectorFileInterface {
 
   public:
@@ -29,6 +30,28 @@ class CustomMythenFile : public DetectorFileInterface {
     // uint8_t m_num_counts{}; TODO extend
     static const aare::Dtype m_dtype;
     static const aare::DetectorType m_det_type = aare::DetectorType::Mythen3;
+};
+*/
+
+class CustomMythenFile : public SimpleFileInterface {
+  public:
+    CustomMythenFile() = default;
+
+    ~CustomMythenFile() { m_file.close(); }
+
+    void read_into(std::byte *image_buf,
+                   const ssize_t data_types_bytes = 4) override {
+        uint32_t strip_index, photon_count;
+        try {
+            while (m_file >> strip_index >> photon_count) {
+                std::memcpy(image_buf, &photon_count, sizeof(photon_count));
+
+                image_buf += data_types_bytes;
+            }
+        } catch (const std::exception &e) {
+            LOG(aare::TLogLevel::logERROR) << e.what();
+        }
+    }
 };
 
 class CustomBadChannelsFile : public SimpleFileInterface {
