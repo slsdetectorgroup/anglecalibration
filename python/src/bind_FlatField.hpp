@@ -36,11 +36,12 @@ void define_FlatField_binding(py::module &m) {
                 auto flatfield = new NDArray<uint32_t, 1>(self.get_flatfield());
                 return return_image_data(flatfield);
             },
-            [](FlatField &self, py::array_t<uint32_t> flatfield) {
+            [](FlatField &self, py::array flatfield) {
                 py::buffer_info info = flatfield.request();
-                if (info.ndim != 1) {
+                if (info.ndim != 1 || info.strides[0] != sizeof(uint32_t) ||
+                    info.itemsize != sizeof(uint32_t)) {
                     throw std::runtime_error(
-                        "Expected 1D buffer of type uint32_t");
+                        "Expected 1D buffer of type uint32_t and stride 1");
                 }
                 NDView<uint32_t, 1> temp_array_view(
                     reinterpret_cast<uint32_t *>(info.ptr),

@@ -37,7 +37,7 @@ option(ANGCAL_PYTHON_BINDINGS "Build python bindings" OFF)
 option(ANGCAL_TESTS "Build tests" OFF)
 option(ANGCAL_DOCS "Build documentation" OFF)
 option(ANGCAL_INSTALL_PYTHONEXT "Install the python extension in the install tree under CMAKE_INSTALL_PREFIX/angle_calibration/" OFF)
-#option(ASAN "Enable AddressSanitizer" OFF)
+option(ASAN "Enable AddressSanitizer" OFF)
 option(ANGCAL_FETCH_HDF5 "Use FetchContent to download hdf5-devel" OFF)
 option(ANGCAL_FETCH_AARE "Use FetchContent to download aare from github" OFF)
 option(ANGCAL_FETCH_CATCH "Use FetchContent to download catch2" ON)
@@ -56,8 +56,10 @@ if(ANGCAL_FETCH_AARE)
     ) #mmh is this the way to go I think I will define the same compiler options twice now? can directly use aare_compiler_flags instead of compiler_flags
     message(STATUS "target: aare")
 else()
+    message(STATUS "Cmake_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
     find_package(aare REQUIRED) 
     message(STATUS "found aare: ${AARE_INCLUDE_DIRS}")
+
 endif()
 
 if(ANGCAL_FETCH_HDF5)
@@ -77,14 +79,13 @@ else()
     endif()
 endif()
 
-if(ANGCAL_PYTHON_BINDINGS)
-    add_subdirectory(python)
-endif()
-
-
 
 add_library(compiler_flags INTERFACE) #INTERFACE 
 target_compile_features(compiler_flags INTERFACE cxx_std_17)
+
+if(ANGCAL_PYTHON_BINDINGS)
+    add_subdirectory(python)
+endif()
 
 if(MSVC) #Microsoft compiler
     target_compile_options(
@@ -112,7 +113,6 @@ else() #gcc clang compiler options
     )
 endif()
 
-
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     message(STATUS "Release build")
     if(MSVC)
@@ -139,6 +139,20 @@ else()
     endif()
 endif()
 
+if(ASAN)
+    message(STATUS "AddressSanitizer enabled")
+    target_compile_options(
+        compiler_flags 
+        INTERFACE 
+            -fsanitize=address,undefined,pointer-compare 
+            -fno-omit-frame-pointer
+    )
+    target_link_options(compiler_flags 
+    INTERFACE 
+        -fsanitize=address,,undefined,pointer-compare 
+            -fno-omit-frame-pointer
+    )
+endif()
 
 
 set(PUBLICHEADERS

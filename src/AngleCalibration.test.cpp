@@ -78,13 +78,12 @@ TEST_CASE("read initial angle calibration file",
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
         std::make_shared<MythenDetectorSpecifications>();
 
-    AngleCalibration anglecalibration(
-        mythen_detector_ptr, std::shared_ptr<FlatField>{},
-        std::shared_ptr<MythenFileReader>{},
-        std::make_shared<InitialAngCalParametersFile>());
+    auto fpath = test_data_path() / "AngleCalibration_Test_Data";
 
-    std::string filename = test_data_path() / "AngleCalibration_Test_Data" /
-                           "Angcal_2E_Feb2023_P29.off";
+    AngleCalibration anglecalibration(mythen_detector_ptr,
+                                      std::shared_ptr<FlatField>{}, fpath);
+
+    std::string filename = fpath / "Angcal_2E_Feb2023_P29.off";
 
     REQUIRE(std::filesystem::exists(filename));
 
@@ -146,10 +145,12 @@ TEST_CASE("read flatfield", "[anglecalibration][flatfield][.files]") {
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
         std::make_shared<MythenDetectorSpecifications>();
 
+    /*
     std::shared_ptr<CustomMythenFile> custom_file_ptr =
         std::make_shared<CustomMythenFile>();
+    */
 
-    FlatField flatfield(mythen_detector_ptr, custom_file_ptr);
+    FlatField flatfield(mythen_detector_ptr);
 
     std::string flatfield_filename =
         test_data_path() / "AngleCalibration_Test_Data" /
@@ -195,6 +196,47 @@ TEST_CASE("create flatfield", "[anglecalibration], [flatfield], [.files]") {
               21); // virtual data 2 angles, 3 frames - 21 as increasing numbers
 }
 
+TEST_CASE("recalculate histogram", "[anglecalibration][.files]") {
+
+    auto fpath = test_data_path() / "AngleCalibration_Test_Data";
+
+    REQUIRE(std::filesystem::exists(fpath));
+
+    std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
+        std::make_shared<MythenDetectorSpecifications>();
+
+    std::string bad_channels_filename = fpath / "bc2023_003_RING.chans";
+
+    REQUIRE(std::filesystem::exists(bad_channels_filename));
+
+    mythen_detector_ptr->read_bad_channels_from_file(bad_channels_filename);
+
+    std::shared_ptr<FlatField> flat_field_ptr =
+        std::make_shared<FlatField>(mythen_detector_ptr);
+
+    std::string flatfield_filename =
+        fpath /
+        "Flatfield_E22p0keV_T11000eV_up_48M_a_LONG_Feb2023_open_WS_SUMC.raw";
+
+    REQUIRE(std::filesystem::exists(flatfield_filename));
+
+    flat_field_ptr->read_flatfield_from_file(flatfield_filename);
+
+    AngleCalibration anglecalibration(mythen_detector_ptr, flat_field_ptr,
+                                      fpath);
+
+    std::string initial_angles_filename = fpath / "Angcal_2E_Feb2023_P29.off";
+
+    REQUIRE(std::filesystem::exists(initial_angles_filename));
+
+    anglecalibration.read_initial_calibration_from_file(
+        initial_angles_filename);
+
+    auto new_histogram =
+        anglecalibration.calculate_fixed_bin_angle_width_histogram(
+            "ang1up_22keV_LaB60p3mm_48M_a_0320.h5");
+}
+
 TEST_CASE("compare result with python code", "[anglecalibration] [.files]") {
 
     auto fpath = test_data_path() / "AngleCalibration_Test_Data";
@@ -202,8 +244,7 @@ TEST_CASE("compare result with python code", "[anglecalibration] [.files]") {
     REQUIRE(std::filesystem::exists(fpath));
 
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
-        std::make_shared<MythenDetectorSpecifications>(
-            std::make_shared<CustomBadChannelsFile>());
+        std::make_shared<MythenDetectorSpecifications>();
 
     std::string bad_channels_filename = fpath / "bc2023_003_RING.chans";
 
@@ -220,8 +261,8 @@ TEST_CASE("compare result with python code", "[anglecalibration] [.files]") {
 
     mythen_detector_ptr->set_unconnected_modules(unconnected_modules);
 
-    std::shared_ptr<FlatField> flat_field_ptr = std::make_shared<FlatField>(
-        mythen_detector_ptr, std::make_shared<CustomMythenFile>());
+    std::shared_ptr<FlatField> flat_field_ptr =
+        std::make_shared<FlatField>(mythen_detector_ptr);
 
     std::string flatfield_filename =
         fpath /
@@ -231,13 +272,8 @@ TEST_CASE("compare result with python code", "[anglecalibration] [.files]") {
 
     flat_field_ptr->read_flatfield_from_file(flatfield_filename);
 
-    std::shared_ptr<MythenFileReader> mythen_file_reader_ptr =
-        std::make_shared<MythenFileReader>(fpath,
-                                           "ang1up_22keV_LaB60p3mm_48M_a_0");
-
-    AngleCalibration anglecalibration(
-        mythen_detector_ptr, flat_field_ptr, mythen_file_reader_ptr,
-        std::make_shared<InitialAngCalParametersFile>());
+    AngleCalibration anglecalibration(mythen_detector_ptr, flat_field_ptr,
+                                      fpath);
 
     std::string initial_angles_filename = fpath / "Angcal_2E_Feb2023_P29.off";
 
@@ -246,7 +282,13 @@ TEST_CASE("compare result with python code", "[anglecalibration] [.files]") {
     anglecalibration.read_initial_calibration_from_file(
         initial_angles_filename);
 
-    anglecalibration.calculate_fixed_bin_angle_width_histogram(320, 340);
+    std::vector<std::string> filelist(20);
+    int i = 20;
+    std::generate(filelist.begin(), filelist.end(), [&i]() {
+        return "ang1up_22keV_LaB60p3mm_48M_a_03" + std::to_string(i++) + ".h5";
+    });
+
+    anglecalibration.calculate_fixed_bin_angle_width_histogram(filelist);
 
     // anglecalibration.write_to_file("cpp_new_photon_counts.xye");
 
@@ -268,6 +310,7 @@ TEST_CASE("compare result with python code", "[anglecalibration] [.files]") {
     auto python_output_photons = load<double, 1>(
         expected_filename_photons, std::array<ssize_t, 1>{new_num_bins});
 
+    /*
     CHECK(my_equals(anglecalibration.get_new_photon_counts().view(),
                     python_output_photons.view(),
                     1e-8)); // not sure about precision does not exactly match
@@ -276,16 +319,16 @@ TEST_CASE("compare result with python code", "[anglecalibration] [.files]") {
     CHECK(my_equals(anglecalibration.get_new_statistical_errors().view(),
                     python_output_errors.view(),
                     1e-8)); //
-    /*
-    CHECK(anglecalibration.get_new_photon_counts().equals(
+    */
+
+    CHECK(anglecalibration.get_new_photon_counts().view().equals(
         python_output_photons.view(),
         1e-8)); // not sure about precision does not exactly match to all
                 // decimal digits
 
-    CHECK(anglecalibration.get_new_statistical_errors().equals(
+    CHECK(anglecalibration.get_new_statistical_errors().view().equals(
         python_output_errors.view(),
         1e-8)); //
-    */
 }
 
 /*

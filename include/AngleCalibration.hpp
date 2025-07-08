@@ -146,10 +146,24 @@ struct EEParameters {
 class AngleCalibration {
 
   public:
+    /**
+     * ptr to MythenDetectorSpecifications storing all specific variables of
+     mythen detector
+     * ptr to FlatField class
+     * @param file_path_ base_path to acquisition files
+     * @param mythen_file_reader optional, pass if you use custom acquisition
+     files - default: reads hdf5 files
+     * @param custom_file_ptr optional, pass if you use custom files to store
+     initial angle parameters - default: initial angle parameters supports
+     * format module [module_index] center [center] +- [error] conversion
+     [conversion] +- [error] offset [offset] +- [error]
+     */
     AngleCalibration(
         std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
         std::shared_ptr<FlatField> flat_field_,
-        std::shared_ptr<MythenFileReader> mythen_file_reader_,
+        const std::filesystem::path &file_path_,
+        std::optional<std::shared_ptr<MythenFileReader>> mythen_file_reader_ =
+            std::nullopt,
         std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr_ =
             std::nullopt);
 
@@ -160,7 +174,10 @@ class AngleCalibration {
 
     ssize_t get_new_num_bins() const;
 
-    /** reads the historical Detector Group (DG) parameters from file **/
+    /** reads the historical Detector Group (DG) parameters from file
+     * @warning only works if member m_custom_detectot_file_ptr supports reading
+     * the format
+     */
     void read_initial_calibration_from_file(const std::string &filename);
 
     const DGParameters &get_DGparameters() const; // TODO: do i want a
@@ -191,11 +208,17 @@ class AngleCalibration {
      * calculates new histogram with fixed sized angle bins
      * for several acquisitions at different detector angles for given frame
      * indices
-     * @param start_frame_index, end_frame_index gives range of frames
+     * @param file_list vector of file_names
      */
-    void
-    calculate_fixed_bin_angle_width_histogram(const size_t start_frame_index,
-                                              const size_t end_frame_index);
+    void calculate_fixed_bin_angle_width_histogram(
+        const std::vector<std::string> &file_list);
+
+    /**
+     * calculates new histogram with fixed sized angle bins
+     * for one acquisition
+     */
+    NDArray<double, 1>
+    calculate_fixed_bin_angle_width_histogram(const std::string &file_name);
 
     void write_to_file(const std::string &filename,
                        const bool store_nonzero_bins = false,
@@ -270,7 +293,8 @@ class AngleCalibration {
     std::shared_ptr<MythenFileReader>
         mythen_file_reader{}; // TODO replace by FileInterface ptr
 
-    std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr{};
+    std::shared_ptr<SimpleFileInterface> custom_file_ptr =
+        std::make_shared<InitialAngCalParametersFile>();
 };
 
 } // namespace angcal

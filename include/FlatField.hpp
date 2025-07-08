@@ -15,6 +15,7 @@
 #include <sstream>
 #include <string>
 
+#include "CustomFiles.hpp"
 #include "MythenDetectorSpecifications.hpp"
 #include "aare/File.hpp"
 #include "aare/NDArray.hpp"
@@ -50,8 +51,10 @@ class FlatField {
     FlatField(std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
               std::optional<std::shared_ptr<SimpleFileInterface>>
                   custom_file_ptr = std::nullopt)
-        : mythen_detector(mythen_detector_),
-          m_custom_detector_file_ptr(std::move(custom_file_ptr)) {
+        : mythen_detector(mythen_detector_) {
+
+        if (custom_file_ptr.has_value())
+            m_custom_detector_file_ptr = custom_file_ptr.value();
 
         flat_field = NDArray<uint32_t, 1>(
             std::array<ssize_t, 1>{mythen_detector->num_strips()}, 0);
@@ -61,8 +64,7 @@ class FlatField {
      * @brief sums up the photon counts for multiple acquisitions
      * @param file_path: path to filesystem - the filesystem should contain
      * multiple acqisitions for different detector angles acquired using
-     * slsReceiver and mythen3Detector //TODO: constructor needs to be the same
-     * - ugly
+     * slsReceiver and mythen3Detector
      */
     // TODO unsure about design - maybe scientist has to give file with paths
     // one wants to accumulate - what to do with strange file format?
@@ -119,58 +121,55 @@ class FlatField {
      * @param filelist: path to file that stores the file paths to the aquired
      * data the list should contain multiple acquisitions for different detector
      * angles
+     * @warning only works if member m_custom_detectot_file_ptr supports reading
+     * the format
      */
     void create_flatfield_from_filelist(const std::filesystem::path &filelist) {
-        if (m_custom_detector_file_ptr.has_value()) {
-            std::ifstream file_filelist(filelist);
+        std::ifstream file_filelist(filelist);
 
-            try {
-                std::string filename;
-                while (std::getline(file_filelist, filename)) {
-                    m_custom_detector_file_ptr.value()->open(filename);
-                    Frame frame(mythen_detector->num_strips(), 1,
-                                aare::Dtype::TypeIndex::UINT32);
+        try {
+            std::string filename;
+            while (std::getline(file_filelist, filename)) {
+                m_custom_detector_file_ptr->open(filename);
+                Frame frame(mythen_detector->num_strips(), 1,
+                            aare::Dtype::TypeIndex::UINT32);
 
-                    m_custom_detector_file_ptr.value()->read_into(
-                        frame.data(), frame.dtype().bytes());
+                m_custom_detector_file_ptr->read_into(frame.data(),
+                                                      frame.dtype().bytes());
 
-                    if (frame.rows() * frame.cols() !=
-                        mythen_detector->num_strips()) {
-                        throw std::runtime_error(
-                            fmt::format("sizes mismatch. Expect a size of "
-                                        "{} - frame has a size of {}",
-                                        mythen_detector->num_strips(),
-                                        frame.rows() * frame.cols()));
-                    }
-                    for (ssize_t row = 0; row < frame.rows(); ++row)
-                        for (ssize_t col = 0; col < frame.cols(); ++col) {
-                            flat_field(row * frame.cols() + col) +=
-                                *reinterpret_cast<uint32_t *>(frame.pixel_ptr(
-                                    row,
-                                    col)); // TODO inefficient as one has to
-                                           // copy twice into frame and into
-                                           // flat_field
-                        }
+                if (frame.rows() * frame.cols() !=
+                    mythen_detector->num_strips()) {
+                    throw std::runtime_error(
+                        fmt::format("sizes mismatch. Expect a size of "
+                                    "{} - frame has a size of {}",
+                                    mythen_detector->num_strips(),
+                                    frame.rows() * frame.cols()));
                 }
-                file_filelist.close();
-            } catch (const std::exception &e) {
-                std::cerr << "Error: " << e.what() << '\n';
+                for (ssize_t row = 0; row < frame.rows(); ++row)
+                    for (ssize_t col = 0; col < frame.cols(); ++col) {
+                        flat_field(row * frame.cols() + col) +=
+                            *reinterpret_cast<uint32_t *>(frame.pixel_ptr(
+                                row,
+                                col)); // TODO inefficient as one has to
+                                       // copy twice into frame and into
+                                       // flat_field
+                    }
             }
-        } else {
-            throw std::runtime_error(
-                "pointer to CustomFile class needs to be provided");
+            file_filelist.close();
+        } catch (const std::exception &e) {
+            std::cerr << "Error: " << e.what() << '\n';
         }
     }
 
+    /**
+     * read flatfield from file
+     * @warning only works if member m_custom_detectot_file_ptr supports reading
+     * the format
+     */
     void read_flatfield_from_file(const std::string &filename) {
-        if (m_custom_detector_file_ptr.has_value()) {
-            m_custom_detector_file_ptr.value()->open(filename);
-            m_custom_detector_file_ptr.value()->read_into(
-                reinterpret_cast<std::byte *>(flat_field.data()), 4);
-        } else {
-            throw std::runtime_error(
-                "pointer to CustomFile class needs to be provided");
-        }
+        m_custom_detector_file_ptr->open(filename);
+        m_custom_detector_file_ptr->read_into(
+            reinterpret_cast<std::byte *>(flat_field.data()), 4);
     }
 
     /**
@@ -228,7 +227,7 @@ class FlatField {
 
     NDArray<uint32_t, 1> flat_field; // TODO: should be 2d
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector;
-    std::optional<std::shared_ptr<SimpleFileInterface>>
-        m_custom_detector_file_ptr{};
+    std::shared_ptr<SimpleFileInterface> m_custom_detector_file_ptr =
+        std::make_shared<CustomMythenFile>();
 };
 } // namespace angcal

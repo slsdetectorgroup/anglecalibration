@@ -3,6 +3,8 @@
  * @short minimal file reader to read mythen files
  ***********************************************/
 
+#pragma once
+
 #include <bitset>
 #include <filesystem>
 #include <string>
@@ -14,26 +16,30 @@ using namespace aare;
 namespace angcal {
 
 struct MythenFrame {
-    NDArray<uint32_t, 1> photon_counts;
+    NDArray<uint32_t, 1> photon_counts{};
     double detector_angle{};
     // double reference_intensity{}; not needed
     std::array<uint8_t, 3> channel_mask{};
+
+    MythenFrame() = default;
+    MythenFrame(MythenFrame &&) = default; // important for move
 };
 
 /** minimal version for a mythen file reader */
 class MythenFileReader : public HDF5FileReader {
 
   public:
-    MythenFileReader(const std::filesystem::path &file_path_,
-                     const std::string &file_prefix_)
-        : m_base_path(file_path_), file_prefix(file_prefix_) {};
+    MythenFileReader(const std::filesystem::path &file_path_)
+        : m_base_path(file_path_) {};
 
-    MythenFrame read_frame(ssize_t frame_index) {
+    //
+    MythenFrame read_frame(const std::string &file_name) {
         // TODO not a good design fixed number of digits in file name for frame
         // number -> pad with zeros
         //  not even sure if files have the same name
         std::string current_file_name =
-            m_base_path / (file_prefix + std::to_string(frame_index) + ".h5");
+            m_base_path /
+            file_name; //(file_prefix + std::to_string(frame_index) + ".h5");
 
         MythenFrame frame;
         open_file(current_file_name);
@@ -55,7 +61,7 @@ class MythenFileReader : public HDF5FileReader {
         auto dataset_channel_number =
             get_dataset("/entry/instrument/NDAttributes/CounterMask");
 
-        uint8_t channel_number;
+        uint32_t channel_number;
 
         dataset_channel_number.read_into_buffer(
             reinterpret_cast<std::byte *>(&channel_number));
@@ -77,7 +83,6 @@ class MythenFileReader : public HDF5FileReader {
 
   private:
     std::filesystem::path m_base_path{};
-    std::string file_prefix{};
 };
 
 } // namespace angcal

@@ -22,7 +22,8 @@ pybind11_add_module(
 set_target_properties(_angcal PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
-target_link_libraries(_angcal PRIVATE angle_calibration)
+target_link_libraries(_angcal PRIVATE angle_calibration compiler_flags)
+
 
 if(false)
 # List of python files to be copied to the build directory

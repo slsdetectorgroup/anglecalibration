@@ -5,11 +5,20 @@ namespace angcal {
 AngleCalibration::AngleCalibration(
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
     std::shared_ptr<FlatField> flat_field_,
-    std::shared_ptr<MythenFileReader> mythen_file_reader_,
+    const std::filesystem::path &file_path_,
+    std::optional<std::shared_ptr<MythenFileReader>> mythen_file_reader_,
     std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr_)
-    : mythen_detector(mythen_detector_), flat_field(flat_field_),
-      mythen_file_reader(mythen_file_reader_),
-      custom_file_ptr(std::move(custom_file_ptr_)) {
+    : mythen_detector(mythen_detector_), flat_field(flat_field_) {
+
+    if (mythen_file_reader_.has_value()) {
+        mythen_file_reader = mythen_file_reader_.value();
+    } else {
+        mythen_file_reader = std::make_shared<MythenFileReader>(file_path_);
+    }
+
+    if (custom_file_ptr_.has_value()) {
+        custom_file_ptr = custom_file_ptr_.value();
+    }
 
     DGparameters = DGParameters(mythen_detector->max_modules());
 
@@ -48,12 +57,9 @@ NDArray<double, 1> AngleCalibration::get_new_statistical_errors() const {
 
 void AngleCalibration::read_initial_calibration_from_file(
     const std::string &filename) {
-    if (custom_file_ptr.has_value()) {
-        custom_file_ptr.value()->open(filename);
-        custom_file_ptr.value()->read_into(DGparameters.parameters.buffer(), 8);
-    } else {
-        throw std::runtime_error("provide pointer to CustomFile class");
-    }
+
+    custom_file_ptr->open(filename);
+    custom_file_ptr->read_into(DGparameters.parameters.buffer(), 8);
 }
 
 EEParameters AngleCalibration::convert_to_EE_parameters() const {
@@ -163,7 +169,7 @@ double AngleCalibration::angular_strip_width_from_EE_parameters(
 }
 
 void AngleCalibration::calculate_fixed_bin_angle_width_histogram(
-    const size_t start_frame_index, const size_t end_frame_index) {
+    const std::vector<std::string> &file_list) {
 
     new_photon_counts = NDArray<double, 1>(std::array<ssize_t, 1>{num_bins});
 
@@ -179,9 +185,8 @@ void AngleCalibration::calculate_fixed_bin_angle_width_histogram(
     NDArray<double, 1> inverse_normalized_flatfield =
         flat_field->inverse_normalized_flatfield();
 
-    for (size_t frame_index = start_frame_index; frame_index < end_frame_index;
-         ++frame_index) {
-        MythenFrame frame = mythen_file_reader->read_frame(frame_index);
+    for (const auto &file : file_list) {
+        MythenFrame frame = mythen_file_reader->read_frame(file);
         redistribute_photon_counts_to_fixed_angle_bins(
             frame, bin_counts.view(), new_statistical_weights.view(),
             new_errors.view(), inverse_normalized_flatfield.view());
@@ -197,6 +202,34 @@ void AngleCalibration::calculate_fixed_bin_angle_width_histogram(
                 ? 0.
                 : 1.0 / std::sqrt(bin_counts[i]);
     }
+}
+
+NDArray<double, 1> AngleCalibration::calculate_fixed_bin_angle_width_histogram(
+    const std::string &file_name) {
+
+    // TODO: maybe group these into a 2d array - better cache usage
+    NDArray<double, 1> bin_counts(std::array<ssize_t, 1>{num_bins}, 0.0);
+    NDArray<double, 1> new_statistical_weights(std::array<ssize_t, 1>{num_bins},
+                                               0.0);
+    NDArray<double, 1> new_errors(std::array<ssize_t, 1>{num_bins}, 0.0);
+
+    NDArray<double, 1> inverse_normalized_flatfield =
+        flat_field->inverse_normalized_flatfield();
+
+    MythenFrame frame = mythen_file_reader->read_frame(file_name);
+
+    redistribute_photon_counts_to_fixed_angle_bins(
+        frame, bin_counts.view(), new_statistical_weights.view(),
+        new_errors.view(), inverse_normalized_flatfield.view());
+
+    for (ssize_t i = 0; i < bin_counts.size(); ++i) {
+        bin_counts[i] = (new_statistical_weights[i] <=
+                         std::numeric_limits<double>::epsilon())
+                            ? 0.
+                            : bin_counts[i] / new_statistical_weights[i];
+    }
+
+    return bin_counts;
 }
 
 void AngleCalibration::redistribute_photon_counts_to_fixed_angle_bins(
@@ -289,7 +322,8 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_bins(
             double bin_coverage_factor = bin_coverage / histogram_bin_width;
 
             ssize_t bin_index = bin - num_bins1;
-            // TODO: maybe have this threshold configurable
+            // TODO: maybe have this threshold configurable - or should it be
+            // std::numeric_limits
             if (bin_coverage >= 0.0001) {
                 new_statistical_weights(bin_index) +=
                     statistical_weights * bin_coverage_factor;

@@ -8,6 +8,7 @@
 #include <sstream>
 #include <string>
 
+#include "CustomFiles.hpp"
 #include "aare/NDArray.hpp"
 #include "helpers/FileInterface.hpp"
 
@@ -27,8 +28,11 @@ class MythenDetectorSpecifications {
 
     MythenDetectorSpecifications(
         std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr =
-            std::nullopt)
-        : m_custom_file_ptr(std::move(custom_file_ptr)) {
+            std::nullopt) {
+
+        if (custom_file_ptr.has_value()) {
+            m_custom_file_ptr = custom_file_ptr.value();
+        }
         num_strips_ = max_modules_ * strips_per_module_;
 
         bad_channels =
@@ -41,22 +45,27 @@ class MythenDetectorSpecifications {
         std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr =
             std::nullopt)
         : max_modules_(max_modules), num_counters_(num_counters),
-          exposure_time_(exposure_time), bloffset_(bloffset),
-          m_custom_file_ptr(std::move(custom_file_ptr)) {
+          exposure_time_(exposure_time), bloffset_(bloffset) {
+
+        if (custom_file_ptr.has_value()) {
+            m_custom_file_ptr = custom_file_ptr.value();
+        }
+
         num_strips_ = max_modules_ * strips_per_module_;
 
         bad_channels =
             NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips_}, false);
     }
 
+    /**
+     * read bad channels from file
+     * @warning only works if member custom_file_ptr supports reading the format
+     */
     void read_bad_channels_from_file(const std::string &filename) {
-        if (m_custom_file_ptr.has_value()) {
-            m_custom_file_ptr.value()->open(filename);
-            m_custom_file_ptr.value()->read_into(
-                reinterpret_cast<std::byte *>(bad_channels.data()));
-        } else {
-            throw std::runtime_error("provide ptr to CustomFile class");
-        }
+
+        m_custom_file_ptr->open(filename);
+        m_custom_file_ptr->read_into(
+            reinterpret_cast<std::byte *>(bad_channels.data()));
     }
 
     void
@@ -129,7 +138,8 @@ class MythenDetectorSpecifications {
     NDArray<bool, 1> bad_channels{};
     NDArray<ssize_t, 1> m_unconnected_modules{}; // list of unconnected modules
 
-    std::optional<std::shared_ptr<SimpleFileInterface>> m_custom_file_ptr{};
+    std::shared_ptr<SimpleFileInterface> m_custom_file_ptr =
+        std::make_shared<CustomBadChannelsFile>();
 };
 
 } // namespace angcal

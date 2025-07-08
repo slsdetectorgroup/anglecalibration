@@ -1,3 +1,5 @@
+#pragma once
+
 #include "aare/Dtype.hpp"
 #include "aare/logger.hpp"
 #include "helpers/FileInterface.hpp"
@@ -8,30 +10,6 @@
 #include <vector>
 
 namespace angcal {
-
-/*
-class CustomMythenFile : public DetectorFileInterface {
-
-  public:
-    CustomMythenFile(const ssize_t rows, const ssize_t cols,
-                     const std::string &mode = "r");
-
-    ~CustomMythenFile();
-
-    aare::Frame read_frame() override;
-
-    void read_into(std::byte *image_buf) override;
-
-    size_t bytes_per_frame() override;
-
-    size_t pixels_per_frame() override;
-
-  private:
-    // uint8_t m_num_counts{}; TODO extend
-    static const aare::Dtype m_dtype;
-    static const aare::DetectorType m_det_type = aare::DetectorType::Mythen3;
-};
-*/
 
 class CustomMythenFile : public SimpleFileInterface {
   public:
