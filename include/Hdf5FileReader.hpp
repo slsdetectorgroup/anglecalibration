@@ -7,6 +7,7 @@
 
 #include "aare/Frame.hpp"
 #include "aare/NDArray.hpp"
+#include "aare/logger.hpp"
 #include <H5Cpp.h>
 #include <array>
 #include <cxxabi.h>
@@ -145,14 +146,17 @@ class HDF5Dataset {
     template <typename T, ssize_t NDim>
     NDArray<T, NDim> store_as_ndarray() const {
         if (NDim != rank) {
-            std::cout
-                << "Warning: dataset dimension and array dimension mismatch"
-                << std::endl; // TODO: replace with log - still valid if we
-                              // want subset
+            LOG(TLogLevel::logERROR)
+                << "dataset dimension and array dimension mismatch"
+                << std::endl;
+            throw std::runtime_error(
+                "dataset dimension and array dimension mismatch");
         }
         if (typeid(T) != *cpp_type) {
-            std::cout << "Warning: dataset and array type mismatch"
-                      << std::endl;
+            LOG(TLogLevel::logERROR)
+                << "dataset and array type mismatch" << std::endl;
+
+            throw std::runtime_error("dataset and array type mismatch");
         }
         std::array<ssize_t, NDim> array_shape{};
         std::transform(
@@ -188,7 +192,7 @@ class HDF5FileReader {
         try {
             file = H5::H5File(filename, H5F_ACC_RDONLY);
         } catch (H5::Exception &e) {
-            std::cerr << "Error: " << e.getDetailMsg() << std::endl;
+            LOG(TLogLevel::logERROR) << e.getDetailMsg() << std::endl;
         }
     }
 
@@ -199,7 +203,7 @@ class HDF5FileReader {
         try {
             dataset = file.openDataSet(dataset_name);
         } catch (H5::Exception &e) {
-            std::cerr << "Error: " << e.getDetailMsg() << std::endl;
+            LOG(TLogLevel::logERROR) << e.getDetailMsg() << std::endl;
         }
 
         // TODO use optional to handle error

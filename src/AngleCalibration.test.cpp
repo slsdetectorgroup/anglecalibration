@@ -6,6 +6,7 @@
 #include "AngleCalibration.hpp"
 #include "CustomFiles.hpp"
 #include "FlatField.hpp"
+#include "aare/logger.hpp"
 
 #include <filesystem>
 
@@ -44,7 +45,7 @@ std::vector<ssize_t> read_unconnected_modules(const std::string &filename) {
             unconnected_modules.push_back(module);
         }
     } catch (const std::exception &e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        LOG(TLogLevel::logERROR) << e.what() << std::endl;
     }
     return unconnected_modules;
 }

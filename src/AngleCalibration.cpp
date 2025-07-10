@@ -1,5 +1,7 @@
 #include "AngleCalibration.hpp"
 
+#include "aare/logger.hpp"
+
 namespace angcal {
 
 AngleCalibration::AngleCalibration(
@@ -246,8 +248,8 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_bins(
     ssize_t num_bins1 = mythen_detector->min_angle() / histogram_bin_width;
     ssize_t num_bins2 = mythen_detector->max_angle() / histogram_bin_width;
 
-    std::cout << "position: " << frame.detector_angle
-              << std::endl; // replace with log
+    LOG(TLogLevel::logINFO)
+        << "position: " << frame.detector_angle << std::endl;
 
     double exposure_rate = 1. / mythen_detector->exposure_time();
 
@@ -269,8 +271,8 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_bins(
             frame.photon_counts(strip_index) *
             inverse_normalized_flatfield(strip_index) * exposure_rate;
 
-        size_t local_strip_index =
-            global_to_local_strip_index_conversion(strip_index);
+        size_t local_strip_index = global_to_local_strip_index_conversion(
+            strip_index); // strip_index relative to module
 
         double diffraction_angle = diffraction_angle_from_DG_parameters(
             DGparameters.centers(module_index),
@@ -345,8 +347,7 @@ void AngleCalibration::write_to_file(
     std::ofstream output_file(filepath / filename);
 
     if (!output_file) {
-        std::cerr << "Error opening file!"
-                  << std::endl; // TODO: replace with log
+        LOG(TLogLevel::logERROR) << "Error opening file!" << std::endl;
     }
 
     output_file << std::fixed << std::setprecision(15);

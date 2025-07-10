@@ -47,7 +47,6 @@ class FlatField {
      * ssize_t cols, std::string reading_mode) rows, and cols define the
      * intended image size to read
      */
-    // TODO use my custom files as default arguments
     FlatField(std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
               std::optional<std::shared_ptr<SimpleFileInterface>>
                   custom_file_ptr = std::nullopt)
@@ -66,8 +65,6 @@ class FlatField {
      * multiple acqisitions for different detector angles acquired using
      * slsReceiver and mythen3Detector
      */
-    // TODO unsure about design - maybe scientist has to give file with paths
-    // one wants to accumulate - what to do with strange file format?
     // TODO: adjust for different counters!!!!
     void create_flatfield_from_rawfilesystem(
         const std::filesystem::path &file_path) {
@@ -109,10 +106,10 @@ class FlatField {
                 }
             }
         } catch (const std::filesystem::filesystem_error &e) {
-            std::cerr << "Filesystem error: " << e.what()
-                      << '\n'; // TODO replace with log
+            LOG(TLogLevel::logERROR)
+                << "Filesystem error: " << e.what() << '\n';
         } catch (const std::exception &e) {
-            std::cerr << "Runtime error: " << e.what() << '\n';
+            LOG(TLogLevel::logERROR) << "Runtime error: " << e.what() << '\n';
         }
     }
 
@@ -157,7 +154,7 @@ class FlatField {
             }
             file_filelist.close();
         } catch (const std::exception &e) {
-            std::cerr << "Error: " << e.what() << '\n';
+            LOG(TLogLevel::logERROR) << "Error: " << e.what() << '\n';
         }
     }
 

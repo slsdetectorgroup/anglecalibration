@@ -103,7 +103,8 @@ class InitialAngCalParametersFile : public SimpleFileInterface {
                 }
             }
         } catch (const std::exception &e) {
-            std::cerr << "Error: " << e.what() << std::endl;
+            LOG(aare::TLogLevel::logERROR)
+                << "Error: " << e.what() << std::endl;
         }
     }
 };
