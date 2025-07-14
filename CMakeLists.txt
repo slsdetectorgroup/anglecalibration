@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 project(angle_calibration 
-DESCRIPTION "angle calibration library for mythen PSI mythen detector"
+DESCRIPTION "angle calibration library for PSI mythen detector"
 LANGUAGES  CXX)
 
 # Read VERSION file into project version
@@ -27,6 +27,8 @@ endif()
 # Set lower / upper case project names
 string(TOUPPER "${PROJECT_NAME}" PROJECT_NAME_UPPER)
 string(TOLOWER "${PROJECT_NAME}" PROJECT_NAME_LOWER)
+
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 # Set targets export name 
 set(TARGETS_EXPORT_NAME "${PROJECT_NAME_LOWER}-targets")
@@ -56,7 +58,7 @@ if(ANGCAL_FETCH_AARE)
     ) #mmh is this the way to go I think I will define the same compiler options twice now? can directly use aare_compiler_flags instead of compiler_flags
     message(STATUS "target: aare")
 else()
-    message(STATUS "Cmake_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
+    message(STATUS "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
     find_package(aare REQUIRED) 
     message(STATUS "found aare: ${AARE_INCLUDE_DIRS}")
 
@@ -154,15 +156,15 @@ if(ASAN)
     )
 endif()
 
-
+#dont we need a relative path here
 set(PUBLICHEADERS
-    include/AngleCalibration.hpp
-    include/CustomFiles.hpp
-    include/Flatfield.hpp
-    include/Hdf5FileReader.hpp
-    include/MythenFileReader.hpp
-    include/MythenDetectorSpecifications.hpp
-    include/helpers/FileInterface.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/AngleCalibration.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/CustomFiles.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/Flatfield.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/Hdf5FileReader.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenFileReader.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenDetectorSpecifications.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/helpers/FileInterface.hpp
 )
 
 set(SourceFiles 
@@ -189,6 +191,11 @@ endif()
 if(ANGCAL_PYTHON_BINDINGS)
     set_property(TARGET angle_calibration PROPERTY POSITION_INDEPENDENT_CODE ON) #what is this doing
 endif()
+
+if(ANGCAL_DOCS)
+    add_subdirectory(docs)
+endif()
+
 
 #only build library if not added in other cmake with add_subdirectory 
 if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
@@ -229,8 +236,3 @@ add_custom_target(
 endif()
 
 
-if(false)
-if(ANGCAL_DOCS)
-    add_subdirectory(docs)
-endif()
-endif()
