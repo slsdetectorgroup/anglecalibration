@@ -220,6 +220,17 @@ class AngleCalibration {
     NDArray<double, 1>
     calculate_fixed_bin_angle_width_histogram(const std::string &file_name);
 
+    /**
+     * calibrates the DG parameters
+     * @param file_list vector of file_names of acquisition files - detector
+     * position should change
+     * @param base_peak_angle angle of the selcted base peak given in degrees
+     * (generally base peaks are tabulated peaks based on sample) //TODO: in
+     * radians or degrees?
+     */
+    void calibrate(const std::vector<std::string> &file_list,
+                   const double base_peak_angle);
+
     void write_to_file(const std::string &filename,
                        const bool store_nonzero_bins = false,
                        const std::filesystem::path &filepath =
@@ -243,6 +254,7 @@ class AngleCalibration {
      * @param strip_index local strip index of module
      * @param distance_to_strip distance to strip given by strip_index and
      * module -> note needs to be small enough to be in the respective module
+     * @return diffraction angle in degrees
      */
     double diffraction_angle_from_DG_parameters(
         const double center, const double conversion, const double offset,
@@ -264,6 +276,18 @@ class AngleCalibration {
         const size_t global_strip_index) const;
 
     /**
+     * compares multiple ROI around peaks and calculates similarity/variance
+     * based on goodness_of_fit and weighted average
+     * @param S0 photon_varaince over all runs
+     * @param S1 photon_variance*photon_count over all runs
+     * @param S2 photon_variance*photon_count² over all runs
+     * @return similarity criterion
+     */
+    double similarity_criterion(const NDView<double, 1> S0,
+                                const NDView<double, 1> S1,
+                                const NDView<double, 1> S2) const;
+
+    /**
      * redistributes photon counts with of histogram using one bin per strip
      * to histogram with fixed size angle bins
      * @param frame MythenFrame storing data from image
@@ -276,6 +300,23 @@ class AngleCalibration {
         NDView<double, 1> new_statistical_weights, NDView<double, 1> new_errors,
         NDView<double, 1> inverse_nromalized_flatfield) const;
 
+    /**
+     * redistributes photon counts around region of interest of base peak to
+     * fixed angle width bins
+     * @param module_index index of module
+     * @param base_peak_angle angle of the selected base peak given in degrees
+     * @param frame MythenFrame storing data from acquisition
+     * @param inverse_normalized_flatfield inverse flatfield
+     * @param new_fixed_angle_width_bin_histogram accumulate new photon counts
+     * (histogram covers region of interest around base peak)
+     */
+    std::tuple<NDArray<double, 1>, NDArray<double, 1>>
+    redistribute_photon_counts_to_fixed_angle_bins(
+        const size_t module_index, const double base_peak_angle,
+        const MythenFrame &frame,
+        const NDView<double, 1> inverse_normalized_flatfield,
+        NDView<double, 1> S0, NDView<double, 1> S1, NDView<double, 1> S2) const;
+
   private:
     DGParameters DGparameters;
 
@@ -287,6 +328,10 @@ class AngleCalibration {
     NDArray<double, 1> new_photon_count_errors{};
 
     double histogram_bin_width = 0.0036; // [degrees]
+
+    // TODO add in constructor or setter
+    size_t base_peak_roi = 50; // base_peak_as_bin_index +/- base_peak_roi -
+                               // region of interest around base peak
 
     ssize_t num_bins{};
 

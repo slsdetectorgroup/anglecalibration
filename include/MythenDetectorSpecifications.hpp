@@ -123,7 +123,8 @@ class MythenDetectorSpecifications {
         -180.0; // maybe shoudnt be static but configurable
     static constexpr double max_angle_ = 180.0;
     static constexpr double dtt0_ =
-        0.0; // No idea what this is - probably configurable
+        0.0; // oke in Antonios code I think it is called sceps_dp sceps_DP
+             // = 1.0d-8// No idea what this is - probably configurable
 
     size_t max_modules_ = 48;
 
