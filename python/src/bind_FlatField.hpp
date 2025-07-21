@@ -52,14 +52,20 @@ void define_FlatField_binding(py::module &m) {
             })
 
         .def("inverse_normalized_flatfield",
-             [](FlatField &self) {
-                 auto result = new NDArray<double, 1>(
-                     self.inverse_normalized_flatfield());
-                 return return_image_data(result);
-             })
+             &FlatField::inverse_normalized_flatfield)
 
-        .def("normalized_flatfield", [](FlatField &self) {
-            auto result = new NDArray<double, 1>(self.normalized_flatfield());
+        .def("normalized_flatfield", &FlatField::normalized_flatfield)
+
+        .def_property_readonly("get_inverse_normalized_flatfield",
+                               [](FlatField &self) {
+                                   auto result = new NDArray<double, 1>(
+                                       self.get_inverse_normalized_flatfield());
+                                   return return_image_data(result);
+                               })
+
+        .def_property_readonly("get_normalized_flatfield", [](FlatField &self) {
+            auto result =
+                new NDArray<double, 1>(self.get_normalized_flatfield());
             return return_image_data(result);
         });
 }

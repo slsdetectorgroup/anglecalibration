@@ -287,6 +287,8 @@ class AngleCalibration {
                                 const NDView<double, 1> S1,
                                 const NDView<double, 1> S2) const;
 
+    double calculate_similarity_of_peaks(const size_t module_index) const;
+
     /**
      * redistributes photon counts with of histogram using one bin per strip
      * to histogram with fixed size angle bins
@@ -306,16 +308,21 @@ class AngleCalibration {
      * @param module_index index of module
      * @param base_peak_angle angle of the selected base peak given in degrees
      * @param frame MythenFrame storing data from acquisition
-     * @param inverse_normalized_flatfield inverse flatfield
      * @param new_fixed_angle_width_bin_histogram accumulate new photon counts
      * (histogram covers region of interest around base peak)
      */
     std::tuple<NDArray<double, 1>, NDArray<double, 1>>
-    redistribute_photon_counts_to_fixed_angle_bins(
-        const size_t module_index, const double base_peak_angle,
-        const MythenFrame &frame,
-        const NDView<double, 1> inverse_normalized_flatfield,
-        NDView<double, 1> S0, NDView<double, 1> S1, NDView<double, 1> S2) const;
+    redistribute_photon_counts_to_fixed_angle_bins(const size_t module_index,
+                                                   const MythenFrame &frame,
+                                                   NDView<double, 1> S0,
+                                                   NDView<double, 1> S1,
+                                                   NDView<double, 1> S2) const;
+
+    // TODO: also a bad design - make shift_parameter configurable - consider
+    // having second class Optimization
+    void optimization_algorithm(const size_t module_index,
+                                const double shift_parameter1 = 0.01,
+                                const double shift_parameter2 = 0.005);
 
   private:
     DGParameters DGparameters;
@@ -334,6 +341,12 @@ class AngleCalibration {
                                // region of interest around base peak
 
     ssize_t num_bins{};
+
+    double base_peak_angle{}; // center of base peak in angles to use for
+                              // calibration
+
+    std::vector<std::string>
+        file_list{}; // list of acquisition files used for calibration
 
     std::shared_ptr<MythenFileReader>
         mythen_file_reader{}; // TODO replace by FileInterface ptr

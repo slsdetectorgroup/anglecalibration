@@ -178,33 +178,37 @@ class FlatField {
 
     NDArray<uint32_t, 1> get_flatfield() const { return flat_field; }
 
-    NDArray<double, 1>
-    inverse_normalized_flatfield(double tolerance = 0.0001) const {
-        double mean = calculate_mean(tolerance);
-
-        NDArray<double, 1> inverse_normalized_flatfield(flat_field.shape());
-
-        for (ssize_t i = 0; i < flat_field.size(); ++i) {
-            inverse_normalized_flatfield[i] =
-                (flat_field[i] <= tolerance ? 0.0 : mean / flat_field[i]);
-            if (inverse_normalized_flatfield[i] < tolerance)
-                mythen_detector->get_bad_channels()[i] = true;
-        }
-
-        return inverse_normalized_flatfield;
+    NDView<double, 1> get_inverse_normalized_flatfield() const {
+        return inverse_normalized_flat_field.view();
     }
 
-    NDArray<double, 1> normalized_flatfield(double tolerance = 0.0001) const {
+    NDView<double, 1> get_normalized_flatfield() const {
+        return normalized_flat_field.view();
+    }
+
+    void inverse_normalized_flatfield(double tolerance = 0.0001) {
         double mean = calculate_mean(tolerance);
 
-        NDArray<double, 1> normalized_flatfield(flat_field.shape());
+        inverse_normalized_flat_field = NDArray<double, 1>(flat_field.shape());
 
         for (ssize_t i = 0; i < flat_field.size(); ++i) {
-            normalized_flatfield[i] = (flat_field[i] == flat_field[i] / mean);
-            if (normalized_flatfield[i] < tolerance)
+            inverse_normalized_flat_field[i] =
+                (flat_field[i] <= tolerance ? 0.0 : mean / flat_field[i]);
+            if (inverse_normalized_flat_field[i] < tolerance)
                 mythen_detector->get_bad_channels()[i] = true;
         }
-        return normalized_flatfield;
+    }
+
+    void normalized_flatfield(double tolerance = 0.0001) {
+        double mean = calculate_mean(tolerance);
+
+        normalized_flat_field = NDArray<double, 1>(flat_field.shape());
+
+        for (ssize_t i = 0; i < flat_field.size(); ++i) {
+            normalized_flat_field[i] = (flat_field[i] == flat_field[i] / mean);
+            if (normalized_flat_field[i] < tolerance)
+                mythen_detector->get_bad_channels()[i] = true;
+        }
     }
 
   private:
@@ -223,6 +227,8 @@ class FlatField {
     }
 
     NDArray<uint32_t, 1> flat_field; // TODO: should be 2d
+    NDArray<double, 1> normalized_flat_field;
+    NDArray<double, 1> inverse_normalized_flat_field;
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector;
     std::shared_ptr<SimpleFileInterface> m_custom_detector_file_ptr =
         std::make_shared<CustomMythenFile>();
