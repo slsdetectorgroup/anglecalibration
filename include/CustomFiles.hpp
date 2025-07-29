@@ -1,8 +1,8 @@
 #pragma once
 
 #include "aare/Dtype.hpp"
-#include "aare/logger.hpp"
 #include "helpers/FileInterface.hpp"
+#include "logger.hpp"
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -27,7 +27,7 @@ class CustomMythenFile : public SimpleFileInterface {
                 image_buf += data_types_bytes;
             }
         } catch (const std::exception &e) {
-            LOG(aare::TLogLevel::logERROR) << e.what();
+            LOG(TLogLevel::logERROR) << e.what();
         }
     }
 };
@@ -62,7 +62,7 @@ class CustomBadChannelsFile : public SimpleFileInterface {
                 }
             }
         } catch (const std::exception &e) {
-            LOG(aare::TLogLevel::logERROR) << e.what();
+            LOG(TLogLevel::logERROR) << e.what();
         }
     }
 };
@@ -103,8 +103,7 @@ class InitialAngCalParametersFile : public SimpleFileInterface {
                 }
             }
         } catch (const std::exception &e) {
-            LOG(aare::TLogLevel::logERROR)
-                << "Error: " << e.what() << std::endl;
+            LOG(TLogLevel::logERROR) << "Error: " << e.what() << std::endl;
         }
     }
 };

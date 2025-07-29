@@ -7,7 +7,7 @@
 
 #include "aare/Frame.hpp"
 #include "aare/NDArray.hpp"
-#include "aare/logger.hpp"
+#include "logger.hpp"
 #include <H5Cpp.h>
 #include <array>
 #include <cxxabi.h>

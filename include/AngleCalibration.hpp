@@ -172,7 +172,9 @@ class AngleCalibration {
 
     double get_histogram_bin_width() const;
 
-    ssize_t get_new_num_bins() const;
+    ssize_t get_base_peak_ROI_num_bins() const;
+
+    ssize_t get_base_peak_ROI() const;
 
     /** reads the historical Detector Group (DG) parameters from file
      * @warning only works if member m_custom_detectot_file_ptr supports reading
@@ -236,15 +238,33 @@ class AngleCalibration {
                        const std::filesystem::path &filepath =
                            std::filesystem::current_path()) const;
 
-  private:
-    /** calculates diffraction angle from EE module parameters (used in
-     * Beer's Law)
-     * @param strip_index local strip index of module
+    double calculate_similarity_of_peaks(const size_t module_index) const;
+
+    /** check if base_peak is cituated in module */
+    bool base_peak_is_in_module(const size_t module_index,
+                                const double detector_angle) const;
+
+    void set_base_peak_angle(const double base_peak_angle_);
+
+    /**
+     * redistributes photon counts around region of interest of base peak to
+     * fixed angle width bins
+     * @param module_index index of module
+     * @param frame MythenFrame storing data from acquisition
+     * @param new_fixed_angle_width_bin_histogram accumulate new photon counts
+     * (histogram covers region of interest around base peak)
      */
-    double diffraction_angle_from_EE_parameters(
-        const double module_center_distance, const double normal_distance,
-        const double angle, const size_t strip_index,
-        const double distance_to_strip = 0) const;
+    template <bool base_peak_ROI_only = false>
+    void redistribute_photon_counts_to_fixed_angle_width_bins(
+        const size_t module_index, const MythenFrame &frame,
+        NDView<double, 1> fixed_angle_width_bins_photon_counts,
+        NDView<double, 1> fixed_angle_width_bins_photon_counts_variance,
+        std::optional<NDView<double, 1>> S0 = std::nullopt,
+        std::optional<NDView<double, 1>> S1 = std::nullopt,
+        std::optional<NDView<double, 1>> S2 = std::nullopt) const;
+
+    NDArray<double, 1> redistribute_photon_counts_to_fixed_angle_width_bins(
+        const MythenFrame &frame) const;
 
     /** calculates diffraction angle from EE module parameters (used in
      * Beer's Law)
@@ -257,15 +277,24 @@ class AngleCalibration {
      * @return diffraction angle in degrees
      */
     double diffraction_angle_from_DG_parameters(
-        const double center, const double conversion, const double offset,
-        const size_t strip_index, const double distance_to_strip = 0) const;
+        const size_t module_index, const size_t strip_index,
+        const double distance_to_strip = 0) const;
+
+  private:
+    /** calculates diffraction angle from EE module parameters (used in
+     * Beer's Law)
+     * @param strip_index local strip index of module
+     */
+    double diffraction_angle_from_EE_parameters(
+        const double module_center_distance, const double normal_distance,
+        const double angle, const size_t strip_index,
+        const double distance_to_strip = 0) const;
 
     /** calculated the strip width expressed as angle [degrees]
      * @param strip_index local strip index of module
      */
     double angular_strip_width_from_DG_parameters(
-        const double center, const double conversion, const double offset,
-        const size_t local_strip_index) const;
+        const size_t module_index, const size_t local_strip_index) const;
 
     double angular_strip_width_from_EE_parameters(
         const double module_center_distance, const double normal_distance,
@@ -287,8 +316,6 @@ class AngleCalibration {
                                 const NDView<double, 1> S1,
                                 const NDView<double, 1> S2) const;
 
-    double calculate_similarity_of_peaks(const size_t module_index) const;
-
     /**
      * redistributes photon counts with of histogram using one bin per strip
      * to histogram with fixed size angle bins
@@ -301,22 +328,6 @@ class AngleCalibration {
         const MythenFrame &frame, NDView<double, 1> bin_counts,
         NDView<double, 1> new_statistical_weights, NDView<double, 1> new_errors,
         NDView<double, 1> inverse_nromalized_flatfield) const;
-
-    /**
-     * redistributes photon counts around region of interest of base peak to
-     * fixed angle width bins
-     * @param module_index index of module
-     * @param base_peak_angle angle of the selected base peak given in degrees
-     * @param frame MythenFrame storing data from acquisition
-     * @param new_fixed_angle_width_bin_histogram accumulate new photon counts
-     * (histogram covers region of interest around base peak)
-     */
-    std::tuple<NDArray<double, 1>, NDArray<double, 1>>
-    redistribute_photon_counts_to_fixed_angle_bins(const size_t module_index,
-                                                   const MythenFrame &frame,
-                                                   NDView<double, 1> S0,
-                                                   NDView<double, 1> S1,
-                                                   NDView<double, 1> S2) const;
 
     // TODO: also a bad design - make shift_parameter configurable - consider
     // having second class Optimization
@@ -337,8 +348,8 @@ class AngleCalibration {
     double histogram_bin_width = 0.0036; // [degrees]
 
     // TODO add in constructor or setter
-    size_t base_peak_roi = 50; // base_peak_as_bin_index +/- base_peak_roi -
-                               // region of interest around base peak
+    ssize_t base_peak_roi = 50; // base_peak_as_bin_index +/- base_peak_roi -
+                                // region of interest around base peak
 
     ssize_t num_bins{};
 
@@ -354,5 +365,158 @@ class AngleCalibration {
     std::shared_ptr<SimpleFileInterface> custom_file_ptr =
         std::make_shared<InitialAngCalParametersFile>();
 };
+
+template <bool base_peak_ROI_only>
+void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
+    const size_t module_index, const MythenFrame &frame,
+    NDView<double, 1> fixed_angle_width_bins_photon_counts,
+    NDView<double, 1> fixed_angle_width_bins_photon_counts_variance,
+    std::optional<NDView<double, 1>> S0, std::optional<NDView<double, 1>> S1,
+    std::optional<NDView<double, 1>> S2) const {
+    double left_boundary_roi_base_peak =
+        mythen_detector->min_angle(); // dummy values
+    double right_boundary_roi_base_peak =
+        mythen_detector->max_angle(); // dummy values
+
+    if constexpr (base_peak_ROI_only) {
+        size_t base_peak_as_bin_index = static_cast<size_t>(
+            (base_peak_angle) /
+            histogram_bin_width); // TODO: in antonios code actually rounded
+                                  // to nearest integer
+        left_boundary_roi_base_peak =
+            (base_peak_as_bin_index - base_peak_roi - 0.5) *
+            histogram_bin_width; // in degrees
+        right_boundary_roi_base_peak =
+            (base_peak_as_bin_index + base_peak_roi + 0.5) *
+            histogram_bin_width; // in degrees
+    }
+
+    for (size_t strip_index = 0;
+         strip_index < mythen_detector->strips_per_module(); ++strip_index) {
+
+        if (mythen_detector->get_bad_channels()[strip_index]) {
+            continue; // skip bad channels
+        }
+
+        double left_strip_boundary_angle =
+            diffraction_angle_from_DG_parameters(module_index, strip_index,
+                                                 -0.5) +
+            frame.detector_angle;
+
+        double right_strip_boundary_angle =
+            diffraction_angle_from_DG_parameters(module_index, strip_index,
+                                                 0.5) +
+            frame.detector_angle;
+
+        if (base_peak_ROI_only &
+            (left_strip_boundary_angle > right_boundary_roi_base_peak ||
+             right_strip_boundary_angle < left_boundary_roi_base_peak)) {
+            continue; // skip strip if not in ROI
+        }
+
+        size_t global_strip_index =
+            module_index * mythen_detector->strips_per_module() +
+            strip_index; // TODO: is this really correct - check sign
+
+        double flatfield_normalized_photon_counts =
+            (frame.photon_counts(global_strip_index) + 1); //*
+        // flat_field->get_inverse_normalized_flatfield()(
+        // global_strip_index);
+
+        double some_flatfield_error = 1.0; // TODO: some dummy value - implement
+
+        // I guess it measures the
+        // expcected noise - where is the formula
+        double photon_counts_variance =
+            1. / (std::pow(flatfield_normalized_photon_counts, 2) *
+                  (1. / (frame.photon_counts(global_strip_index) + 1) +
+                   std::pow(some_flatfield_error *
+                                flat_field->get_inverse_normalized_flatfield()(
+                                    global_strip_index),
+                            2)));
+
+        double strip_width_angle =
+            angular_strip_width_from_DG_parameters(module_index, strip_index);
+
+        double correction_factor = histogram_bin_width / strip_width_angle;
+
+        ssize_t left_bin_index_covered_by_strip = static_cast<ssize_t>(
+            left_strip_boundary_angle /
+            histogram_bin_width); // -
+                                  // mythen_detector->min_angle()/histogram_bin_width
+
+        ssize_t right_bin_index_covered_by_strip = static_cast<ssize_t>(
+            right_strip_boundary_angle /
+            histogram_bin_width); // -
+                                  // mythen_detector->min_angle()/histogram_bin_width
+
+        if constexpr (base_peak_ROI_only) {
+            left_bin_index_covered_by_strip = std::max(
+                static_cast<ssize_t>(base_peak_angle / histogram_bin_width) -
+                    base_peak_roi,
+                left_bin_index_covered_by_strip); // -
+                                                  // mythen_detector->min_angle()/histogram_bin_width
+            right_bin_index_covered_by_strip = std::min(
+                static_cast<ssize_t>(base_peak_angle / histogram_bin_width) +
+                    base_peak_roi,
+                right_bin_index_covered_by_strip);
+        }
+
+        size_t proper_bin_index =
+            0; // the computed bin indices dont start at zero but arange around
+               // zero depending on the sign if the diffraction angle
+        for (ssize_t bin_index = left_bin_index_covered_by_strip;
+             bin_index <= right_bin_index_covered_by_strip; ++bin_index) {
+
+            double bin_coverage =
+                std::abs(std::min(right_strip_boundary_angle,
+                                  (bin_index + 0.5) * histogram_bin_width) -
+                         std::max(left_strip_boundary_angle,
+                                  (bin_index - 0.5) * histogram_bin_width));
+
+            double bin_coverage_factor = bin_coverage / histogram_bin_width;
+
+            // convert to bin index
+            if constexpr (base_peak_ROI_only) {
+                proper_bin_index =
+                    bin_index - (static_cast<ssize_t>(base_peak_angle /
+                                                      histogram_bin_width) -
+                                 base_peak_roi); // bin index starts at zero
+            } else {
+                proper_bin_index =
+                    bin_index -
+                    static_cast<ssize_t>(
+                        mythen_detector->min_angle() /
+                        histogram_bin_width); // bin index starts at zero
+            }
+
+            fixed_angle_width_bins_photon_counts(proper_bin_index) +=
+                flatfield_normalized_photon_counts * correction_factor *
+                bin_coverage_factor;
+
+            fixed_angle_width_bins_photon_counts_variance(proper_bin_index) +=
+                photon_counts_variance /
+                std::pow(correction_factor * bin_coverage_factor,
+                         2); // TODO no idea if this is correct
+
+            if (S0.has_value()) {
+                S0.value()(proper_bin_index) +=
+                    fixed_angle_width_bins_photon_counts_variance(
+                        proper_bin_index);
+            }
+            if (S1.has_value()) {
+                S1.value()(proper_bin_index) +=
+                    fixed_angle_width_bins_photon_counts(proper_bin_index) *
+                    fixed_angle_width_bins_photon_counts(proper_bin_index);
+            }
+            if (S2.has_value()) {
+                S2.value()(proper_bin_index) +=
+                    fixed_angle_width_bins_photon_counts(proper_bin_index) *
+                    fixed_angle_width_bins_photon_counts(proper_bin_index) *
+                    fixed_angle_width_bins_photon_counts(proper_bin_index);
+            }
+        }
+    }
+}
 
 } // namespace angcal

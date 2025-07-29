@@ -38,12 +38,15 @@ include(FetchContent)
 option(ANGCAL_PYTHON_BINDINGS "Build python bindings" OFF)
 option(ANGCAL_TESTS "Build tests" OFF)
 option(ANGCAL_DOCS "Build documentation" OFF)
+option(ANGCAL_PLOT "plot for visualization" OFF)
+option(ANGCAL_VERBOSE "print debug info" OFF)
 option(ANGCAL_INSTALL_PYTHONEXT "Install the python extension in the install tree under CMAKE_INSTALL_PREFIX/angle_calibration/" OFF)
 option(ASAN "Enable AddressSanitizer" OFF)
 option(ANGCAL_FETCH_HDF5 "Use FetchContent to download hdf5-devel" OFF)
 option(ANGCAL_FETCH_AARE "Use FetchContent to download aare from github" OFF)
 option(ANGCAL_FETCH_CATCH "Use FetchContent to download catch2" ON)
 option(ANGCAL_FETCH_PYBIND11 "Use FetchContent to download pybind11" ON)
+
 
 if(ANGCAL_FETCH_AARE)
     FetchContent_Declare(aare GIT_REPOSITORY https://github.com/slsdetectorgroup/aare
@@ -80,6 +83,7 @@ else()
             For MacOS: brew install hdf5")
     endif()
 endif()
+
 
 
 add_library(compiler_flags INTERFACE) #INTERFACE 
@@ -156,7 +160,6 @@ if(ASAN)
     )
 endif()
 
-#dont we need a relative path here
 set(PUBLICHEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/AngleCalibration.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CustomFiles.hpp
@@ -165,19 +168,32 @@ set(PUBLICHEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenFileReader.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenDetectorSpecifications.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/helpers/FileInterface.hpp
-)
-
-
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/logger.hpp
+) 
 
 set(SourceFiles 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AngleCalibration.cpp
 )
 
+
+
 add_library(angle_calibration STATIC ${SourceFiles}) 
+
+
 target_include_directories(angle_calibration PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" 
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
 target_link_libraries(angle_calibration PUBLIC aare_core HDF5::HDF5 PRIVATE compiler_flags) 
+
+get_property(allTargets DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY BUILDSYSTEM_TARGETS)
+message(STATUS "Available targets: ${allTargets}")
+
+if(ANGCAL_PLOT)
+set(TARGET_NAME angle_calibration)
+add_subdirectory(plotting_scripts)
+endif()
+
+add_subdirectory(examples)
 
 
 if(ANGCAL_TESTS)
@@ -198,6 +214,16 @@ if(ANGCAL_DOCS)
     add_subdirectory(docs)
 endif()
 
+if(ANGCAL_VERBOSE)
+    target_compile_definitions(angle_calibration PUBLIC ANGCAL_VERBOSE)
+    target_compile_definitions(angle_calibration PUBLIC ANGCAL_LOG_LEVEL=angcal::logDEBUG5)
+else()
+    target_compile_definitions(angle_calibration PUBLIC ANGCAL_LOG_LEVEL=angcal::logINFO)
+endif()
+
+set_target_properties(angle_calibration PROPERTIES
+    PUBLIC_HEADER "${PUBLICHEADERS}"
+)
 
 #only build library if not added in other cmake with add_subdirectory 
 if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)

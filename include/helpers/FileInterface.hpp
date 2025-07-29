@@ -5,7 +5,7 @@
 #pragma once
 #include "aare/Dtype.hpp"
 #include "aare/Frame.hpp"
-#include "aare/logger.hpp"
+#include "logger.hpp"
 
 /**
  * @brief very simple FileInterface to read from simple ascii files or raw files
@@ -30,7 +30,7 @@ class SimpleFileInterface {
                 throw std::logic_error("file does not exist");
             }
         } catch (std::exception &e) {
-            LOG(aare::TLogLevel::logERROR) << "file does not exist\n";
+            LOG(angcal::TLogLevel::logERROR) << "file does not exist\n";
         }
     }
 

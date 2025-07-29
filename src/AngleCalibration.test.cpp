@@ -6,7 +6,7 @@
 #include "AngleCalibration.hpp"
 #include "CustomFiles.hpp"
 #include "FlatField.hpp"
-#include "aare/logger.hpp"
+#include "logger.hpp"
 
 #include <filesystem>
 

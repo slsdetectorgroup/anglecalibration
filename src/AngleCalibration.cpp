@@ -1,6 +1,12 @@
 #include "AngleCalibration.hpp"
 
-#include "aare/logger.hpp"
+#include "logger.hpp"
+
+#include <cstdlib>
+
+#ifdef ANGCAL_PLOT
+#include "plot_histogram.hpp"
+#endif
 
 namespace angcal {
 
@@ -34,7 +40,7 @@ AngleCalibration::AngleCalibration(
         1; // TODO only works if negative
            // and positive angle
     */
-    num_bins = base_peak_roi * 2 + 1;
+    // num_bins = base_peak_roi * 2 + 1;
 }
 
 void AngleCalibration::set_histogram_bin_width(double bin_width) {
@@ -52,7 +58,11 @@ double AngleCalibration::get_histogram_bin_width() const {
     return histogram_bin_width;
 }
 
-ssize_t AngleCalibration::get_new_num_bins() const { return num_bins; }
+ssize_t AngleCalibration::get_base_peak_ROI_num_bins() const {
+    return 2 * base_peak_roi + 1;
+}
+
+ssize_t AngleCalibration::get_base_peak_ROI() const { return base_peak_roi; }
 
 const DGParameters &AngleCalibration::get_DGparameters() const {
     return DGparameters;
@@ -130,8 +140,12 @@ AngleCalibration::convert_to_BC_parameters() {}
 */
 
 double AngleCalibration::diffraction_angle_from_DG_parameters(
-    const double center, const double conversion, const double offset,
-    const size_t strip_index, const double distance_to_strip) const {
+    const size_t module_index, const size_t strip_index,
+    const double distance_to_strip) const {
+
+    double offset = DGparameters.offsets(module_index);
+    double center = DGparameters.centers(module_index);
+    double conversion = DGparameters.conversions(module_index);
 
     return offset + 180.0 / M_PI *
                         (center * std::abs(conversion) -
@@ -156,13 +170,12 @@ double AngleCalibration::diffraction_angle_from_EE_parameters(
 }
 
 double AngleCalibration::angular_strip_width_from_DG_parameters(
-    const double center, const double conversion, const double offset,
-    const size_t local_strip_index) const {
+    const size_t module_index, const size_t local_strip_index) const {
 
     return std::abs(diffraction_angle_from_DG_parameters(
-                        center, conversion, offset, local_strip_index, -0.5) -
+                        module_index, local_strip_index, 0.5) -
                     diffraction_angle_from_DG_parameters(
-                        center, conversion, offset, local_strip_index, 0.5));
+                        module_index, local_strip_index, -0.5));
 }
 
 double AngleCalibration::angular_strip_width_from_EE_parameters(
@@ -177,6 +190,10 @@ double AngleCalibration::angular_strip_width_from_EE_parameters(
                         local_strip_index, 0.5));
 
     // TODO: again not sure about division order - taking abs anyway
+}
+
+void AngleCalibration::set_base_peak_angle(const double base_peak_angle_) {
+    base_peak_angle = base_peak_angle_;
 }
 
 double
@@ -213,51 +230,77 @@ AngleCalibration::similarity_criterion(const NDView<double, 1> S0,
                                   1)); // should actually only divide by runs
 }
 
-double AngleCalibration::calculate_similarity_of_peaks(
-    const size_t module_index) const {
-    // used to calculate similarity criterion between peaks of different
-    // acquisition S_index = sum_i^num_runs
-    // photon_count^index*photon_variance
-    NDArray<double, 1> S2(std::array<ssize_t, 1>{num_bins}, 0.0);
-    NDArray<double, 1> S1(std::array<ssize_t, 1>{num_bins}, 0.0);
-    NDArray<double, 1> S0(std::array<ssize_t, 1>{num_bins}, 0.0);
+// TODO maybe inline this
+bool AngleCalibration::base_peak_is_in_module(
+    const size_t module_index, const double detector_angle) const {
 
     double base_peak_hwid = 0.18; // TODO: not sure what this is - should it be
                                   // configurable
+    // check if base_peak_angle is within the range of angles for this
+    // module
+    double left_module_boundary_angle =
+        diffraction_angle_from_DG_parameters(module_index, 0);
+    double right_module_boundary_angle = diffraction_angle_from_DG_parameters(
+        module_index, mythen_detector->strips_per_module() - 1);
+
+    // TODO: in antonios code only bloffset and angle is added why? -
+    // maybe we can directly add it or is it used later?- careful
+    left_module_boundary_angle +=
+        (detector_angle + mythen_detector->dtt0() +
+         mythen_detector->bloffset()); // Antonio didnt add dtt0
+
+    right_module_boundary_angle += (detector_angle + mythen_detector->dtt0() +
+                                    mythen_detector->bloffset());
+
+    LOG(TLogLevel::logDEBUG) << fmt::format(
+        "module_boundaries_in_angle for module {} [{}, {}]\n", module_index,
+        left_module_boundary_angle, right_module_boundary_angle);
+
+    // TODO check bounds with base_peak_hwid
+    return base_peak_angle + base_peak_hwid >= left_module_boundary_angle &&
+           base_peak_angle - base_peak_hwid <= right_module_boundary_angle;
+}
+
+double AngleCalibration::calculate_similarity_of_peaks(
+    const size_t module_index) const {
+
+    ssize_t num_bins_in_ROI = 2 * base_peak_roi + 1;
+    // used to calculate similarity criterion between peaks of different
+    // acquisition S_index = sum_i^num_runs
+    // photon_count^index*photon_variance
+    NDArray<double, 1> S2(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+    NDArray<double, 1> S1(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+    NDArray<double, 1> S0(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
 
     for (const auto &file : file_list) {
         MythenFrame frame = mythen_file_reader->read_frame(file);
 
-        //++sum_photon_counts; // dont know if intented - just used to skew
-        // the distribution?
+        // base peak angle is in module
+        if (base_peak_is_in_module(module_index, frame.detector_angle)) {
 
-        // check if base_peak_angle is within the range of angles for this
-        // module
-        double left_module_boundary_angle =
-            diffraction_angle_from_DG_parameters(
-                DGparameters.centers(module_index),
-                DGparameters.conversions(module_index),
-                DGparameters.offsets(module_index), 0);
-        double right_module_boundary_angle =
-            diffraction_angle_from_DG_parameters(
-                DGparameters.centers(module_index),
-                DGparameters.conversions(module_index),
-                DGparameters.offsets(module_index),
-                mythen_detector->strips_per_module());
+#ifdef ANGCAL_PLOT
+            plot_photon_counts(
+                frame.photon_counts.view(),
+                std::make_pair<size_t>(
+                    module_index * mythen_detector->strips_per_module(),
+                    (module_index + 1) * mythen_detector->strips_per_module()),
+                module_index, *mythen_detector);
+#endif
 
-        // TODO: in antonios code only bloffset and angle is added why? -
-        // maybe we can directly add it or is it used later?- careful
-        left_module_boundary_angle +=
-            (frame.detector_angle + mythen_detector->dtt0() +
-             mythen_detector->bloffset()); // Antonio didnt add dtt0
+            NDArray<double, 1> fixed_angle_width_bins_photon_counts(
+                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+            NDArray<double, 1> fixed_angle_width_bins_photon_counts_variance(
+                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+            // calculates flatfield normalized photon counts and
+            // photon_count_variance for ROI around base_peak and
+            // redistributes to fixed angle width bins
 
-        right_module_boundary_angle +=
-            (frame.detector_angle + mythen_detector->dtt0() +
-             mythen_detector->bloffset());
-
-        if (base_peak_angle + base_peak_hwid < left_module_boundary_angle ||
-            base_peak_angle > right_module_boundary_angle)
-            continue; // skip module if base peak angle is not in range
+            redistribute_photon_counts_to_fixed_angle_width_bins<true>(
+                module_index, frame,
+                fixed_angle_width_bins_photon_counts.view(),
+                fixed_angle_width_bins_photon_counts_variance.view(), S0.view(),
+                S1.view(), S2.view());
+        }
 
         // we should have histograms per run!!!
         /*
@@ -277,16 +320,9 @@ double AngleCalibration::calculate_similarity_of_peaks(
                 frame.photon_counts(strip_index);
         }
         */
-
-        // calculates flatfield normalized photon counts and
-        // photon_count_variance for ROI around base_peak and redistributes
-        // to fixed angle width bins
-        auto [fixed_angle_width_bins_photon_counts,
-              fixed_angle_width_bins_photon_count_variance] =
-            redistribute_photon_counts_to_fixed_angle_bins(
-                module_index, frame, S0.view(), S1.view(), S2.view());
     }
 
+    // TODO: give a warning if there was no acquisition for a module
     return similarity_criterion(S0.view(), S1.view(), S2.view());
 
     /*
@@ -310,8 +346,8 @@ double AngleCalibration::calculate_similarity_of_peaks(
     */
 }
 
-// TODO: maybe have a function where we calculate the average photon counts -
-// multiple loops - or directly store normalized data somewhere instead of
+// TODO: maybe have a function where we calculate the average photon counts
+// - multiple loops - or directly store normalized data somewhere instead of
 // computing on the fly
 
 void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
@@ -324,154 +360,35 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
     for (size_t module_index = 0; module_index < mythen_detector->max_modules();
          ++module_index) {
 
-        LOG(aare::TLogLevel::logINFO)
+        LOG(angcal::TLogLevel::logINFO)
             << "starting calibration for module " << module_index;
 
         optimization_algorithm(module_index);
     }
 }
 
-// TODO go over function again - in particular peak position and detector
-// position
-// TODO: maybe store as one 2d array - better cache usage or struct with named
-// access functions
-std::tuple<NDArray<double, 1>, NDArray<double, 1>>
-AngleCalibration::redistribute_photon_counts_to_fixed_angle_bins(
-    const size_t module_index, const MythenFrame &frame, NDView<double, 1> S0,
-    NDView<double, 1> S1, NDView<double, 1> S2) const {
+NDArray<double, 1>
+AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
+    const MythenFrame &frame) const {
+    ssize_t new_num_bins =
+        std::floor(mythen_detector->max_angle() / histogram_bin_width) -
+        std::floor(mythen_detector->min_angle() / histogram_bin_width) + 1;
 
-    NDArray<double, 1> new_fixed_angle_width_bins_photon_variance =
-        NDArray<double, 1>(std::array<ssize_t, 1>{num_bins}, 0.0);
+    NDArray<double, 1> fixed_angle_width_bins_photon_counts =
+        NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
 
-    NDArray<double, 1> new_fixed_angle_width_bins_photon_counts =
-        NDArray<double, 1>(std::array<ssize_t, 1>{num_bins}, 0.0);
+    NDArray<double, 1> fixed_angle_width_bins_photon_variance =
+        NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
 
-    size_t base_peak_as_bin_index = static_cast<size_t>(
-        base_peak_angle /
-        histogram_bin_width); // TODO: in antonios code actually rounded to
-                              // nearest integer
-    double left_boundary_roi_base_peak =
-        (base_peak_as_bin_index - base_peak_roi - 0.5) *
-        histogram_bin_width; // in degrees //TODO: Antonio subtracts the
-                             // detector angle but why?
-    double right_boundary_roi_base_peak =
-        (base_peak_as_bin_index + base_peak_roi + 0.5) *
-        histogram_bin_width; // in degrees
+    for (size_t module_index = 0; module_index < mythen_detector->max_modules();
+         ++module_index) {
 
-    for (size_t strip_index =
-             module_index * mythen_detector->strips_per_module();
-         strip_index <
-         (module_index + 1) * mythen_detector->strips_per_module();
-         ++strip_index) {
-
-        size_t local_strip_index =
-            global_to_local_strip_index_conversion(strip_index);
-        double left_strip_boundary_angle = diffraction_angle_from_DG_parameters(
-            DGparameters.centers(module_index),
-            DGparameters.conversions(module_index),
-            DGparameters.offsets(module_index), local_strip_index, 0.5);
-        double right_strip_boundary_angle =
-            diffraction_angle_from_DG_parameters(
-                DGparameters.centers(module_index),
-                DGparameters.conversions(module_index),
-                DGparameters.offsets(module_index), local_strip_index, -0.5);
-
-        if (mythen_detector->get_bad_channels()[strip_index]) {
-            continue; // skip bad channels
-        }
-        if (left_strip_boundary_angle > right_boundary_roi_base_peak ||
-            right_strip_boundary_angle < left_boundary_roi_base_peak) {
-            continue; // skip strip if not in range
-        }
-
-        // maybe calculate once for all modules - or at least save - easier for
-        // visualization, debugging but more loops
-        double flatfield_normalized_photon_counts =
-            (frame.photon_counts(strip_index) + 1) *
-            flat_field->get_inverse_normalized_flatfield()(
-                strip_index); // we add one to the photon counts to skew
-                              // the distribution //TODO obviously
-                              // calculate inverse flaftield beforehand
-
-        double some_flatfield_error = 1.0; // TODO: some dummy value - implement
-
-        // I guess it measures the
-        // expcected noise - where is the formula
-        double photon_counts_variance =
-            1. / (std::pow(flatfield_normalized_photon_counts, 2) *
-                  (1. / (frame.photon_counts(strip_index) + 1.) +
-                   std::pow(some_flatfield_error *
-                                flat_field->get_inverse_normalized_flatfield()(
-                                    strip_index),
-                            2)));
-
-        double strip_width_angle = angular_strip_width_from_DG_parameters(
-            DGparameters.centers(module_index),
-            DGparameters.conversions(module_index),
-            DGparameters.offsets(module_index), local_strip_index);
-
-        double bin_coverage_of_strip = histogram_bin_width / strip_width_angle;
-
-        size_t left_bin_index_covered_by_strip =
-            std::max(base_peak_as_bin_index - 50,
-                     static_cast<size_t>(
-                         (left_strip_boundary_angle + frame.detector_angle) /
-                         histogram_bin_width));
-
-        size_t right_bin_index_covered_by_strip =
-            std::min(base_peak_as_bin_index + 50,
-                     static_cast<size_t>(
-                         (right_strip_boundary_angle + frame.detector_angle) /
-                         histogram_bin_width));
-
-        // TODO: do strips overlap? - if not second loop is not needed
-        for (size_t bin_index = left_bin_index_covered_by_strip;
-             bin_index <= right_bin_index_covered_by_strip; ++bin_index) {
-
-            // TODO: ANtonio recalculates bin width and checks if its in
-            // boundaries - i think its redundant - check
-
-            // well still weird doesnt change for bins - maybe bin_coverage is
-            // wrong
-            if (bin_coverage_of_strip >= 0.0001) {
-
-                new_fixed_angle_width_bins_photon_variance(bin_index) +=
-                    photon_counts_variance /
-                    (bin_coverage_of_strip * bin_coverage_of_strip);
-
-                new_fixed_angle_width_bins_photon_counts(bin_index) +=
-                    flatfield_normalized_photon_counts / bin_coverage_of_strip;
-
-                S0(bin_index) +=
-                    new_fixed_angle_width_bins_photon_variance(bin_index);
-                S1(bin_index) +=
-                    new_fixed_angle_width_bins_photon_counts(bin_index) *
-                    new_fixed_angle_width_bins_photon_counts(bin_index);
-                S2(bin_index) +=
-                    new_fixed_angle_width_bins_photon_counts(bin_index) *
-                    new_fixed_angle_width_bins_photon_counts(bin_index) *
-                    new_fixed_angle_width_bins_photon_counts(bin_index);
-            }
-        }
+        redistribute_photon_counts_to_fixed_angle_width_bins(
+            module_index, frame, fixed_angle_width_bins_photon_counts.view(),
+            fixed_angle_width_bins_photon_variance.view());
     }
 
-    return std::make_tuple(new_fixed_angle_width_bins_photon_counts,
-                           new_fixed_angle_width_bins_photon_variance);
-
-    // mmh doesnt it mix up goodness-of-fit criterion
-    /*
-    for (size_t bin_index = 0; bin_index < num_bins; ++bin_index) {
-
-        new_fixed_angle_width_bin_histogram(bin_index) =
-            (new_statistical_weights(bin_index) <=
-             std::numeric_limits<double>::epsilon())
-                ? 0.
-                : new_photon_counts(bin_index) /
-                      new_statistical_weights(bin_index);
-
-        // TODO: still need gbinne - maybe its not used
-    }
-    */
+    return fixed_angle_width_bins_photon_counts;
 }
 
 // might be deprecated
@@ -553,7 +470,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_bins(
     ssize_t num_bins1 = mythen_detector->min_angle() / histogram_bin_width;
     ssize_t num_bins2 = mythen_detector->max_angle() / histogram_bin_width;
 
-    LOG(TLogLevel::logINFO)
+    LOG(angcal::TLogLevel::logINFO)
         << "position: " << frame.detector_angle << std::endl;
 
     double exposure_rate = 1. / mythen_detector->exposure_time();
@@ -580,9 +497,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_bins(
             strip_index); // strip_index relative to module
 
         double diffraction_angle = diffraction_angle_from_DG_parameters(
-            DGparameters.centers(module_index),
-            DGparameters.conversions(module_index),
-            DGparameters.offsets(module_index), local_strip_index);
+            module_index, local_strip_index);
 
         diffraction_angle += (frame.detector_angle + mythen_detector->dtt0() +
                               mythen_detector->bloffset());
@@ -592,9 +507,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_bins(
             continue;
 
         double angle_covered_by_strip = angular_strip_width_from_DG_parameters(
-            DGparameters.centers(module_index),
-            DGparameters.conversions(module_index),
-            DGparameters.offsets(module_index), local_strip_index);
+            module_index, local_strip_index);
 
         double photon_count_per_bin = histogram_bin_width *
                                       corrected_photon_count /
@@ -645,8 +558,8 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_bins(
     }
 }
 
-// actually used to optimize BC parameters, first parameters used to optimze Lm
-// second parameter used to optimize phi
+// actually used to optimize BC parameters, first parameters used to optimze
+// Lm second parameter used to optimize phi
 void AngleCalibration::optimization_algorithm(const size_t module_index,
                                               const double shift_parameter1,
                                               const double shift_parameter2) {
@@ -657,8 +570,8 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
     std::vector<std::pair<double, double>> shift_parameters;
     shift_parameters.reserve(9);
 
-    // TODO dont know if order matters for faster convergence - kept it like in
-    // Antonios code
+    // TODO dont know if order matters for faster convergence - kept it like
+    // in Antonios code
     shift_parameters.emplace_back(-shift_parameter1, -shift_parameter2);
     shift_parameters.emplace_back(-shift_parameter1, shift_parameter2);
     shift_parameters.emplace_back(shift_parameter1, -shift_parameter2);
@@ -676,16 +589,16 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
 
     std::vector<double> sp(
         shift_parameters
-            .size()); // store values of similarity of peak for different shift
-                      // parameters //0. sp_x-1,y-1 / 1. sp_x-1,y+1 / 2.
-                      // sp_x+1,y-1 / 3. sp_x+1,y+1 / 4. sp_x-1,y / 5. sp_x+1,y
-                      // / 6. sp_x,y-1 / 7. sp_x,y+1 / 8 sp_x,y
+            .size()); // store values of similarity of peak for different
+                      // shift parameters //0. sp_x-1,y-1 / 1. sp_x-1,y+1
+                      // / 2. sp_x+1,y-1 / 3. sp_x+1,y+1 / 4. sp_x-1,y / 5.
+                      // sp_x+1,y / 6. sp_x,y-1 / 7. sp_x,y+1 / 8 sp_x,y
 
     bool convergence_criterion = false;
     while (!convergence_criterion) {
 
-        // TODO can i get rid of the break or does it need to be in that order
-        // due to convergence
+        // TODO can i get rid of the break or does it need to be in that
+        // order due to convergence
         for (auto shift_parameter : shift_parameters) {
             DGparameters.centers(module_index) += shift_parameter.first;
             DGparameters.conversions(module_index) += shift_parameter.second;
@@ -720,7 +633,8 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
             ((sp[3] - 2 * sp[7] + sp[1]) + (sp[5] - 2 * sp[8] + sp[4]) +
              (sp[2] - 2 * sp[6] + sp[0])) /
             (shift_parameter1 * shift_parameter2 *
-             3); // (sp_x+1,y+1 - 2sp_x,y+1 + sp_x-1,y-1)/delta_x*delta_x etc.
+             3); // (sp_x+1,y+1 - 2sp_x,y+1 + sp_x-1,y-1)/delta_x*delta_x
+                 // etc.
         double Dyy =
             ((sp[3] - 2 * sp[5] + sp[2]) + (sp[7] - 2 * sp[8] + sp[6]) +
              (sp[1] - 2 * sp[4] + sp[0])) /
@@ -753,9 +667,9 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
             1. / (Dxx * Dyy - Dyx * Dyx - regularization_term * (Dxx + Dyy) +
                   regularization_term * regularization_term);
 
-        // steepest descent in direction of Hessian^(-1)*gradient Hessian^(-1) =
-        // 1/determinant [[Dyy + regularization, -Dyx], [-Dyx, Dxx +
-        // regularization]]
+        // steepest descent in direction of Hessian^(-1)*gradient
+        // Hessian^(-1) = 1/determinant [[Dyy + regularization, -Dyx],
+        // [-Dyx, Dxx + regularization]]
         std::pair<double, double> steepest_descent(
             ((Dyy + regularization_term) * Dx - Dyx * Dy) * inverse_determinant,
             ((Dxx + regularization_term) * Dy - Dyx * Dx) *
@@ -813,7 +727,7 @@ void AngleCalibration::write_to_file(
     std::ofstream output_file(filepath / filename);
 
     if (!output_file) {
-        LOG(TLogLevel::logERROR) << "Error opening file!" << std::endl;
+        LOG(angcal::TLogLevel::logERROR) << "Error opening file!" << std::endl;
     }
 
     output_file << std::fixed << std::setprecision(15);
