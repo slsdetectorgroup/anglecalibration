@@ -246,6 +246,8 @@ class AngleCalibration {
 
     void set_base_peak_angle(const double base_peak_angle_);
 
+    bool module_is_disconnected(const size_t module_index) const;
+
     /**
      * redistributes photon counts around region of interest of base peak to
      * fixed angle width bins
@@ -379,7 +381,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         mythen_detector->max_angle(); // dummy values
 
     if constexpr (base_peak_ROI_only) {
-        size_t base_peak_as_bin_index = static_cast<size_t>(
+        ssize_t base_peak_as_bin_index = static_cast<ssize_t>(
             (base_peak_angle) /
             histogram_bin_width); // TODO: in antonios code actually rounded
                                   // to nearest integer
@@ -390,33 +392,34 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             (base_peak_as_bin_index + base_peak_roi + 0.5) *
             histogram_bin_width; // in degrees
     }
-
     for (size_t strip_index = 0;
          strip_index < mythen_detector->strips_per_module(); ++strip_index) {
 
-        if (mythen_detector->get_bad_channels()[strip_index]) {
+        size_t global_strip_index =
+            module_index * mythen_detector->strips_per_module() +
+            strip_index; // TODO: is this really correct - check sign
+
+        if (mythen_detector->get_bad_channels()(global_strip_index)) {
             continue; // skip bad channels
         }
 
         double left_strip_boundary_angle =
             diffraction_angle_from_DG_parameters(module_index, strip_index,
                                                  -0.5) +
-            frame.detector_angle;
+            frame.detector_angle; // + mythen_detector->dtt0() +
+        // mythen_detector->bloffset();
 
         double right_strip_boundary_angle =
             diffraction_angle_from_DG_parameters(module_index, strip_index,
                                                  0.5) +
-            frame.detector_angle;
+            frame.detector_angle; // + mythen_detector->dtt0() +
+        // mythen_detector->bloffset();
 
-        if (base_peak_ROI_only &
+        if (base_peak_ROI_only &&
             (left_strip_boundary_angle > right_boundary_roi_base_peak ||
              right_strip_boundary_angle < left_boundary_roi_base_peak)) {
             continue; // skip strip if not in ROI
         }
-
-        size_t global_strip_index =
-            module_index * mythen_detector->strips_per_module() +
-            strip_index; // TODO: is this really correct - check sign
 
         double flatfield_normalized_photon_counts =
             (frame.photon_counts(global_strip_index) + 1); //*
@@ -451,6 +454,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                                   // mythen_detector->min_angle()/histogram_bin_width
 
         if constexpr (base_peak_ROI_only) {
+
             left_bin_index_covered_by_strip = std::max(
                 static_cast<ssize_t>(base_peak_angle / histogram_bin_width) -
                     base_peak_roi,

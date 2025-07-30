@@ -32,6 +32,8 @@ int main() {
 
     assert(std::filesystem::exists(bad_channels_filename));
 
+    auto bad_channels = mythen_detector_ptr->get_bad_channels();
+
     mythen_detector_ptr->read_bad_channels_from_file(bad_channels_filename);
 
     LOG(TLogLevel::logDEBUG) << "read bad channels";
@@ -65,26 +67,17 @@ int main() {
 
     LOG(TLogLevel::logDEBUG) << "read initial parameters from file";
 
-    /*
-    std::vector<std::string> filelist(20);
-    int i = 20;
-    std::generate(filelist.begin(), filelist.end(), [&i]() {
-        return "ang1up_22keV_LaB60p3mm_48M_a_03" + std::to_string(i++) + ".h5";
-    });
-    */
-
-    std::vector<std::string> filelist{"ang1dnSi0p3mm_0160.h5"};
-
-    const double base_peak_angle = 36.0568;
+    const double base_peak_angle = -31.73; // 36.0568;
     // 35.550; // angpeak=69.225 - maybe select
     // one yourself !!! -could this be off?
+
+    anglecalibration.set_base_peak_angle(base_peak_angle);
 
     LOG(TLogLevel::logDEBUG) << "starting calibration";
     // anglecalibration.calculate_similarity_of_peaks(0);
     // anglecalibration.calibrate(filelist, base_peak_angle);
 
-    anglecalibration.set_base_peak_angle(base_peak_angle);
-
+    std::vector<std::string> filelist{"ang1dnSi0p3mm_0160.h5"};
     MythenFileReader mythen_file_reader(file_path);
 
     NDArray<double, 1> S2(
@@ -104,10 +97,11 @@ int main() {
                   << std::endl;
 
 #ifdef ANGCAL_PLOT
+
         // plot everything
         plot_photon_counts(frame.photon_counts.view(),
                            {0, mythen_detector_ptr->num_strips()}, std::nullopt,
-                           *mythen_detector_ptr);
+                           mythen_detector_ptr);
 
         auto new_fixed_angle_width_bins_photon_counts =
             anglecalibration
@@ -143,18 +137,11 @@ int main() {
              ++module_index) {
             // base peak angle is in module
             if (anglecalibration.base_peak_is_in_module(module_index,
-                                                        frame.detector_angle)) {
+                                                        frame.detector_angle) &&
+                !anglecalibration.module_is_disconnected(module_index)) {
 
                 LOG(TLogLevel::logINFO)
                     << "base_peak is in module: " << module_index << "\n";
-                /*
-                auto [fixed_angle_width_bins_photon_counts,
-                      fixed_angle_width_bins_photon_count_variance] =
-                    anglecalibration
-                        .redistribute_photon_counts_to_fixed_angle_bins(
-                            module_index, frame, S0.view(), S1.view(),
-                            S2.view());
-                */
 
 #ifdef ANGCAL_PLOT
 
@@ -206,31 +193,6 @@ int main() {
                     base_peak_roi_photon_counts.view(), {0, 101},
                     bin_to_diffraction_angle_base_peak_ROI_only, module_index);
 
-                /*
-                plot_photon_counts(
-                    frame.photon_counts.view(),
-                    {module_index * mythen_detector_ptr->strips_per_module(),
-                     (module_index + 1) *
-                         mythen_detector_ptr->strips_per_module()},
-                    module_index, *mythen_detector_ptr);
-
-                size_t left_module_boundary_angle = static_cast<size_t>(
-                    (anglecalibration.diffraction_angle_from_DG_parameters(
-                         module_index, 0, 0.5) +
-                     frame.detector_angle) /
-                    anglecalibration.get_histogram_bin_width());
-                size_t right_module_boundary_angle = static_cast<size_t>(
-                    (anglecalibration.diffraction_angle_from_DG_parameters(
-                         module_index, mythen_detector_ptr->strips_per_module(),
-                         -0.5) +
-                     frame.detector_angle) /
-                    anglecalibration.get_histogram_bin_width());
-
-                plot_photon_counts_for_fixed_angle_width_bins(
-                    fixed_angle_width_bins_photon_counts.view(),
-                    {left_module_boundary_angle, right_module_boundary_angle},
-                    module_index, anglecalibration.get_histogram_bin_width());
-                */
 #endif
             }
         }

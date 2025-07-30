@@ -11,12 +11,12 @@
 
 namespace angcal {
 
-inline void plot_photon_counts(
-    const aare::NDView<uint32_t, 1> photon_counts,
-    const std::pair<size_t, size_t> bin_range,
-    std::optional<const size_t> module_index,
-    std::optional<MythenDetectorSpecifications> mythen_detector_specifications =
-        std::nullopt) {
+inline void
+plot_photon_counts(const aare::NDView<uint32_t, 1> photon_counts,
+                   const std::pair<size_t, size_t> bin_range,
+                   std::optional<const size_t> module_index,
+                   std::optional<std::shared_ptr<MythenDetectorSpecifications>>
+                       mythen_detector_specifications = std::nullopt) {
 
     std::vector<std::pair<int, int>> plot_data;
     const size_t num_bins = bin_range.second - bin_range.first;
@@ -26,9 +26,14 @@ inline void plot_photon_counts(
         if (!mythen_detector_specifications.has_value()) {
             plot_data.emplace_back(bin, photon_counts(bin));
 
-        } else if (mythen_detector_specifications.has_value() &&
-                   !mythen_detector_specifications->get_bad_channels()(bin)) {
-            plot_data.emplace_back(bin, photon_counts(bin));
+        } else if (mythen_detector_specifications.has_value()) {
+
+            if (!mythen_detector_specifications.value()->get_bad_channels()(
+                    bin)) {
+                plot_data.emplace_back(bin, photon_counts(bin));
+            } else {
+                plot_data.emplace_back(bin, 0);
+            }
         }
     }
 
@@ -66,24 +71,15 @@ inline void plot_photon_counts_for_fixed_angle_width_bins(
     const aare::NDView<double, 1> photon_counts,
     const std::pair<size_t, size_t> bin_range,
     Func &&bin_index_to_angle_conversion,
-    std::optional<const size_t> module_index = std::nullopt,
-    std::optional<MythenDetectorSpecifications> mythen_detector_specifications =
-        std::nullopt) {
+    std::optional<const size_t> module_index = std::nullopt) {
 
     std::vector<std::pair<double, double>> plot_data;
     const size_t num_bins = bin_range.second - bin_range.first;
     plot_data.reserve(num_bins);
 
     for (size_t bin = bin_range.first; bin < bin_range.second; ++bin) {
-        if (!mythen_detector_specifications.has_value()) {
-            plot_data.emplace_back(bin_index_to_angle_conversion(bin),
-                                   photon_counts(bin));
-
-        } else if (mythen_detector_specifications.has_value() &&
-                   !mythen_detector_specifications->get_bad_channels()(bin)) {
-            plot_data.emplace_back(bin_index_to_angle_conversion(bin),
-                                   photon_counts(bin));
-        }
+        plot_data.emplace_back(bin_index_to_angle_conversion(bin),
+                               photon_counts(bin));
     }
 
     Gnuplot gp;

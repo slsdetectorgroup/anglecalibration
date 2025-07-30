@@ -76,6 +76,17 @@ NDArray<double, 1> AngleCalibration::get_new_statistical_errors() const {
     return new_photon_count_errors;
 }
 
+bool AngleCalibration::module_is_disconnected(const size_t module_index) const {
+
+    // all channels in the module are bad
+    return std::all_of(mythen_detector->get_bad_channels().begin() +
+                           module_index * mythen_detector->strips_per_module(),
+                       mythen_detector->get_bad_channels().begin() +
+                           (module_index + 1) *
+                               mythen_detector->strips_per_module(),
+                       [](const auto &elem) { return elem; });
+}
+
 void AngleCalibration::read_initial_calibration_from_file(
     const std::string &filename) {
 
@@ -235,30 +246,34 @@ bool AngleCalibration::base_peak_is_in_module(
     const size_t module_index, const double detector_angle) const {
 
     double base_peak_hwid = 0.18; // TODO: not sure what this is - should it be
-                                  // configurable
-    // check if base_peak_angle is within the range of angles for this
-    // module
+                                  // configurable Oke its 50*histogram_bin_width
+                                  // e.g. hwidth in angles!!!
+
     double left_module_boundary_angle =
-        diffraction_angle_from_DG_parameters(module_index, 0);
-    double right_module_boundary_angle = diffraction_angle_from_DG_parameters(
-        module_index, mythen_detector->strips_per_module() - 1);
+        diffraction_angle_from_DG_parameters(module_index, 0) + detector_angle;
+    double right_module_boundary_angle =
+        diffraction_angle_from_DG_parameters(
+            module_index, mythen_detector->strips_per_module() - 1) +
+        detector_angle;
 
     // TODO: in antonios code only bloffset and angle is added why? -
     // maybe we can directly add it or is it used later?- careful
+    /*
     left_module_boundary_angle +=
         (detector_angle + mythen_detector->dtt0() +
          mythen_detector->bloffset()); // Antonio didnt add dtt0
 
     right_module_boundary_angle += (detector_angle + mythen_detector->dtt0() +
                                     mythen_detector->bloffset());
+    */
 
     LOG(TLogLevel::logDEBUG) << fmt::format(
         "module_boundaries_in_angle for module {} [{}, {}]\n", module_index,
         left_module_boundary_angle, right_module_boundary_angle);
 
     // TODO check bounds with base_peak_hwid
-    return base_peak_angle + base_peak_hwid >= left_module_boundary_angle &&
-           base_peak_angle - base_peak_hwid <= right_module_boundary_angle;
+    return !(base_peak_angle + base_peak_hwid < left_module_boundary_angle ||
+             base_peak_angle - base_peak_hwid > right_module_boundary_angle);
 }
 
 double AngleCalibration::calculate_similarity_of_peaks(
@@ -284,7 +299,7 @@ double AngleCalibration::calculate_similarity_of_peaks(
                 std::make_pair<size_t>(
                     module_index * mythen_detector->strips_per_module(),
                     (module_index + 1) * mythen_detector->strips_per_module()),
-                module_index, *mythen_detector);
+                module_index, mythen_detector);
 #endif
 
             NDArray<double, 1> fixed_angle_width_bins_photon_counts(
@@ -360,6 +375,8 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
     for (size_t module_index = 0; module_index < mythen_detector->max_modules();
          ++module_index) {
 
+        // skip if module is not connected
+
         LOG(angcal::TLogLevel::logINFO)
             << "starting calibration for module " << module_index;
 
@@ -380,8 +397,18 @@ AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     NDArray<double, 1> fixed_angle_width_bins_photon_variance =
         NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
 
+    // TODO: actually they should not be added up each set of modules is
+    // independant - at beamlines the module positions overlap
+    //  - how to handle in a generic way? - depends on detector arrangement
     for (size_t module_index = 0; module_index < mythen_detector->max_modules();
          ++module_index) {
+
+        if (module_is_disconnected(module_index)) {
+            continue;
+        }
+
+        LOG(TLogLevel::logDEBUG)
+            << fmt::format("module_index {} contibutes", module_index);
 
         redistribute_photon_counts_to_fixed_angle_width_bins(
             module_index, frame, fixed_angle_width_bins_photon_counts.view(),

@@ -33,10 +33,9 @@ class MythenDetectorSpecifications {
         if (custom_file_ptr.has_value()) {
             m_custom_file_ptr = custom_file_ptr.value();
         }
-        num_strips_ = max_modules_ * strips_per_module_;
 
         bad_channels =
-            NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips_}, false);
+            NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips()}, false);
     }
 
     MythenDetectorSpecifications(
@@ -51,10 +50,8 @@ class MythenDetectorSpecifications {
             m_custom_file_ptr = custom_file_ptr.value();
         }
 
-        num_strips_ = max_modules_ * strips_per_module_;
-
         bad_channels =
-            NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips_}, false);
+            NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips()}, false);
     }
 
     /**
@@ -86,7 +83,11 @@ class MythenDetectorSpecifications {
             });
     }
 
+    /*
     NDArray<bool, 1> get_bad_channels() const { return bad_channels; }
+    */
+
+    NDView<bool, 1> get_bad_channels() const { return bad_channels.view(); }
 
     void set_bad_channels(const NDArray<bool, 1> &bad_channels_) {
         bad_channels = bad_channels_;
@@ -114,7 +115,7 @@ class MythenDetectorSpecifications {
 
     static constexpr double max_angle() { return max_angle_; }
 
-    ssize_t num_strips() const { return num_strips_; }
+    ssize_t num_strips() const { return max_modules_ * strips_per_module_; }
 
   private:
     static constexpr size_t strips_per_module_ = 1280;
@@ -133,8 +134,6 @@ class MythenDetectorSpecifications {
     double exposure_time_ = 5.0; // TODO: could read from acquired file but
                                  // maybe should be configurable
     double bloffset_ = 1.532; // what is this? detector offset relative to what?
-
-    ssize_t num_strips_{};
 
     NDArray<bool, 1> bad_channels{};
     NDArray<ssize_t, 1> m_unconnected_modules{}; // list of unconnected modules

@@ -194,8 +194,10 @@ class FlatField {
         for (ssize_t i = 0; i < flat_field.size(); ++i) {
             inverse_normalized_flat_field[i] =
                 (flat_field[i] <= tolerance ? 0.0 : mean / flat_field[i]);
+            /*
             if (inverse_normalized_flat_field[i] < tolerance)
                 mythen_detector->get_bad_channels()[i] = true;
+            */ //uncomment as flatfield is probably not correct
         }
     }
 
