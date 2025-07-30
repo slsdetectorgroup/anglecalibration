@@ -111,14 +111,16 @@ int main() {
 
         // plot all
         double most_left_strip_boundary_angle =
-            (anglecalibration.diffraction_angle_from_DG_parameters(0, 0, -0.5) +
-             frame.detector_angle + 180.0) /
+            (anglecalibration.diffraction_angle_from_DG_parameters(
+                 0, frame.detector_angle, 0, -0.5) +
+             180.0) /
             bin_width;
 
         double most_right_strip_boundary_angle =
             (anglecalibration.diffraction_angle_from_DG_parameters(
-                 mythen_detector_ptr->max_modules() / 2, 1279, 0.5) +
-             frame.detector_angle + 180.0) /
+                 mythen_detector_ptr->max_modules() / 2, frame.detector_angle,
+                 1279, 0.5) +
+             180.0) /
             bin_width;
 
         auto bin_to_diffraction_angle = [&bin_width](const size_t bin_index) {
@@ -148,14 +150,14 @@ int main() {
                 // plot module
                 double left_strip_boundary_angle =
                     (anglecalibration.diffraction_angle_from_DG_parameters(
-                         module_index, 0, -0.5) +
-                     frame.detector_angle + 180.0) /
+                         module_index, frame.detector_angle, 0, -0.5) +
+                     180.0) /
                     anglecalibration.get_histogram_bin_width();
 
                 double right_strip_boundary_angle =
                     (anglecalibration.diffraction_angle_from_DG_parameters(
-                         module_index, 1279, 0.5) +
-                     frame.detector_angle + 180.0) /
+                         module_index, frame.detector_angle, 1279, 0.5) +
+                     180.0) /
                     anglecalibration.get_histogram_bin_width();
 
                 plot_photon_counts_for_fixed_angle_width_bins(

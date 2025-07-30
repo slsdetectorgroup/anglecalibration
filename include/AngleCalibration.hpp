@@ -279,8 +279,8 @@ class AngleCalibration {
      * @return diffraction angle in degrees
      */
     double diffraction_angle_from_DG_parameters(
-        const size_t module_index, const size_t strip_index,
-        const double distance_to_strip = 0) const;
+        const size_t module_index, const double detector_angle,
+        const size_t strip_index, const double distance_to_strip = 0) const;
 
   private:
     /** calculates diffraction angle from EE module parameters (used in
@@ -289,8 +289,8 @@ class AngleCalibration {
      */
     double diffraction_angle_from_EE_parameters(
         const double module_center_distance, const double normal_distance,
-        const double angle, const size_t strip_index,
-        const double distance_to_strip = 0) const;
+        const double angle, const double detector_angle,
+        const size_t strip_index, const double distance_to_strip = 0) const;
 
     /** calculated the strip width expressed as angle [degrees]
      * @param strip_index local strip index of module
@@ -403,17 +403,12 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             continue; // skip bad channels
         }
 
-        double left_strip_boundary_angle =
-            diffraction_angle_from_DG_parameters(module_index, strip_index,
-                                                 -0.5) +
-            frame.detector_angle; // + mythen_detector->dtt0() +
-        // mythen_detector->bloffset();
+        double left_strip_boundary_angle = diffraction_angle_from_DG_parameters(
+            module_index, frame.detector_angle, strip_index, -0.5);
 
         double right_strip_boundary_angle =
-            diffraction_angle_from_DG_parameters(module_index, strip_index,
-                                                 0.5) +
-            frame.detector_angle; // + mythen_detector->dtt0() +
-        // mythen_detector->bloffset();
+            diffraction_angle_from_DG_parameters(
+                module_index, frame.detector_angle, strip_index, 0.5);
 
         if (base_peak_ROI_only &&
             (left_strip_boundary_angle > right_boundary_roi_base_peak ||

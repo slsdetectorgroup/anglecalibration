@@ -32,26 +32,10 @@ AngleCalibration::AngleCalibration(
     flat_field->inverse_normalized_flatfield();
 
     DGparameters = DGParameters(mythen_detector->max_modules());
-
-    /*
-    num_bins = std::floor(mythen_detector->max_angle() / histogram_bin_width)
-    -
-    std::floor(mythen_detector->min_angle() / histogram_bin_width) +
-        1; // TODO only works if negative
-           // and positive angle
-    */
-    // num_bins = base_peak_roi * 2 + 1;
 }
 
 void AngleCalibration::set_histogram_bin_width(double bin_width) {
     histogram_bin_width = bin_width;
-
-    /*
-    num_bins = std::floor(mythen_detector->max_angle() / histogram_bin_width) -
-               std::floor(mythen_detector->min_angle() / histogram_bin_width) +
-               1; // TODO only works if negative
-                  // and positive angle
-    */
 }
 
 double AngleCalibration::get_histogram_bin_width() const {
@@ -76,6 +60,7 @@ NDArray<double, 1> AngleCalibration::get_new_statistical_errors() const {
     return new_photon_count_errors;
 }
 
+// TODO: command is connected - maybe use that
 bool AngleCalibration::module_is_disconnected(const size_t module_index) const {
 
     // all channels in the module are bad
@@ -151,42 +136,44 @@ AngleCalibration::convert_to_BC_parameters() {}
 */
 
 double AngleCalibration::diffraction_angle_from_DG_parameters(
-    const size_t module_index, const size_t strip_index,
-    const double distance_to_strip) const {
+    const size_t module_index, const double detector_angle,
+    const size_t strip_index, const double distance_to_strip) const {
 
     double offset = DGparameters.offsets(module_index);
     double center = DGparameters.centers(module_index);
     double conversion = DGparameters.conversions(module_index);
 
-    return offset + 180.0 / M_PI *
-                        (center * std::abs(conversion) -
-                         atan((center - (strip_index + distance_to_strip)) *
-                              std::abs(conversion)));
+    return offset +
+           180.0 / M_PI *
+               (center * std::abs(conversion) -
+                atan((center - (strip_index + distance_to_strip)) *
+                     std::abs(conversion))) +
+           detector_angle; // + + mythen_detector->dtt0() +
+                           // mythen_detector->bloffset();;
 }
 
 double AngleCalibration::diffraction_angle_from_EE_parameters(
     const double module_center_distance, const double normal_distance,
-    const double angle, const size_t strip_index,
+    const double angle, const double detector_angle, const size_t strip_index,
     const double distance_to_strip) const {
 
-    return angle - 180.0 / M_PI *
-                       atan((module_center_distance -
-                             MythenDetectorSpecifications::pitch() *
-                                 (strip_index + distance_to_strip)) /
-                            normal_distance); // TODO: why is it minus
-                                              // is it defined counter
-                                              // clockwise? thought
-                                              // should have a flipped
-                                              // sign
+    return angle -
+           180.0 / M_PI *
+               atan((module_center_distance -
+                     MythenDetectorSpecifications::pitch() *
+                         (strip_index + distance_to_strip)) /
+                    normal_distance) +
+           detector_angle; //+ mythen_detector->dtt0() +
+                           // mythen_detector->bloffset();
 }
 
 double AngleCalibration::angular_strip_width_from_DG_parameters(
     const size_t module_index, const size_t local_strip_index) const {
 
     return std::abs(diffraction_angle_from_DG_parameters(
-                        module_index, local_strip_index, 0.5) -
+                        module_index, 0.0, local_strip_index, 0.5) -
                     diffraction_angle_from_DG_parameters(
-                        module_index, local_strip_index, -0.5));
+                        module_index, 0.0, local_strip_index, -0.5));
 }
 
 double AngleCalibration::angular_strip_width_from_EE_parameters(
@@ -194,13 +181,11 @@ double AngleCalibration::angular_strip_width_from_EE_parameters(
     const double angle, const size_t local_strip_index) const {
 
     return std::abs(diffraction_angle_from_EE_parameters(
-                        module_center_distance, normal_distance, angle,
+                        module_center_distance, normal_distance, angle, 0.0,
                         local_strip_index, -0.5) -
                     diffraction_angle_from_EE_parameters(
-                        module_center_distance, normal_distance, angle,
+                        module_center_distance, normal_distance, angle, 0.0,
                         local_strip_index, 0.5));
-
-    // TODO: again not sure about division order - taking abs anyway
 }
 
 void AngleCalibration::set_base_peak_angle(const double base_peak_angle_) {
@@ -250,22 +235,9 @@ bool AngleCalibration::base_peak_is_in_module(
                                   // e.g. hwidth in angles!!!
 
     double left_module_boundary_angle =
-        diffraction_angle_from_DG_parameters(module_index, 0) + detector_angle;
-    double right_module_boundary_angle =
-        diffraction_angle_from_DG_parameters(
-            module_index, mythen_detector->strips_per_module() - 1) +
-        detector_angle;
-
-    // TODO: in antonios code only bloffset and angle is added why? -
-    // maybe we can directly add it or is it used later?- careful
-    /*
-    left_module_boundary_angle +=
-        (detector_angle + mythen_detector->dtt0() +
-         mythen_detector->bloffset()); // Antonio didnt add dtt0
-
-    right_module_boundary_angle += (detector_angle + mythen_detector->dtt0() +
-                                    mythen_detector->bloffset());
-    */
+        diffraction_angle_from_DG_parameters(module_index, detector_angle, 0);
+    double right_module_boundary_angle = diffraction_angle_from_DG_parameters(
+        module_index, detector_angle, mythen_detector->strips_per_module() - 1);
 
     LOG(TLogLevel::logDEBUG) << fmt::format(
         "module_boundaries_in_angle for module {} [{}, {}]\n", module_index,
@@ -524,10 +496,10 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_bins(
             strip_index); // strip_index relative to module
 
         double diffraction_angle = diffraction_angle_from_DG_parameters(
-            module_index, local_strip_index);
+            module_index, frame.detector_angle, local_strip_index);
 
-        diffraction_angle += (frame.detector_angle + mythen_detector->dtt0() +
-                              mythen_detector->bloffset());
+        // diffraction_angle += (frame.detector_angle + mythen_detector->dtt0()
+        // + mythen_detector->bloffset());
 
         if (diffraction_angle < mythen_detector->min_angle() ||
             diffraction_angle > mythen_detector->max_angle())
