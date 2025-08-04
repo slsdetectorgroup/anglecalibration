@@ -11,14 +11,16 @@
 
 namespace angcal {
 
+template <typename T>
 inline void
-plot_photon_counts(const aare::NDView<uint32_t, 1> photon_counts,
+plot_photon_counts(const aare::NDView<T, 1> photon_counts,
                    const std::pair<size_t, size_t> bin_range,
                    std::optional<const size_t> module_index,
                    std::optional<std::shared_ptr<MythenDetectorSpecifications>>
                        mythen_detector_specifications = std::nullopt) {
 
-    std::vector<std::pair<int, int>> plot_data;
+    // TODO: change to size_t
+    std::vector<std::pair<int, T>> plot_data;
     const size_t num_bins = bin_range.second - bin_range.first;
     plot_data.reserve(num_bins);
 

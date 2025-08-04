@@ -28,9 +28,6 @@ AngleCalibration::AngleCalibration(
         custom_file_ptr = custom_file_ptr_.value();
     }
 
-    // calculate inverse normalized flatfield
-    flat_field->inverse_normalized_flatfield();
-
     DGparameters = DGParameters(mythen_detector->max_modules());
 }
 
@@ -348,6 +345,20 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
          ++module_index) {
 
         // skip if module is not connected
+        if (!module_is_disconnected(module_index)) {
+
+            LOG(angcal::TLogLevel::logINFO)
+                << "starting calibration for module " << module_index;
+
+            optimization_algorithm(module_index);
+        }
+    }
+}
+
+void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
+                                 const double base_peak_angle_,
+                                 const size_t module_index) {
+    if (!module_is_disconnected(module_index)) {
 
         LOG(angcal::TLogLevel::logINFO)
             << "starting calibration for module " << module_index;

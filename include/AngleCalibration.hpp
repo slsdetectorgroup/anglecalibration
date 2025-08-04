@@ -233,6 +233,9 @@ class AngleCalibration {
     void calibrate(const std::vector<std::string> &file_list,
                    const double base_peak_angle);
 
+    void calibrate(const std::vector<std::string> &file_list_,
+                   const double base_peak_angle_, const size_t module_index);
+
     void write_to_file(const std::string &filename,
                        const bool store_nonzero_bins = false,
                        const std::filesystem::path &filepath =
@@ -417,14 +420,13 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         }
 
         double flatfield_normalized_photon_counts =
-            (frame.photon_counts(global_strip_index) + 1); //*
-        // flat_field->get_inverse_normalized_flatfield()(
-        // global_strip_index);
+            (frame.photon_counts(global_strip_index) + 1) *
+            flat_field->get_inverse_normalized_flatfield()(global_strip_index);
 
         double some_flatfield_error = 1.0; // TODO: some dummy value - implement
 
         // I guess it measures the
-        // expcected noise - where is the formula
+        // expcected noise - where is the formula -used as the variance
         double photon_counts_variance =
             1. / (std::pow(flatfield_normalized_photon_counts, 2) *
                   (1. / (frame.photon_counts(global_strip_index) + 1) +
@@ -498,6 +500,8 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                 std::pow(correction_factor * bin_coverage_factor,
                          2); // TODO no idea if this is correct
 
+            // S_index = sum_i^num_runs
+            // photon_count^index*photon_variance
             if (S0.has_value()) {
                 S0.value()(proper_bin_index) +=
                     fixed_angle_width_bins_photon_counts_variance(
@@ -506,13 +510,15 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             if (S1.has_value()) {
                 S1.value()(proper_bin_index) +=
                     fixed_angle_width_bins_photon_counts(proper_bin_index) *
-                    fixed_angle_width_bins_photon_counts(proper_bin_index);
+                    fixed_angle_width_bins_photon_counts_variance(
+                        proper_bin_index);
             }
             if (S2.has_value()) {
                 S2.value()(proper_bin_index) +=
                     fixed_angle_width_bins_photon_counts(proper_bin_index) *
                     fixed_angle_width_bins_photon_counts(proper_bin_index) *
-                    fixed_angle_width_bins_photon_counts(proper_bin_index);
+                    fixed_angle_width_bins_photon_counts_variance(
+                        proper_bin_index);
             }
         }
     }

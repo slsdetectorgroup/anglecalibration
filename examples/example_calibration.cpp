@@ -1,4 +1,5 @@
 #include "AngleCalibration.hpp"
+#include "aare/File.hpp"
 #include "logger.hpp"
 #include <filesystem>
 
@@ -53,6 +54,14 @@ int main() {
     std::string flatfield_filename =
         file_path / "Flatfield_E17p5keV_T8751eV_MIX_Mar2021_open_WS.raw";
 
+    NDArray<double, 1> inverse_normalized_flatfield(
+        std::array<ssize_t, 1>{mythen_detector_ptr->num_strips()});
+    CustomFlatFieldFile flatfieldfilereader;
+    flatfieldfilereader.open(flatfield_filename);
+    flatfieldfilereader.read_into(inverse_normalized_flatfield.buffer(), 8);
+    flat_field_ptr->set_inverse_normalized_flatfield(
+        inverse_normalized_flatfield);
+
     flat_field_ptr->read_flatfield_from_file(flatfield_filename);
 
     LOG(TLogLevel::logDEBUG) << "read flatfield from file";
@@ -77,7 +86,7 @@ int main() {
     // anglecalibration.calculate_similarity_of_peaks(0);
     // anglecalibration.calibrate(filelist, base_peak_angle);
 
-    std::vector<std::string> filelist{"ang1dnSi0p3mm_0160.h5"};
+    std::vector<std::string> filelist{"ang1dnSi0p3mm_0170.h5"}; // 160
     MythenFileReader mythen_file_reader(file_path);
 
     NDArray<double, 1> S2(
@@ -95,6 +104,27 @@ int main() {
 
         std::cout << "frame_detector_angle: " << frame.detector_angle
                   << std::endl;
+
+        // frame.photon_counts *=
+        // flat_field_ptr->get_inverse_normalized_flatfield(); -> only stores
+        // the first 14 connected modules - flatfield stores all modules
+        NDArray<double, 1> normalized_photon_counts(
+            frame.photon_counts.shape());
+        for (ssize_t i = 0; i < frame.photon_counts.size(); ++i) {
+            normalized_photon_counts(i) =
+                frame.photon_counts(i) *
+                flat_field_ptr->get_inverse_normalized_flatfield()(i);
+        }
+
+#ifdef ANGCAL_PLOT
+        plot_photon_counts(frame.photon_counts.view(),
+                           {0, mythen_detector_ptr->num_strips()}, std::nullopt,
+                           mythen_detector_ptr);
+
+        plot_photon_counts(normalized_photon_counts.view(),
+                           {0, mythen_detector_ptr->num_strips()}, std::nullopt,
+                           mythen_detector_ptr);
+#endif
 
 #ifdef ANGCAL_PLOT
 

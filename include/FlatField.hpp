@@ -37,6 +37,7 @@ constexpr bool custom_file_compatibility_v =
     custom_file_compatibility<CustomFile>::value;
 */
 
+// TODO change to uint32_t
 class FlatField {
 
   public:
@@ -52,9 +53,11 @@ class FlatField {
                   custom_file_ptr = std::nullopt)
         : mythen_detector(mythen_detector_) {
 
-        if (custom_file_ptr.has_value())
+        if (custom_file_ptr.has_value()) {
             m_custom_detector_file_ptr = custom_file_ptr.value();
+        }
 
+        // TODO is it double or uint32_t
         flat_field = NDArray<uint32_t, 1>(
             std::array<ssize_t, 1>{mythen_detector->num_strips()}, 0);
     }
@@ -165,6 +168,7 @@ class FlatField {
      */
     void read_flatfield_from_file(const std::string &filename) {
         m_custom_detector_file_ptr->open(filename);
+        std::cout << "ok im reading into" << std::endl;
         m_custom_detector_file_ptr->read_into(
             reinterpret_cast<std::byte *>(flat_field.data()), 4);
     }
@@ -178,6 +182,11 @@ class FlatField {
 
     NDArray<uint32_t, 1> get_flatfield() const { return flat_field; }
 
+    void set_inverse_normalized_flatfield(
+        const NDArray<double, 1> &inverse_normalized_flatfield_) {
+        inverse_normalized_flat_field = inverse_normalized_flatfield_;
+    }
+
     NDView<double, 1> get_inverse_normalized_flatfield() const {
         return inverse_normalized_flat_field.view();
     }
@@ -186,40 +195,43 @@ class FlatField {
         return normalized_flat_field.view();
     }
 
-    void inverse_normalized_flatfield(double tolerance = 0.0001) {
-        double mean = calculate_mean(tolerance);
+    void inverse_normalized_flatfield() {
+        double mean = calculate_mean();
 
         inverse_normalized_flat_field = NDArray<double, 1>(flat_field.shape());
 
         for (ssize_t i = 0; i < flat_field.size(); ++i) {
+            // TODO maybe collapse if else
             inverse_normalized_flat_field[i] =
-                (flat_field[i] <= tolerance ? 0.0 : mean / flat_field[i]);
-            /*
-            if (inverse_normalized_flat_field[i] < tolerance)
+                (flat_field[i] <= std::numeric_limits<double>::epsilon()
+                     ? 0.0
+                     : mean / flat_field[i]);
+
+            if (inverse_normalized_flat_field[i] <
+                std::numeric_limits<double>::epsilon())
                 mythen_detector->get_bad_channels()[i] = true;
-            */ //uncomment as flatfield is probably not correct
         }
     }
 
-    void normalized_flatfield(double tolerance = 0.0001) {
-        double mean = calculate_mean(tolerance);
+    void normalized_flatfield() {
+        double mean = calculate_mean();
 
         normalized_flat_field = NDArray<double, 1>(flat_field.shape());
 
         for (ssize_t i = 0; i < flat_field.size(); ++i) {
-            normalized_flat_field[i] = (flat_field[i] == flat_field[i] / mean);
-            if (normalized_flat_field[i] < tolerance)
+            normalized_flat_field[i] = flat_field[i] / mean;
+            if (normalized_flat_field[i] <
+                std::numeric_limits<double>::epsilon())
                 mythen_detector->get_bad_channels()[i] = true;
         }
     }
 
   private:
-    // TODO: remove tolerance
-    double calculate_mean(double tolerance) const {
+    double calculate_mean() const {
         auto [sum, count] = std::accumulate(
             flat_field.begin(), flat_field.end(),
             std::make_pair<double, ssize_t>(0.0, 0),
-            [&tolerance](std::pair<double, ssize_t> acc, const auto &element) {
+            [](std::pair<double, ssize_t> acc, const auto &element) {
                 return element == 0 ? acc
                                     : std::make_pair(acc.first + element,
                                                      acc.second + 1);
