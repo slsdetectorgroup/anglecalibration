@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdint>
 
+#include <chrono>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -10,6 +11,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "FlatField.hpp"
@@ -17,6 +19,13 @@
 #include "MythenFileReader.hpp"
 #include "aare/NDArray.hpp"
 #include "helpers/FileInterface.hpp"
+
+#ifdef ANGCAL_PLOT
+#include "plot_histogram.hpp"
+using PlotHandle = Gnuplot *; // Or reference wrapper
+#else
+using PlotHandle = std::nullptr_t;
+#endif
 
 using namespace aare;
 
@@ -172,9 +181,14 @@ class AngleCalibration {
 
     double get_histogram_bin_width() const;
 
+    ssize_t new_number_of_bins() const;
+
     ssize_t get_base_peak_ROI_num_bins() const;
 
     ssize_t get_base_peak_ROI() const;
+
+    std::shared_ptr<MythenDetectorSpecifications>
+    get_detector_specifications() const;
 
     /** reads the historical Detector Group (DG) parameters from file
      * @warning only works if member m_custom_detectot_file_ptr supports reading
@@ -241,13 +255,22 @@ class AngleCalibration {
                        const std::filesystem::path &filepath =
                            std::filesystem::current_path()) const;
 
-    double calculate_similarity_of_peaks(const size_t module_index) const;
+    double calculate_similarity_of_peaks(const size_t module_index,
+                                         PlotHandle gp = nullptr) const;
 
-    /** check if base_peak is cituated in module */
-    bool base_peak_is_in_module(const size_t module_index,
-                                const double detector_angle) const;
+    /** check if base_peak is cituated in module
+     * @param bounds_in_angle: boundary that is acceptable [degrees]- per
+     * default the base peak ROI width is used
+     * @return true if [base_peak - bound_in_angle, base_peak + bound_in_angle]
+     * overlap with the module region in angles
+     */
+    bool base_peak_is_in_module(
+        const size_t module_index, const double detector_angle,
+        std::optional<double> bounds_in_angles = std::nullopt) const;
 
     void set_base_peak_angle(const double base_peak_angle_);
+
+    double get_base_peak_angle() const;
 
     bool module_is_disconnected(const size_t module_index) const;
 
@@ -319,7 +342,8 @@ class AngleCalibration {
      */
     double similarity_criterion(const NDView<double, 1> S0,
                                 const NDView<double, 1> S1,
-                                const NDView<double, 1> S2) const;
+                                const NDView<double, 1> S2,
+                                const size_t num_runs) const;
 
     /**
      * redistributes photon counts with of histogram using one bin per strip
@@ -337,6 +361,7 @@ class AngleCalibration {
     // TODO: also a bad design - make shift_parameter configurable - consider
     // having second class Optimization
     void optimization_algorithm(const size_t module_index,
+                                PlotHandle gp = nullptr,
                                 const double shift_parameter1 = 0.01,
                                 const double shift_parameter2 = 0.005);
 
@@ -491,34 +516,35 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                         histogram_bin_width); // bin index starts at zero
             }
 
-            fixed_angle_width_bins_photon_counts(proper_bin_index) +=
+            double corrected_photon_counts =
                 flatfield_normalized_photon_counts * correction_factor *
                 bin_coverage_factor;
 
-            fixed_angle_width_bins_photon_counts_variance(proper_bin_index) +=
+            double corrected_photon_counts_variance =
                 photon_counts_variance /
                 std::pow(correction_factor * bin_coverage_factor,
                          2); // TODO no idea if this is correct
+
+            fixed_angle_width_bins_photon_counts(proper_bin_index) +=
+                corrected_photon_counts;
+
+            fixed_angle_width_bins_photon_counts_variance(proper_bin_index) +=
+                corrected_photon_counts_variance;
 
             // S_index = sum_i^num_runs
             // photon_count^index*photon_variance
             if (S0.has_value()) {
                 S0.value()(proper_bin_index) +=
-                    fixed_angle_width_bins_photon_counts_variance(
-                        proper_bin_index);
+                    corrected_photon_counts_variance;
             }
             if (S1.has_value()) {
                 S1.value()(proper_bin_index) +=
-                    fixed_angle_width_bins_photon_counts(proper_bin_index) *
-                    fixed_angle_width_bins_photon_counts_variance(
-                        proper_bin_index);
+                    corrected_photon_counts * corrected_photon_counts_variance;
             }
             if (S2.has_value()) {
                 S2.value()(proper_bin_index) +=
-                    fixed_angle_width_bins_photon_counts(proper_bin_index) *
-                    fixed_angle_width_bins_photon_counts(proper_bin_index) *
-                    fixed_angle_width_bins_photon_counts_variance(
-                        proper_bin_index);
+                    corrected_photon_counts * corrected_photon_counts *
+                    corrected_photon_counts_variance;
             }
         }
     }

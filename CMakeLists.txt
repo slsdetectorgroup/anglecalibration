@@ -216,7 +216,7 @@ endif()
 
 if(ANGCAL_VERBOSE)
     target_compile_definitions(angle_calibration PUBLIC ANGCAL_VERBOSE)
-    target_compile_definitions(angle_calibration PUBLIC ANGCAL_LOG_LEVEL=angcal::logDEBUG5)
+    target_compile_definitions(angle_calibration PUBLIC ANGCAL_LOG_LEVEL=angcal::logDEBUG)
 else()
     target_compile_definitions(angle_calibration PUBLIC ANGCAL_LOG_LEVEL=angcal::logINFO)
 endif()

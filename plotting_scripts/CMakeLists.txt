@@ -9,12 +9,14 @@ FetchContent_Declare(
     GIT_TAG        master
 )
 
+
 FetchContent_MakeAvailable(gnuplot_iostream)
 
 find_package(Boost REQUIRED COMPONENTS iostreams)
 
 list(APPEND PUBLICHEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/plot_histogram.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PlotHelpers.hpp
 )
 
 #add plot_histogram.hpp
@@ -33,4 +35,7 @@ target_include_directories(angle_calibration PUBLIC ${Boost_INCLUDE_DIRS})
 target_link_libraries(angle_calibration PUBLIC ${Boost_LIBRARIES})
 
 target_compile_definitions(angle_calibration PUBLIC ANGCAL_PLOT)
+
+
+
 

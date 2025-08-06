@@ -11,13 +11,14 @@
 
 namespace angcal {
 
+inline size_t plot_window = 0;
+
 template <typename T>
-inline void
-plot_photon_counts(const aare::NDView<T, 1> photon_counts,
-                   const std::pair<size_t, size_t> bin_range,
-                   std::optional<const size_t> module_index,
-                   std::optional<std::shared_ptr<MythenDetectorSpecifications>>
-                       mythen_detector_specifications = std::nullopt) {
+void plot_photon_counts(
+    const aare::NDView<T, 1> photon_counts,
+    const std::pair<size_t, size_t> bin_range, const std::string &plot_title,
+    std::optional<std::shared_ptr<MythenDetectorSpecifications>>
+        mythen_detector_specifications = std::nullopt) {
 
     // TODO: change to size_t
     std::vector<std::pair<int, T>> plot_data;
@@ -40,40 +41,62 @@ plot_photon_counts(const aare::NDView<T, 1> photon_counts,
     }
 
     Gnuplot gp;
+
     gp << "set terminal qt persist\n";
-    // gp << "set terminal qt" << window_id << "\n";
-    if (module_index.has_value()) {
-        gp << "set title 'Photon Counts for module " << module_index.value()
-           << "'\n";
-    } else {
-        gp << "set title 'Photon Counts for all modules'\n";
-    }
+
+    gp << "set title \" " << plot_title << " \" \n";
+
     gp << "set xlabel 'Strip Index'\n";
     gp << "set ylabel 'Photon Count'\n";
-    gp << "plot '-' using 1:2 with lines lc rgb 'orange' title 'Photon "
-          "Counts'\n";
-    // gp << "plot '-' using 1:2 with points pointtype 7 pointsize 1 lc rgb "
-    //"'orange' title 'Photon Counts'\n";
+    gp << "plot '-' using 1:2 with lines lc rgb 'orange' notitle \n";
 
     gp.send1d(plot_data);
-    gp << "bind all 'alt-End' 'exit gnuplot'\n";
-    // gp << "pause mouse close\n";
-    gp << "pause -1 'Close window or press Enter to continue'\n";
+}
 
-    std::cout << "Press Enter to continue...\n";
-    std::cin.get();
+inline void
+initialize_plot(Gnuplot &gp, const std::string &plot_title,
+                const std::string &xlabel = "Diffraction Angle [degree]",
+                const std::string &ylabel = "Photon Counts") {
 
-    //++window_id;
+    gp << "set terminal qt " << plot_window++ << " persist\n";
+
+    gp << "set title \"" << plot_title << "\"\n";
+
+    gp << "set xlabel \"" << xlabel << "\"\n";
+    gp << "set ylabel \"" << ylabel << "\"\n";
+
+    gp << "plot sin(x) with lines lc rgb 'white' notitle \n"; // dummy
+    // gp << "plot NaN title ''\n";
+
+    // gp << "set multiplot \n";
+}
+
+template <typename Func>
+inline void append_to_plot(Gnuplot &gp,
+                           const aare::NDView<double, 1> photon_counts,
+                           const std::pair<size_t, size_t> bin_range,
+                           Func &&bin_index_to_angle_conversion,
+                           const std::string &datasetname) {
+
+    std::ofstream out(datasetname);
+    for (size_t bin = bin_range.first; bin < bin_range.second; ++bin) {
+        out << bin_index_to_angle_conversion(bin) << " " << photon_counts(bin)
+            << "\n";
+    }
+
+    gp << "replot '" << datasetname << "' using 1:2 with lines notitle\n";
+    gp.flush();
 }
 
 // maybe add a range
 // TODO add st::enable_if for FUnc
 template <typename Func>
 inline void plot_photon_counts_for_fixed_angle_width_bins(
-    const aare::NDView<double, 1> photon_counts,
-    const std::pair<size_t, size_t> bin_range,
-    Func &&bin_index_to_angle_conversion,
-    std::optional<const size_t> module_index = std::nullopt) {
+    Gnuplot &gp, const aare::NDView<double, 1> photon_counts,
+    const std::pair<size_t, size_t> bin_range, const std::string &plot_title,
+    Func &&bin_index_to_angle_conversion) {
+
+    gp << "set title \"" << plot_title << "\"\n";
 
     std::vector<std::pair<double, double>> plot_data;
     const size_t num_bins = bin_range.second - bin_range.first;
@@ -84,28 +107,11 @@ inline void plot_photon_counts_for_fixed_angle_width_bins(
                                photon_counts(bin));
     }
 
-    Gnuplot gp;
-    gp << "set terminal qt persist\n";
-    if (module_index.has_value()) {
-        gp << "set title 'Photon Counts for module " << module_index.value()
-           << "'\n";
-    } else {
-        gp << "set title 'Photon Counts for all modules'\n";
-    }
-    gp << "set xlabel 'Diffraction Angle'\n";
-    gp << "set ylabel 'Photon Count'\n";
-    gp << "plot '-' using 1:2 with lines lc rgb 'orange' title 'Photon "
-          "Counts'\n";
-    // gp << "plot '-' using 1:2 with points pointtype 7 pointsize 1 lc rgb "
-    //"'orange' title 'Photon Counts'\n";
+    gp << "plot '-' using 1:2 with lines lc rgb 'orange' notitle\n";
 
     gp.send1d(plot_data);
-    gp << "bind all 'alt-End' 'exit gnuplot'\n";
-    // gp << "pause mouse close\n";
-    gp << "pause -1 'Close window or press Enter to continue'\n";
 
-    std::cout << "Press Enter to continue...\n";
-    std::cin.get();
+    gp.flush();
 }
 
 } // namespace angcal

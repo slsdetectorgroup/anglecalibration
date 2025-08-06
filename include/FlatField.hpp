@@ -168,7 +168,6 @@ class FlatField {
      */
     void read_flatfield_from_file(const std::string &filename) {
         m_custom_detector_file_ptr->open(filename);
-        std::cout << "ok im reading into" << std::endl;
         m_custom_detector_file_ptr->read_into(
             reinterpret_cast<std::byte *>(flat_field.data()), 4);
     }

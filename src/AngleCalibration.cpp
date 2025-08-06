@@ -3,8 +3,10 @@
 #include "logger.hpp"
 
 #include <cstdlib>
+#include <filesystem>
 
 #ifdef ANGCAL_PLOT
+#include "PlotHelpers.hpp"
 #include "plot_histogram.hpp"
 #endif
 
@@ -44,6 +46,18 @@ ssize_t AngleCalibration::get_base_peak_ROI_num_bins() const {
 }
 
 ssize_t AngleCalibration::get_base_peak_ROI() const { return base_peak_roi; }
+
+std::shared_ptr<MythenDetectorSpecifications>
+AngleCalibration::get_detector_specifications() const {
+    return mythen_detector;
+}
+
+ssize_t AngleCalibration::new_number_of_bins() const {
+    ssize_t new_num_bins =
+        std::floor(mythen_detector->max_angle() / histogram_bin_width) -
+        std::floor(mythen_detector->min_angle() / histogram_bin_width) + 1;
+    return new_num_bins;
+}
 
 const DGParameters &AngleCalibration::get_DGparameters() const {
     return DGparameters;
@@ -189,29 +203,29 @@ void AngleCalibration::set_base_peak_angle(const double base_peak_angle_) {
     base_peak_angle = base_peak_angle_;
 }
 
-double
-AngleCalibration::similarity_criterion(const NDView<double, 1> S0,
-                                       const NDView<double, 1> S1,
-                                       const NDView<double, 1> S2) const {
+double AngleCalibration::get_base_peak_angle() const { return base_peak_angle; }
+
+double AngleCalibration::similarity_criterion(const NDView<double, 1> S0,
+                                              const NDView<double, 1> S1,
+                                              const NDView<double, 1> S2,
+                                              const size_t num_runs) const {
 
     double similarity_criterion = 0;
-    size_t num_runs = 0;
     for (ssize_t bin_index = 0; bin_index < S0.size(); ++bin_index) {
 
-        num_runs +=
-            (S0(bin_index) >
-             std::numeric_limits<double>::epsilon()); // doesnt really reflect
-                                                      // number of runs and
-                                                      // number of bins
-
         double weighted_average =
-            1. / S0(bin_index); // photon variance over each run
+            S0(bin_index) < std::numeric_limits<double>::epsilon()
+                ? 0.0
+                : 1. / S0(bin_index); // photon variance over each run //TODO
+                                      // check if this is correct with Antonios
+                                      // code!! - how to caluclate varaince?
         double goodness_of_fit =
             S2(bin_index) -
             S1(bin_index) * S1(bin_index) *
                 weighted_average; // calculates chi value for optimal parameter
                                   // a over all runs chi_bin = (a-
                                   // photon_count)*photon_variance
+
         similarity_criterion +=
             goodness_of_fit *
             weighted_average; // TODO in antonios code only goodness of fit is
@@ -219,34 +233,46 @@ AngleCalibration::similarity_criterion(const NDView<double, 1> S0,
     }
 
     return similarity_criterion /
-           std::max(num_runs, static_cast<size_t>(
-                                  1)); // should actually only divide by runs
+           std::max(num_runs,
+                    static_cast<size_t>(1)); // should actually only divide by
+                                             // runs or also by num bins?
 }
 
 // TODO maybe inline this
 bool AngleCalibration::base_peak_is_in_module(
-    const size_t module_index, const double detector_angle) const {
+    const size_t module_index, const double detector_angle,
+    std::optional<double> bounds_in_angles) const {
 
-    double base_peak_hwid = 0.18; // TODO: not sure what this is - should it be
-                                  // configurable Oke its 50*histogram_bin_width
-                                  // e.g. hwidth in angles!!!
+    if (!bounds_in_angles.has_value()) {
+        bounds_in_angles =
+            base_peak_roi *
+            histogram_bin_width; // take ROI of base peak in angles
+    }
 
     double left_module_boundary_angle =
         diffraction_angle_from_DG_parameters(module_index, detector_angle, 0);
     double right_module_boundary_angle = diffraction_angle_from_DG_parameters(
         module_index, detector_angle, mythen_detector->strips_per_module() - 1);
 
-    LOG(TLogLevel::logDEBUG) << fmt::format(
+    LOG(TLogLevel::logDEBUG1) << fmt::format(
         "module_boundaries_in_angle for module {} [{}, {}]\n", module_index,
         left_module_boundary_angle, right_module_boundary_angle);
 
     // TODO check bounds with base_peak_hwid
-    return !(base_peak_angle + base_peak_hwid < left_module_boundary_angle ||
-             base_peak_angle - base_peak_hwid > right_module_boundary_angle);
+    return !(base_peak_angle + *bounds_in_angles < left_module_boundary_angle ||
+             base_peak_angle - *bounds_in_angles > right_module_boundary_angle);
 }
 
-double AngleCalibration::calculate_similarity_of_peaks(
-    const size_t module_index) const {
+double
+AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
+                                                PlotHandle gp) const {
+
+    LOG(TLogLevel::logDEBUG1)
+        << "module center: " << DGparameters.centers(module_index);
+    LOG(TLogLevel::logDEBUG1)
+        << "module offset: " << DGparameters.offsets(module_index);
+    LOG(TLogLevel::logDEBUG1)
+        << "module conversion: " << DGparameters.conversions(module_index);
 
     ssize_t num_bins_in_ROI = 2 * base_peak_roi + 1;
     // used to calculate similarity criterion between peaks of different
@@ -256,20 +282,26 @@ double AngleCalibration::calculate_similarity_of_peaks(
     NDArray<double, 1> S1(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
     NDArray<double, 1> S0(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
 
+#ifdef ANGCAL_PLOT
+    auto data_file_path =
+        std::filesystem::current_path().parent_path() / "build" / "data";
+    if (!std::filesystem::exists(data_file_path))
+        std::filesystem::create_directories(data_file_path);
+    *gp << "clear\n";
+    gp->flush();
+    *gp << "plot sin(x) with lines lc rgb 'white' lw 0 notitle \n"; // dummy
+                                                                    // value
+#endif
+
+    size_t num_runs = 0;
     for (const auto &file : file_list) {
+
         MythenFrame frame = mythen_file_reader->read_frame(file);
 
         // base peak angle is in module
         if (base_peak_is_in_module(module_index, frame.detector_angle)) {
 
-#ifdef ANGCAL_PLOT
-            plot_photon_counts(
-                frame.photon_counts.view(),
-                std::make_pair<size_t>(
-                    module_index * mythen_detector->strips_per_module(),
-                    (module_index + 1) * mythen_detector->strips_per_module()),
-                module_index, mythen_detector);
-#endif
+            LOG(TLogLevel::logDEBUG1) << "file name: " << file;
 
             NDArray<double, 1> fixed_angle_width_bins_photon_counts(
                 std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
@@ -284,50 +316,44 @@ double AngleCalibration::calculate_similarity_of_peaks(
                 fixed_angle_width_bins_photon_counts.view(),
                 fixed_angle_width_bins_photon_counts_variance.view(), S0.view(),
                 S1.view(), S2.view());
-        }
 
-        // we should have histograms per run!!!
-        /*
-        for (size_t strip_index =
-                 module_index * mythen_detector->strips_per_module();
-             strip_index <
-             (module_index + 1) * mythen_detector->strips_per_module();
-             ++strip_index) {
+#ifdef ANGCAL_PLOT
+            auto bin_to_diffraction_angle_base_peak_ROI_only =
+                [this](const size_t bin_index) {
+                    return (static_cast<ssize_t>(bin_index) -
+                            static_cast<ssize_t>(this->base_peak_roi)) *
+                               this->histogram_bin_width +
+                           this->base_peak_angle;
+                };
 
-            // TODO: supposed to normalize this thing with
-            // total_number_of_photon_count per run and module multiplied
-            // with scale factor
-            // /(total_number_of_photon_counts_per_run_and_module *
-            // scale_factor)
+            std::string filename =
+                std::filesystem::path(file).stem().string() + ".dat";
+            auto dataset_name = data_file_path / filename;
+
+            append_to_plot(*gp, fixed_angle_width_bins_photon_counts.view(),
+                           {0, 2 * base_peak_roi + 1},
+                           bin_to_diffraction_angle_base_peak_ROI_only,
+                           dataset_name);
+#endif
             ++num_runs;
-            total_photon_counts(module_index) +=
-                frame.photon_counts(strip_index);
         }
-        */
     }
+
+#ifdef ANGCAL_PLOT
+    gp->flush(); // make plot appear
+    LOG(TLogLevel::logDEBUG1) << "num_runs: " << num_runs;
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(500)); // let gnuplot update
+#endif
 
     // TODO: give a warning if there was no acquisition for a module
-    return similarity_criterion(S0.view(), S1.view(), S2.view());
 
-    /*
-    sum_photon_counts += std::accumulate(total_photon_counts.begin(),
-                                         total_photon_counts.end(), 0.0);
-
-    // in theory this should happen - but need to store seperately for eacg
-    // run
-
-    for (size_t strip_index = 0;
-         strip_index < mythen_detector->num_strips(); ++strip_index) {
-
-        size_t module_index =
-            strip_index % mythen_detector->strips_per_module();
-
-        flatfield_normalized_photon_counts(strip_index) /=
-    (total_photon_counts(module_index) * scale_factor);
-        flatfield_normalized_photon_counts_error(strip_index) /=
-            (total_photon_counts(module_index) * scale_factor);
-    }
-    */
+    double similarity_of_peaks =
+        num_runs == 0
+            ? std::numeric_limits<double>::infinity()
+            : similarity_criterion(S0.view(), S1.view(), S2.view(), num_runs);
+    LOG(TLogLevel::logDEBUG1) << "similarity_of_peaks: " << similarity_of_peaks;
+    return similarity_of_peaks;
 }
 
 // TODO: maybe have a function where we calculate the average photon counts
@@ -350,7 +376,18 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
             LOG(angcal::TLogLevel::logINFO)
                 << "starting calibration for module " << module_index;
 
+#ifdef ANGCAL_PLOT
+            Gnuplot gp;
+            std::string plot_title =
+                fmt::format("Base Peaks for {} ", module_index);
+            initialize_plot(gp, plot_title);
+            optimization_algorithm(module_index, &gp);
+#else
             optimization_algorithm(module_index);
+#endif
+        } else {
+            LOG(TLogLevel::logINFO)
+                << fmt::format("module {} is disconnected", module_index);
         }
     }
 }
@@ -358,21 +395,30 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
 void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
                                  const double base_peak_angle_,
                                  const size_t module_index) {
-    if (!module_is_disconnected(module_index)) {
 
+    file_list = file_list_;
+    base_peak_angle = base_peak_angle_;
+
+    if (!module_is_disconnected(module_index)) {
         LOG(angcal::TLogLevel::logINFO)
             << "starting calibration for module " << module_index;
 
+#ifdef ANGCAL_PLOT
+        Gnuplot gp;
+        std::string plot_title =
+            fmt::format("Base Peaks for {} ", module_index);
+        initialize_plot(gp, plot_title);
+        optimization_algorithm(module_index, &gp);
+#else
         optimization_algorithm(module_index);
+#endif
     }
 }
 
 NDArray<double, 1>
 AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     const MythenFrame &frame) const {
-    ssize_t new_num_bins =
-        std::floor(mythen_detector->max_angle() / histogram_bin_width) -
-        std::floor(mythen_detector->min_angle() / histogram_bin_width) + 1;
+    ssize_t new_num_bins = new_number_of_bins();
 
     NDArray<double, 1> fixed_angle_width_bins_photon_counts =
         NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
@@ -390,10 +436,10 @@ AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             continue;
         }
 
-        LOG(TLogLevel::logDEBUG)
+        LOG(TLogLevel::logDEBUG1)
             << fmt::format("module_index {} contibutes", module_index);
 
-        redistribute_photon_counts_to_fixed_angle_width_bins(
+        redistribute_photon_counts_to_fixed_angle_width_bins<false>(
             module_index, frame, fixed_angle_width_bins_photon_counts.view(),
             fixed_angle_width_bins_photon_variance.view());
     }
@@ -403,7 +449,7 @@ AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
 
 // might be deprecated
 void AngleCalibration::calculate_fixed_bin_angle_width_histogram(
-    const std::vector<std::string> &file_list) {
+    const std::vector<std::string> &file_list_) {
 
     new_photon_counts = NDArray<double, 1>(std::array<ssize_t, 1>{num_bins});
 
@@ -419,7 +465,7 @@ void AngleCalibration::calculate_fixed_bin_angle_width_histogram(
     NDView<double, 1> inverse_normalized_flatfield =
         flat_field->get_inverse_normalized_flatfield();
 
-    for (const auto &file : file_list) {
+    for (const auto &file : file_list_) {
         MythenFrame frame = mythen_file_reader->read_frame(file);
         redistribute_photon_counts_to_fixed_angle_bins(
             frame, bin_counts.view(), new_statistical_weights.view(),
@@ -571,11 +617,14 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_bins(
 // actually used to optimize BC parameters, first parameters used to optimze
 // Lm second parameter used to optimize phi
 void AngleCalibration::optimization_algorithm(const size_t module_index,
+                                              PlotHandle gp,
                                               const double shift_parameter1,
                                               const double shift_parameter2) {
 
     constexpr double tolerance1 =
         0.001; // dont know if this should be configurable
+
+    constexpr size_t max_iterations = 200;
 
     std::vector<std::pair<double, double>> shift_parameters;
     shift_parameters.reserve(9);
@@ -593,7 +642,7 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
     shift_parameters.emplace_back(0.0, 0.0);
 
     double previous_similarity_of_peaks =
-        calculate_similarity_of_peaks(module_index);
+        calculate_similarity_of_peaks(module_index, gp);
 
     double next_similarity_of_peaks{};
 
@@ -605,29 +654,59 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
                       // sp_x+1,y / 6. sp_x,y-1 / 7. sp_x,y+1 / 8 sp_x,y
 
     bool convergence_criterion = false;
-    while (!convergence_criterion) {
+    size_t iteration_index = 0;
+    while (!convergence_criterion && (iteration_index < max_iterations)) {
 
         // TODO can i get rid of the break or does it need to be in that
         // order due to convergence
-        for (auto shift_parameter : shift_parameters) {
-            DGparameters.centers(module_index) += shift_parameter.first;
-            DGparameters.conversions(module_index) += shift_parameter.second;
-            // TODO: pass parameters directly
-            next_similarity_of_peaks =
-                calculate_similarity_of_peaks(module_index);
-            if (next_similarity_of_peaks < previous_similarity_of_peaks) {
-                // update centers for real
-                previous_similarity_of_peaks = next_similarity_of_peaks;
-                break;
-            } else {
-                DGparameters.centers(module_index) -= shift_parameter.first;
-                DGparameters.conversions(module_index) -=
-                    shift_parameter.second;
+        size_t parameter_index = 0;
+        while (parameter_index < shift_parameters.size()) {
+            for (parameter_index = 0; parameter_index < shift_parameters.size();
+                 ++parameter_index) {
+
+                LOG(TLogLevel::logDEBUG1) << fmt::format(
+                    "Iteration {} with peak similarity of {}", iteration_index,
+                    previous_similarity_of_peaks);
+
+                ++iteration_index;
+
+                DGparameters.centers(module_index) +=
+                    shift_parameters[parameter_index].first;
+                DGparameters.conversions(module_index) +=
+                    shift_parameters[parameter_index].second;
+                // TODO: pass parameters directly
+                next_similarity_of_peaks =
+                    calculate_similarity_of_peaks(module_index, gp);
+                sp[parameter_index] = next_similarity_of_peaks;
+                if (next_similarity_of_peaks < previous_similarity_of_peaks) {
+                    // update centers for real
+                    previous_similarity_of_peaks = next_similarity_of_peaks;
+                    // break;
+                } else {
+                    DGparameters.centers(module_index) -=
+                        shift_parameters[parameter_index].first;
+                    DGparameters.conversions(module_index) -=
+                        shift_parameters[parameter_index].second;
+                }
             }
         }
 
+        LOG(TLogLevel::logINFO)
+            << "peak similarity: " << previous_similarity_of_peaks;
+
+        LOG(TLogLevel::logINFO)
+            << "fine tune parameters in direction of steepest descent";
+
+        LOG(TLogLevel::logDEBUG) << "peak_similarities: ";
+        std::for_each(sp.begin(), sp.end(), [](const auto &elem) {
+            LOG(TLogLevel::logDEBUG) << elem << ", ";
+        });
+
+        PlotHelper::pause();
         // deviates from Antonios code
         // calculate Hessian matrix
+        // TODO: sp_are only the parameters not the value !!
+
         double Dy =
             (sp[7] - sp[6] + sp[1] - sp[0] + sp[3] - sp[2]) /
             (6 * shift_parameter2); //(sp_x,y+1 - sp_x,y-1)/delta_y +
@@ -685,6 +764,10 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
             ((Dxx + regularization_term) * Dy - Dyx * Dx) *
                 inverse_determinant);
 
+        LOG(TLogLevel::logDEBUG)
+            << fmt::format("direction of steepest descent: [{},{}]",
+                           steepest_descent.first, steepest_descent.second);
+
         double scale_factor = std::min(
             1.0,
             1. / std::max(std::abs(steepest_descent.first /
@@ -700,33 +783,56 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
 
         bool found_best_parameters = false;
 
-        while (!found_best_parameters) {
+        // check termination criterion iteration_index added on purpose
+        while (!found_best_parameters && iteration_index < max_iterations) {
 
             next_similarity_of_peaks =
-                calculate_similarity_of_peaks(module_index);
+                calculate_similarity_of_peaks(module_index, gp);
 
-            found_best_parameters =
-                next_similarity_of_peaks <= previous_similarity_of_peaks;
+            // TODO what if im stuck in here
+            if (next_similarity_of_peaks > previous_similarity_of_peaks) {
+                DGparameters.centers(module_index) -= steepest_descent.first;
+                DGparameters.conversions(module_index) -=
+                    steepest_descent.second;
+            }
+
+            found_best_parameters = next_similarity_of_peaks <=
+                                    previous_similarity_of_peaks; // TODO was <=
+            // TODO what if im stuck in here
             steepest_descent.first *= 0.5;
             steepest_descent.second *= 0.5;
             DGparameters.centers(module_index) += steepest_descent.first;
             DGparameters.conversions(module_index) += steepest_descent.second;
+
+            LOG(TLogLevel::logDEBUG1)
+                << fmt::format("Iteration {} with peak similarity of {}",
+                               iteration_index, previous_similarity_of_peaks);
+
+            ++iteration_index;
         }
 
         double relative_change =
             (previous_similarity_of_peaks - next_similarity_of_peaks) /
             previous_similarity_of_peaks;
 
+        LOG(TLogLevel::logINFO)
+            << "relative change of similarity of peaks: " << relative_change;
+
         double some_other_criterion = std::sqrt(
             std::pow(Dx * steepest_descent.first + Dy * steepest_descent.second,
                      2) /
             std::pow(steepest_descent.first + steepest_descent.second, 2));
 
-        convergence_criterion =
-            (relative_change < 0.001) &
-            (some_other_criterion <
-             0.001); // TODO: should these tolerances also be configurable -
-                     // maybe pass as function argument
+        convergence_criterion = (relative_change < 0.001); // &
+        //(some_other_criterion <
+        // 0.001); // TODO: should these tolerances also be configurable -
+        // maybe pass as function argument
+
+        LOG(TLogLevel::logINFO)
+            << fmt::format("Iteration {} with peak similarity of {}",
+                           iteration_index, previous_similarity_of_peaks);
+
+        ++iteration_index;
     }
 }
 
