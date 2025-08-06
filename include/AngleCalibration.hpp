@@ -17,6 +17,7 @@
 #include "FlatField.hpp"
 #include "MythenDetectorSpecifications.hpp"
 #include "MythenFileReader.hpp"
+#include "Parameters.hpp"
 #include "aare/NDArray.hpp"
 #include "helpers/FileInterface.hpp"
 
@@ -30,127 +31,6 @@ using PlotHandle = std::nullptr_t;
 using namespace aare;
 
 namespace angcal {
-
-using parameters =
-    std::tuple<std::vector<double>, std::vector<double>, std::vector<double>>;
-
-// TODO: check if interpretation and units are correct
-// historical DG parameters
-/**
- * historical Detector Group parameters
- */
-struct DGParameters {
-
-    DGParameters() = default;
-
-    DGParameters(const ssize_t n_modules) {
-        parameters = NDArray<double, 2>(std::array<ssize_t, 2>{n_modules, 3});
-    }
-
-    double &operator()(const size_t module_index,
-                       const size_t parameter_index) {
-        return parameters(module_index, parameter_index);
-    }
-
-    double operator()(const size_t module_index,
-                      const size_t parameter_index) const {
-        return parameters(module_index, parameter_index);
-    }
-
-    /**
-     * orthogonal projection of sample onto
-     * detector (given in strip number) [mm]
-     * D/pitch
-     */
-    double &centers(const size_t module_index) {
-        return parameters(module_index, 0);
-    }
-
-    double centers(const size_t module_index) const {
-        return parameters(module_index, 0);
-    }
-
-    /**
-     * pitch/(normal distance from sample
-     * to detector (R)) [mm]
-     * used for easy conversion
-     */
-    double &conversions(const size_t module_index) {
-        return parameters(module_index, 1);
-    }
-
-    double conversions(const size_t module_index) const {
-        return parameters(module_index, 1);
-    }
-
-    /** position of strip zero relative to sample [degrees] phi
-     * 180/pi*D/R TODO: expected an arcsin(D/R)?
-     */
-    double &offsets(const size_t module_index) {
-        return parameters(module_index, 2);
-    }
-
-    double offsets(const size_t module_index) const {
-        return parameters(module_index, 2);
-    }
-
-    NDArray<double, 2> parameters{};
-};
-
-/**
- * geometric parameters
- */
-struct EEParameters {
-
-    EEParameters(const ssize_t n_modules) {
-        parameters = NDArray<double, 2>(std::array<ssize_t, 2>{n_modules, 3});
-    }
-
-    double &operator()(const size_t module_index,
-                       const size_t parameter_index) {
-        return parameters(module_index, parameter_index);
-    }
-
-    double operator()(const size_t module_index,
-                      const size_t parameter_index) const {
-        return parameters(module_index, parameter_index);
-    }
-
-    /**
-     * normal distance between sample and detector (R)
-     */
-    double &normal_distances(const size_t module_index) {
-        return parameters(module_index, 0);
-    }
-
-    double normal_distances(const size_t module_index) const {
-        return parameters(module_index, 0);
-    }
-
-    /**
-     * distances between intersection point of sample normal and module origin
-     * (D)
-     */
-    double &module_center_distances(const size_t module_index) {
-        return parameters(module_index, 1);
-    }
-    double module_center_distances(const size_t module_index) const {
-        return parameters(module_index, 1);
-    }
-
-    /** angles between undiffracted beam and orthogonal sample projection on
-     * detector (phi)
-     */
-    double &angles(const size_t module_index) {
-        return parameters(module_index, 2);
-    }
-
-    double angles(const size_t module_index) const {
-        return parameters(module_index, 2);
-    }
-
-    NDArray<double, 2> parameters{};
-};
 
 class AngleCalibration {
 
@@ -202,23 +82,6 @@ class AngleCalibration {
     NDArray<double, 1> get_new_photon_counts() const;
 
     NDArray<double, 1> get_new_statistical_errors() const;
-
-    /** converts DG parameters to easy EE parameters e.g.geometric
-     * parameters */
-    EEParameters convert_to_EE_parameters() const;
-
-    std::tuple<double, double, double>
-    convert_to_EE_parameters(const size_t module_index) const;
-
-    std::tuple<double, double, double>
-    convert_to_EE_parameters(const double center, const double conversion,
-                             const double offset) const;
-
-    /*
-    //converts DG parameters to BC parameters e.g. best computing
-     parameters
-    parameters convert_to_BC_parameters() const;
-    */
 
     /**
      * calculates new histogram with fixed sized angle bins
@@ -308,6 +171,10 @@ class AngleCalibration {
         const size_t module_index, const double detector_angle,
         const size_t strip_index, const double distance_to_strip = 0) const;
 
+    double diffraction_angle_from_BC_parameters(
+        const size_t module_index, const double detector_angle,
+        const size_t strip_index, const double distance_to_strip = 0) const;
+
   private:
     /** calculates diffraction angle from EE module parameters (used in
      * Beer's Law)
@@ -366,7 +233,8 @@ class AngleCalibration {
                                 const double shift_parameter2 = 0.005);
 
   private:
-    DGParameters DGparameters;
+    DGParameters DGparameters{};
+    BCParameters BCparameters{};
 
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector{};
 

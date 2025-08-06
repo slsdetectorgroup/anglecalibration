@@ -31,6 +31,7 @@ AngleCalibration::AngleCalibration(
     }
 
     DGparameters = DGParameters(mythen_detector->max_modules());
+    BCparameters = BCParameters(mythen_detector->max_modules());
 }
 
 void AngleCalibration::set_histogram_bin_width(double bin_width) {
@@ -90,39 +91,6 @@ void AngleCalibration::read_initial_calibration_from_file(
     custom_file_ptr->read_into(DGparameters.parameters.buffer(), 8);
 }
 
-EEParameters AngleCalibration::convert_to_EE_parameters() const {
-
-    EEParameters EEparameters(DGparameters.parameters.shape(0));
-
-    for (ssize_t i = 0; i < DGparameters.parameters.shape(0); ++i) {
-        auto [module_center_distance, normal_distance, angle] =
-            convert_to_EE_parameters(i);
-        EEparameters.normal_distances(i) = normal_distance;
-        EEparameters.module_center_distances(i) = module_center_distance;
-        EEparameters.angles(i) = angle;
-    }
-
-    return EEparameters;
-}
-
-std::tuple<double, double, double>
-AngleCalibration::convert_to_EE_parameters(const size_t module_index) const {
-    return convert_to_EE_parameters(DGparameters.centers(module_index),
-                                    DGparameters.conversions(module_index),
-                                    DGparameters.offsets(module_index));
-}
-
-std::tuple<double, double, double> AngleCalibration::convert_to_EE_parameters(
-    const double center, const double conversion, const double offset) const {
-    const double module_center_distance =
-        center * MythenDetectorSpecifications::pitch();
-    const double normal_distance =
-        MythenDetectorSpecifications::pitch() / std::abs(conversion);
-    const double angle = offset + 180.0 / M_PI * center * std::abs(conversion);
-
-    return std::make_tuple(module_center_distance, normal_distance, angle);
-}
-
 size_t AngleCalibration::global_to_local_strip_index_conversion(
     const size_t global_strip_index) const {
     const size_t module_index =
@@ -161,6 +129,30 @@ double AngleCalibration::diffraction_angle_from_DG_parameters(
                      std::abs(conversion))) +
            detector_angle; // + + mythen_detector->dtt0() +
                            // mythen_detector->bloffset();;
+}
+
+double AngleCalibration::diffraction_angle_from_BC_parameters(
+    const size_t module_index, const double detector_angle,
+    const size_t strip_index, const double distance_to_strip) const {
+
+    const double angle_module_center_normal =
+        BCparameters.angle_center_module_normal(module_index);
+    const double distance_center_sample =
+        BCparameters.module_center_sample_distances(module_index);
+    const double angle_module_center_beam =
+        BCparameters.angle_center_beam(module_index);
+
+    return angle_module_center_beam +
+           180.0 / M_PI *
+               (angle_module_center_normal -
+                atan((distance_center_sample * sin(angle_module_center_normal) +
+                      (MythenDetectorSpecifications::strips_per_module() * 0.5 -
+                       strip_index - distance_to_strip) *
+                          MythenDetectorSpecifications::pitch()) /
+                     (distance_center_sample *
+                      cos(angle_module_center_normal)))) +
+           detector_angle; // + + mythen_detector->dtt0() +
+                           // mythen_detector->bloffset();
 }
 
 double AngleCalibration::diffraction_angle_from_EE_parameters(
@@ -681,6 +673,7 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
                 if (next_similarity_of_peaks < previous_similarity_of_peaks) {
                     // update centers for real
                     previous_similarity_of_peaks = next_similarity_of_peaks;
+                    parameter_index = 0;
                     // break;
                 } else {
                     DGparameters.centers(module_index) -=
