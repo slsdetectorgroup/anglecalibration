@@ -12,6 +12,7 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(gnuplot_iostream)
 
+#maybe fetch too 
 find_package(Boost REQUIRED COMPONENTS iostreams)
 
 list(APPEND PUBLICHEADERS
