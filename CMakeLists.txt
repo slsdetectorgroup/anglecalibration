@@ -176,10 +176,7 @@ set(SourceFiles
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AngleCalibration.cpp
 )
 
-
-
 add_library(angle_calibration STATIC ${SourceFiles}) 
-
 
 target_include_directories(angle_calibration PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" 
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")

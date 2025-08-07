@@ -19,43 +19,24 @@ pybind11_add_module(
     src/module.cpp  # source file
 )
 
+message("cmake binary directory: ${CMAKE_BINARY_DIR}")
+
 set_target_properties(_angcal PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/angcal 
 )
+
 target_link_libraries(_angcal PRIVATE angle_calibration compiler_flags)
 
 
-if(false)
 # List of python files to be copied to the build directory
 set( PYTHON_FILES
-    aare/__init__.py
+    angcal/__init__.py
 )
-
 
 # Copy the python files to the build directory
 foreach(FILE ${PYTHON_FILES})
-    configure_file(${FILE} ${CMAKE_BINARY_DIR}/${FILE}  )
+    configure_file(${FILE} ${CMAKE_BINARY_DIR}/${FILE})
 endforeach(FILE ${PYTHON_FILES})
-endif() 
-
-set_target_properties(_angcal PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/angle_calibration 
-)
-
-if(false)
-set(PYTHON_EXAMPLES
-    examples/play.py
-    examples/fits.py
-)
-
-
-# Copy the python examples to the build directory
-foreach(FILE ${PYTHON_EXAMPLES})
-    configure_file(${FILE} ${CMAKE_BINARY_DIR}/${FILE}  )
-    message(STATUS "Copying ${FILE} to ${CMAKE_BINARY_DIR}/${FILE}")
-endforeach(FILE ${PYTHON_EXAMPLES})
-endif()
-
 
 if(ANGCAL_INSTALL_PYTHONEXT)
     install(
@@ -64,11 +45,10 @@ if(ANGCAL_INSTALL_PYTHONEXT)
         LIBRARY DESTINATION angle_calibration
         COMPONENT python
     )
-    if(false)
+    
     install(
         FILES ${PYTHON_FILES} 
-        DESTINATION aare
+        DESTINATION angle_calibration
         COMPONENT python
         )
-    endif()
 endif()
