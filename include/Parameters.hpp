@@ -190,12 +190,16 @@ struct DGParameters {
                  std::abs(conversions(
                      module_index))); // TODO in Antonios code it is minus?
         double distance_module_center_sample =
-            MythenDetectorSpecifications::pitch() *
+            MythenDetectorSpecifications::pitch() /
             std::abs(conversions(module_index)) *
-            sqrt(1 +
-                 (std::abs(conversions(module_index)) *
-                  (centers(module_index) -
-                   0.5 * MythenDetectorSpecifications::strips_per_module())));
+            std::sqrt(
+                1 +
+                std::pow(
+                    std::abs(conversions(module_index)) *
+                        (centers(module_index) -
+                         0.5 *
+                             MythenDetectorSpecifications::strips_per_module()),
+                    2));
         double angle_beam_module_center =
             offsets(module_index) +
             180.0 / M_PI * std::abs(conversions(module_index)) *
@@ -208,7 +212,7 @@ struct DGParameters {
     }
 
     void convert_to_BCParameters(BCParameters &bcparameters) const {
-        for (ssize_t module_index;
+        for (ssize_t module_index = 0;
              module_index < bcparameters.parameters.shape(0); ++module_index) {
             auto [angle_center_module_normal, distance_module_center_sample,
                   angle_beam_module_center] =
@@ -223,7 +227,7 @@ struct DGParameters {
     }
 
     std::tuple<double, double, double>
-    convert_to_EE_parameters(const size_t module_index) const {
+    convert_to_EEParameters(const size_t module_index) const {
 
         const double module_center_distance =
             centers(module_index) * MythenDetectorSpecifications::pitch();
@@ -236,13 +240,13 @@ struct DGParameters {
         return std::make_tuple(module_center_distance, normal_distance, angle);
     }
 
-    EEParameters convert_to_EE_parameters() const {
+    EEParameters convert_to_EEParameters() const {
 
         EEParameters EEparameters(parameters.shape(0));
 
         for (ssize_t i = 0; i < parameters.shape(0); ++i) {
             auto [module_center_distance, normal_distance, angle] =
-                convert_to_EE_parameters(i);
+                convert_to_EEParameters(i);
             EEparameters.normal_distances(i) = normal_distance;
             EEparameters.module_center_distances(i) = module_center_distance;
             EEparameters.angles(i) = angle;

@@ -204,7 +204,6 @@ for (ssize_t i = 0; i < frame.photon_counts.size(); ++i) {
     plotter.plot_redistributed_photon_counts(
         new_fixed_angle_width_bins_photon_counts.view());
     */
-
 #endif
 
     size_t module_index = 3;
@@ -231,7 +230,6 @@ for (ssize_t i = 0; i < frame.photon_counts.size(); ++i) {
         get_base_peak_for_module(anglecalibration, module_index, frame);
     plotter.plot_base_peak_of_module(module_index, base_peak_for_module.view());
     */
-
 #endif
 
     module_index = 7;

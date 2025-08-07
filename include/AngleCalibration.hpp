@@ -79,26 +79,6 @@ class AngleCalibration {
     const DGParameters &get_DGparameters() const; // TODO: do i want a
                                                   // reference?
 
-    NDArray<double, 1> get_new_photon_counts() const;
-
-    NDArray<double, 1> get_new_statistical_errors() const;
-
-    /**
-     * calculates new histogram with fixed sized angle bins
-     * for several acquisitions at different detector angles for given frame
-     * indices
-     * @param file_list vector of file_names
-     */
-    void calculate_fixed_bin_angle_width_histogram(
-        const std::vector<std::string> &file_list);
-
-    /**
-     * calculates new histogram with fixed sized angle bins
-     * for one acquisition
-     */
-    NDArray<double, 1>
-    calculate_fixed_bin_angle_width_histogram(const std::string &file_name);
-
     /**
      * calibrates the DG parameters
      * @param file_list vector of file_names of acquisition files - detector
@@ -175,7 +155,6 @@ class AngleCalibration {
         const size_t module_index, const double detector_angle,
         const size_t strip_index, const double distance_to_strip = 0) const;
 
-  private:
     /** calculates diffraction angle from EE module parameters (used in
      * Beer's Law)
      * @param strip_index local strip index of module
@@ -185,10 +164,14 @@ class AngleCalibration {
         const double angle, const double detector_angle,
         const size_t strip_index, const double distance_to_strip = 0) const;
 
+  private:
     /** calculated the strip width expressed as angle [degrees]
      * @param strip_index local strip index of module
      */
     double angular_strip_width_from_DG_parameters(
+        const size_t module_index, const size_t local_strip_index) const;
+
+    double angular_strip_width_from_BC_parameters(
         const size_t module_index, const size_t local_strip_index) const;
 
     double angular_strip_width_from_EE_parameters(
@@ -211,19 +194,6 @@ class AngleCalibration {
                                 const NDView<double, 1> S1,
                                 const NDView<double, 1> S2,
                                 const size_t num_runs) const;
-
-    /**
-     * redistributes photon counts with of histogram using one bin per strip
-     * to histogram with fixed size angle bins
-     * @param frame MythenFrame storing data from image
-     * @param bin_counts accumulate new photon counts
-     * @param new_statistical_weights accumulate new statistical weights
-     * @param new_errors accumulate new_errors
-     */
-    void redistribute_photon_counts_to_fixed_angle_bins(
-        const MythenFrame &frame, NDView<double, 1> bin_counts,
-        NDView<double, 1> new_statistical_weights, NDView<double, 1> new_errors,
-        NDView<double, 1> inverse_nromalized_flatfield) const;
 
     // TODO: also a bad design - make shift_parameter configurable - consider
     // having second class Optimization
@@ -299,11 +269,11 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             continue; // skip bad channels
         }
 
-        double left_strip_boundary_angle = diffraction_angle_from_DG_parameters(
+        double left_strip_boundary_angle = diffraction_angle_from_BC_parameters(
             module_index, frame.detector_angle, strip_index, -0.5);
 
         double right_strip_boundary_angle =
-            diffraction_angle_from_DG_parameters(
+            diffraction_angle_from_BC_parameters(
                 module_index, frame.detector_angle, strip_index, 0.5);
 
         if (base_peak_ROI_only &&
@@ -329,7 +299,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                             2)));
 
         double strip_width_angle =
-            angular_strip_width_from_DG_parameters(module_index, strip_index);
+            angular_strip_width_from_BC_parameters(module_index, strip_index);
 
         double correction_factor = histogram_bin_width / strip_width_angle;
 
