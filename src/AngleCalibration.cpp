@@ -15,7 +15,6 @@ namespace angcal {
 AngleCalibration::AngleCalibration(
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
     std::shared_ptr<FlatField> flat_field_,
-    const std::filesystem::path &file_path_,
     std::optional<std::shared_ptr<MythenFileReader>> mythen_file_reader_,
     std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr_)
     : mythen_detector(mythen_detector_), flat_field(flat_field_) {
@@ -23,7 +22,7 @@ AngleCalibration::AngleCalibration(
     if (mythen_file_reader_.has_value()) {
         mythen_file_reader = mythen_file_reader_.value();
     } else {
-        mythen_file_reader = std::make_shared<MythenFileReader>(file_path_);
+        mythen_file_reader = std::make_shared<MythenFileReader>();
     }
 
     if (custom_file_ptr_.has_value()) {
@@ -418,6 +417,25 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
 
 NDArray<double, 1>
 AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
+    const MythenFrame &frame, const size_t module_index) const {
+
+    ssize_t new_num_bins = new_number_of_bins();
+
+    NDArray<double, 1> fixed_angle_width_bins_photon_counts =
+        NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
+
+    NDArray<double, 1> fixed_angle_width_bins_photon_variance =
+        NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
+
+    redistribute_photon_counts_to_fixed_angle_width_bins<false>(
+        module_index, frame, fixed_angle_width_bins_photon_counts.view(),
+        fixed_angle_width_bins_photon_variance.view());
+
+    return fixed_angle_width_bins_photon_counts;
+};
+
+NDArray<double, 1>
+AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     const MythenFrame &frame) const {
     ssize_t new_num_bins = new_number_of_bins();
 
@@ -445,6 +463,25 @@ AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             module_index, frame, fixed_angle_width_bins_photon_counts.view(),
             fixed_angle_width_bins_photon_variance.view());
     }
+
+    return fixed_angle_width_bins_photon_counts;
+}
+
+NDArray<double, 1>
+AngleCalibration::redistributed_photon_counts_in_base_peak_ROI(
+    const MythenFrame &frame, const size_t module_index) const {
+
+    NDArray<double, 1> fixed_angle_width_bins_photon_counts =
+        NDArray<double, 1>(std::array<ssize_t, 1>{get_base_peak_ROI_num_bins()},
+                           0.0);
+
+    NDArray<double, 1> fixed_angle_width_bins_photon_variance =
+        NDArray<double, 1>(std::array<ssize_t, 1>{get_base_peak_ROI_num_bins()},
+                           0.0);
+
+    redistribute_photon_counts_to_fixed_angle_width_bins<true>(
+        module_index, frame, fixed_angle_width_bins_photon_counts.view(),
+        fixed_angle_width_bins_photon_variance.view());
 
     return fixed_angle_width_bins_photon_counts;
 }

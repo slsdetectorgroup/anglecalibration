@@ -31,7 +31,7 @@ TEST_CASE("read initial angle calibration file",
     auto fpath = test_data_path() / "AngleCalibration_Test_Data";
 
     AngleCalibration anglecalibration(mythen_detector_ptr,
-                                      std::shared_ptr<FlatField>{}, fpath);
+                                      std::shared_ptr<FlatField>{});
 
     std::string filename = fpath / "Angcal_2E_Feb2023_P29.off";
 
@@ -131,7 +131,7 @@ TEST_CASE("check parameter conversion", "[anglecalibration]") {
     auto file_path = test_data_path();
 
     AngleCalibration anglecalibration(mythen_detector_ptr,
-                                      std::shared_ptr<FlatField>{}, file_path);
+                                      std::shared_ptr<FlatField>{});
 
     std::string initial_angles_filename =
         test_data_path() / "AngleCalibration_Test_Data" / "AntoniosTestData" /

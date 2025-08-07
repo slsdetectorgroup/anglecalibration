@@ -15,12 +15,10 @@ class PlotHelper {
         };
 
         bin_to_diffraction_angle_base_peak_ROI_only =
-            [this](const size_t bin_index) {
-                return (static_cast<ssize_t>(bin_index) -
-                        static_cast<ssize_t>(
-                            m_anglecalibration->get_base_peak_ROI())) *
-                           m_anglecalibration->get_histogram_bin_width() +
-                       m_anglecalibration->get_base_peak_angle();
+            [this](const ssize_t bin_index) {
+                return ((bin_index - m_anglecalibration->get_base_peak_ROI()) *
+                            m_anglecalibration->get_histogram_bin_width() +
+                        m_anglecalibration->get_base_peak_angle());
             };
     }
 
@@ -147,7 +145,6 @@ void plot_module_in_angle_for_all_frames(
 
     std::shared_ptr<Gnuplot> gp = std::make_shared<Gnuplot>();
     size_t frame_number = 0;
-    const ssize_t new_num_bins = anglecalibration.new_number_of_bins();
 
     for (const auto &file : filelist) {
 
@@ -157,18 +154,10 @@ void plot_module_in_angle_for_all_frames(
             if (anglecalibration.base_peak_is_in_module(
                     module_index, frame.detector_angle, base_peak_boundary)) {
 
-                NDArray<double, 1> fixed_angle_width_bins_photon_counts(
-                    std::array<ssize_t, 1>{new_num_bins}, 0.0);
-                NDArray<double, 1>
-                    fixed_angle_width_bins_photon_counts_variance(
-                        std::array<ssize_t, 1>{new_num_bins}, 0.0);
-
-                anglecalibration
-                    .redistribute_photon_counts_to_fixed_angle_width_bins<
-                        false>(
-                        module_index, frame,
-                        fixed_angle_width_bins_photon_counts.view(),
-                        fixed_angle_width_bins_photon_counts_variance.view());
+                auto fixed_angle_width_bins_photon_counts =
+                    anglecalibration
+                        .redistribute_photon_counts_to_fixed_angle_width_bins(
+                            frame, module_index);
 
                 plotter.plot_module_redistributed_to_fixed_angle_width_bins(
                     module_index, fixed_angle_width_bins_photon_counts.view(),
@@ -179,20 +168,10 @@ void plot_module_in_angle_for_all_frames(
             }
         } else {
 
-            NDArray<double, 1> fixed_angle_width_bins_photon_counts(
-                std::array<ssize_t, 1>{new_num_bins}, 0.0);
-            NDArray<double, 1> fixed_angle_width_bins_photon_counts_variance(
-                std::array<ssize_t, 1>{new_num_bins}, 0.0);
-
-            anglecalibration
-                .redistribute_photon_counts_to_fixed_angle_width_bins<false>(
-                    module_index, frame,
-                    fixed_angle_width_bins_photon_counts.view(),
-                    fixed_angle_width_bins_photon_counts_variance.view());
-
-            plotter.plot_module_redistributed_to_fixed_angle_width_bins(
-                module_index, fixed_angle_width_bins_photon_counts.view(),
-                frame.detector_angle, gp);
+            auto fixed_angle_width_bins_photon_counts =
+                anglecalibration
+                    .redistribute_photon_counts_to_fixed_angle_width_bins(
+                        frame, module_index);
 
             plotter.plot_module_redistributed_to_fixed_angle_width_bins(
                 module_index, fixed_angle_width_bins_photon_counts.view(),

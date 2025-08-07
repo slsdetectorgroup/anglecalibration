@@ -32,7 +32,7 @@ void define_MythenFrame_bindings(py::module &m) {
 void define_MythenFileReader_bindings(py::module &m) {
     py::class_<MythenFileReader, std::shared_ptr<MythenFileReader>>(
         m, "MythenFileReader")
-        .def(py::init<const std::filesystem::path &>(), py::arg("file_path"))
+        .def(py::init<>())
 
         .def("read_frame",
              [](MythenFileReader &self, const std::string &file_name) {

@@ -24,46 +24,6 @@ inline auto data_path() {
 
 using namespace angcal;
 
-// helper functions
-NDArray<double, 1>
-get_redistributed_photon_counts(const AngleCalibration &anglecalibration,
-                                const size_t module_index,
-                                const MythenFrame &frame) {
-
-    const ssize_t new_num_bins = anglecalibration.new_number_of_bins();
-
-    NDArray<double, 1> fixed_angle_width_bins_photon_counts(
-        std::array<ssize_t, 1>{new_num_bins}, 0.0);
-    NDArray<double, 1> fixed_angle_width_bins_photon_counts_variance(
-        std::array<ssize_t, 1>{new_num_bins}, 0.0);
-
-    anglecalibration
-        .redistribute_photon_counts_to_fixed_angle_width_bins<false>(
-            module_index, frame, fixed_angle_width_bins_photon_counts.view(),
-            fixed_angle_width_bins_photon_counts_variance.view());
-
-    return fixed_angle_width_bins_photon_counts;
-}
-
-NDArray<double, 1>
-get_base_peak_region_of_interest(const AngleCalibration &anglecalibration,
-                                 const size_t module_index,
-                                 const MythenFrame &frame) {
-
-    NDArray<double, 1> base_peak_roi_photon_counts(
-        std::array<ssize_t, 1>{anglecalibration.get_base_peak_ROI_num_bins()},
-        0.0);
-    NDArray<double, 1> base_peak_roi_photon_counts_variance(
-        std::array<ssize_t, 1>{anglecalibration.get_base_peak_ROI_num_bins()},
-        0.0);
-
-    anglecalibration.redistribute_photon_counts_to_fixed_angle_width_bins<true>(
-        module_index, frame, base_peak_roi_photon_counts.view(),
-        base_peak_roi_photon_counts_variance.view());
-
-    return base_peak_roi_photon_counts;
-}
-
 int main() {
 
     auto file_path = data_path() / "Antonio20250512" / "angcal_M3_Mar21_2";
@@ -119,11 +79,9 @@ int main() {
 
     LOG(TLogLevel::logDEBUG) << "read flatfield from file";
 
-    // TODO change MythenFileReader to not take path
-    MythenFileReader mythen_file_reader(file_path);
+    MythenFileReader mythen_file_reader;
 
-    AngleCalibration anglecalibration(mythen_detector_ptr, flat_field_ptr,
-                                      file_path);
+    AngleCalibration anglecalibration(mythen_detector_ptr, flat_field_ptr);
 
     std::string initial_angles_filename = file_path / "angcal_Mar2021_P10.off";
 
@@ -135,8 +93,9 @@ int main() {
     std::vector<std::string> filelist(1001); // 1001
 
     size_t i = 0;
-    std::generate(filelist.begin(), filelist.end(), [&i]() {
-        return "ang1dnSi0p3mm_" + fmt::format("{:04}", i++) + ".h5";
+    std::generate(filelist.begin(), filelist.end(), [&i, &file_path]() {
+        return file_path /
+               ("ang1dnSi0p3mm_" + fmt::format("{:04}", i++) + ".h5");
     });
 
 #ifdef ANGCAL_PLOT
@@ -156,7 +115,8 @@ int main() {
     anglecalibration.set_base_peak_angle(base_peak_angle);
 
     // plot some stuff
-    MythenFrame frame = mythen_file_reader.read_frame("ang1dnSi0p3mm_0170.h5");
+    MythenFrame frame =
+        mythen_file_reader.read_frame(file_path / "ang1dnSi0p3mm_0170.h5");
 
 #ifdef ANGCAL_PLOT
     plot_photon_counts(frame.photon_counts.view(),
@@ -200,7 +160,8 @@ int main() {
     module_index = 3;
 
     auto module_redistributed_to_fixed_angle_bins =
-        get_redistributed_photon_counts(anglecalibration, module_index, frame);
+        anglecalibration.redistribute_photon_counts_to_fixed_angle_width_bins(
+            frame, module_index);
     plotter.plot_module_redistributed_to_fixed_angle_width_bins(
         module_index, module_redistributed_to_fixed_angle_bins.view(),
         frame.detector_angle);
@@ -213,7 +174,8 @@ int main() {
 #ifdef ANGCAL_PLOT
     module_index = 3;
     auto base_peak_for_module =
-        get_base_peak_region_of_interest(anglecalibration, module_index, frame);
+        anglecalibration.redistributed_photon_counts_in_base_peak_ROI(
+            frame, module_index);
     plotter.plot_base_peak_region_of_interest(module_index,
                                               base_peak_for_module.view());
 #endif

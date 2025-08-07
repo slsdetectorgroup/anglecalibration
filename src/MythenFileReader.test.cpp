@@ -22,9 +22,10 @@ TEST_CASE("test mythenfile_reader", "[.mythenfilereader][.files]") {
 
     REQUIRE(std::filesystem::exists(fpath));
 
-    MythenFileReader file_reader(fpath);
+    MythenFileReader file_reader;
 
-    auto frame = file_reader.read_frame("ang1up_22keV_LaB60p3mm_48M_a_0320.h5");
+    auto frame =
+        file_reader.read_frame(fpath / "ang1up_22keV_LaB60p3mm_48M_a_0320.h5");
 
     CHECK(frame.detector_angle == 0.99955);
 

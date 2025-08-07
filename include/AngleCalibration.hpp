@@ -50,7 +50,6 @@ class AngleCalibration {
     AngleCalibration(
         std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
         std::shared_ptr<FlatField> flat_field_,
-        const std::filesystem::path &file_path_,
         std::optional<std::shared_ptr<MythenFileReader>> mythen_file_reader_ =
             std::nullopt,
         std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr_ =
@@ -97,9 +96,6 @@ class AngleCalibration {
                        const std::filesystem::path &filepath =
                            std::filesystem::current_path()) const;
 
-    double calculate_similarity_of_peaks(const size_t module_index,
-                                         PlotHandle gp = nullptr) const;
-
     /** check if base_peak is cituated in module
      * @param bounds_in_angle: boundary that is acceptable [degrees]- per
      * default the base peak ROI width is used
@@ -116,25 +112,14 @@ class AngleCalibration {
 
     bool module_is_disconnected(const size_t module_index) const;
 
-    /**
-     * redistributes photon counts around region of interest of base peak to
-     * fixed angle width bins
-     * @param module_index index of module
-     * @param frame MythenFrame storing data from acquisition
-     * @param new_fixed_angle_width_bin_histogram accumulate new photon counts
-     * (histogram covers region of interest around base peak)
-     */
-    template <bool base_peak_ROI_only = false>
-    void redistribute_photon_counts_to_fixed_angle_width_bins(
-        const size_t module_index, const MythenFrame &frame,
-        NDView<double, 1> fixed_angle_width_bins_photon_counts,
-        NDView<double, 1> fixed_angle_width_bins_photon_counts_variance,
-        std::optional<NDView<double, 1>> S0 = std::nullopt,
-        std::optional<NDView<double, 1>> S1 = std::nullopt,
-        std::optional<NDView<double, 1>> S2 = std::nullopt) const;
-
     NDArray<double, 1> redistribute_photon_counts_to_fixed_angle_width_bins(
         const MythenFrame &frame) const;
+
+    NDArray<double, 1> redistribute_photon_counts_to_fixed_angle_width_bins(
+        const MythenFrame &frame, const size_t module_index) const;
+
+    NDArray<double, 1> redistributed_photon_counts_in_base_peak_ROI(
+        const MythenFrame &frame, const size_t module_index) const;
 
     /** calculates diffraction angle from EE module parameters (used in
      * Beer's Law)
@@ -180,6 +165,26 @@ class AngleCalibration {
     /** converts global strip index to local strip index of that module */
     size_t global_to_local_strip_index_conversion(
         const size_t global_strip_index) const;
+
+    /**
+     * redistributes photon counts around region of interest of base peak to
+     * fixed angle width bins
+     * @param module_index index of module
+     * @param frame MythenFrame storing data from acquisition
+     * @param new_fixed_angle_width_bin_histogram accumulate new photon counts
+     * (histogram covers region of interest around base peak)
+     */
+    template <bool base_peak_ROI_only = false>
+    void redistribute_photon_counts_to_fixed_angle_width_bins(
+        const size_t module_index, const MythenFrame &frame,
+        NDView<double, 1> fixed_angle_width_bins_photon_counts,
+        NDView<double, 1> fixed_angle_width_bins_photon_counts_variance,
+        std::optional<NDView<double, 1>> S0 = std::nullopt,
+        std::optional<NDView<double, 1>> S1 = std::nullopt,
+        std::optional<NDView<double, 1>> S2 = std::nullopt) const;
+
+    double calculate_similarity_of_peaks(const size_t module_index,
+                                         PlotHandle gp = nullptr) const;
 
     /**
      * compares multiple ROI around peaks and calculates similarity/variance

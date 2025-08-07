@@ -29,20 +29,15 @@ struct MythenFrame {
 class MythenFileReader : public HDF5FileReader {
 
   public:
-    MythenFileReader(const std::filesystem::path &file_path_)
-        : m_base_path(file_path_) {};
+    MythenFileReader() = default;
 
-    //
     MythenFrame read_frame(const std::string &file_name) {
         // TODO not a good design fixed number of digits in file name for frame
         // number -> pad with zeros
         //  not even sure if files have the same name
-        std::string current_file_name =
-            m_base_path /
-            file_name; //(file_prefix + std::to_string(frame_index) + ".h5");
 
         MythenFrame frame;
-        open_file(current_file_name);
+        open_file(file_name);
 
         auto dataset_photon_count =
             get_dataset("/entry/instrument/detector/data");
@@ -80,9 +75,6 @@ class MythenFileReader : public HDF5FileReader {
 
         return frame;
     }
-
-  private:
-    std::filesystem::path m_base_path{};
 };
 
 } // namespace angcal
