@@ -76,8 +76,7 @@ class AngleCalibration {
      */
     void read_initial_calibration_from_file(const std::string &filename);
 
-    const DGParameters &get_DGparameters() const; // TODO: do i want a
-                                                  // reference?
+    const DGParameters &get_DGparameters() const;
 
     /**
      * calibrates the DG parameters
@@ -105,7 +104,7 @@ class AngleCalibration {
      * @param bounds_in_angle: boundary that is acceptable [degrees]- per
      * default the base peak ROI width is used
      * @return true if [base_peak - bound_in_angle, base_peak + bound_in_angle]
-     * overlap with the module region in angles
+     * overlap with the module region in degrees
      */
     bool base_peak_is_in_module(
         const size_t module_index, const double detector_angle,

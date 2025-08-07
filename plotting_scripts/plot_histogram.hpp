@@ -13,6 +13,7 @@ namespace angcal {
 
 inline size_t plot_window = 0;
 
+// TODO should be more generic
 template <typename T>
 void plot_photon_counts(
     const aare::NDView<T, 1> photon_counts,

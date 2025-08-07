@@ -261,13 +261,6 @@ double
 AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
                                                 PlotHandle gp) const {
 
-    LOG(TLogLevel::logDEBUG1)
-        << "module center: " << DGparameters.centers(module_index);
-    LOG(TLogLevel::logDEBUG1)
-        << "module offset: " << DGparameters.offsets(module_index);
-    LOG(TLogLevel::logDEBUG1)
-        << "module conversion: " << DGparameters.conversions(module_index);
-
     ssize_t num_bins_in_ROI = 2 * base_peak_roi + 1;
     // used to calculate similarity criterion between peaks of different
     // acquisition S_index = sum_i^num_runs
@@ -333,9 +326,23 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
         }
     }
 
+    // handle those cases
+    if (num_runs == 0) {
+        LOG(TLogLevel::logDEBUG) << "there was no frame where base peak ROI "
+                                    "overlapped with module region";
+        LOG(TLogLevel::logDEBUG)
+            << "angle between module center and sample-module normal: "
+            << BCparameters.angle_center_module_normal(module_index);
+        LOG(TLogLevel::logDEBUG)
+            << "sample-module center distance: "
+            << BCparameters.module_center_sample_distances(module_index);
+        LOG(TLogLevel::logDEBUG)
+            << "angle between module center and beam direction: "
+            << BCparameters.angle_center_beam(module_index);
+    }
+
 #ifdef ANGCAL_PLOT
     gp->flush(); // make plot appear
-    LOG(TLogLevel::logDEBUG1) << "num_runs: " << num_runs;
     std::this_thread::sleep_for(
         std::chrono::milliseconds(500)); // let gnuplot update
 #endif

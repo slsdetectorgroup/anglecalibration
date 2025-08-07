@@ -46,8 +46,9 @@ get_redistributed_photon_counts(const AngleCalibration &anglecalibration,
 }
 
 NDArray<double, 1>
-get_base_peak_for_module(const AngleCalibration &anglecalibration,
-                         const size_t module_index, const MythenFrame &frame) {
+get_base_peak_region_of_interest(const AngleCalibration &anglecalibration,
+                                 const size_t module_index,
+                                 const MythenFrame &frame) {
 
     NDArray<double, 1> base_peak_roi_photon_counts(
         std::array<ssize_t, 1>{anglecalibration.get_base_peak_ROI_num_bins()},
@@ -62,48 +63,6 @@ get_base_peak_for_module(const AngleCalibration &anglecalibration,
 
     return base_peak_roi_photon_counts;
 }
-
-// TODO change MythenFileReader to not take path
-#ifdef ANGCAL_PLOT
-/*
- * plots the module for all frames where module is within base_peak_boundary of
- * the module
- */
-void plot_module_in_angle_for_all_frames(
-    const AngleCalibration &anglecalibration, const PlotHelper &plotter,
-    MythenFileReader &mythenfilereader, std::vector<std::string> &filelist,
-    const size_t module_index, std::optional<double> base_peak_boundary) {
-
-    std::shared_ptr<Gnuplot> gp = std::make_shared<Gnuplot>();
-    size_t frame_number = 0;
-    for (const auto &file : filelist) {
-
-        MythenFrame frame = mythenfilereader.read_frame(file);
-
-        if (anglecalibration.base_peak_is_in_module(
-                module_index, frame.detector_angle, base_peak_boundary)) {
-            auto base_peak_photon_counts = get_redistributed_photon_counts(
-                anglecalibration, module_index, frame);
-
-            plotter.plot_module_redistributed_to_fixed_angle_width_bins(
-                module_index, base_peak_photon_counts.view(),
-                frame.detector_angle, gp);
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            *gp << "clear \n"; // plot in the same window
-        } else {
-            LOG(TLogLevel::logDEBUG)
-                << "base peak not in module " << module_index;
-        }
-
-        LOG(TLogLevel::logDEBUG1) << fmt::format("frame {} of {} frames",
-                                                 frame_number, filelist.size());
-        ++frame_number;
-    }
-    plotter.pause();
-}
-
-#endif
 
 int main() {
 
@@ -139,6 +98,10 @@ int main() {
     std::string flatfield_filename =
         file_path / "Flatfield_E17p5keV_T8751eV_MIX_Mar2021_open_WS.raw";
 
+    // TODO: do I want to pass an inverse flatfield or only read flatfield and
+    // calculate in Flatfield class
+    //  inverse_flatfield is only properly allocated when calling
+    //  inverse_flatfield
     NDArray<double, 1> inverse_normalized_flatfield(
         std::array<ssize_t, 1>{mythen_detector_ptr->num_strips()});
     CustomFlatFieldFile flatfieldfilereader;
@@ -147,8 +110,16 @@ int main() {
     flat_field_ptr->set_inverse_normalized_flatfield(
         inverse_normalized_flatfield);
 
+#ifdef ANGCAL_PLOT
+    plot_photon_counts(inverse_normalized_flatfield.view(),
+                       {0, mythen_detector_ptr->num_strips()},
+                       "Inverse normalized flatfield", mythen_detector_ptr);
+    PlotHelper::pause();
+#endif
+
     LOG(TLogLevel::logDEBUG) << "read flatfield from file";
 
+    // TODO change MythenFileReader to not take path
     MythenFileReader mythen_file_reader(file_path);
 
     AngleCalibration anglecalibration(mythen_detector_ptr, flat_field_ptr,
@@ -161,12 +132,6 @@ int main() {
 
     LOG(TLogLevel::logDEBUG) << "read initial parameters from file";
 
-    const double base_peak_angle = -31.73; // 36.0568;
-    // 35.550; // angpeak=69.225 - maybe select
-    // one yourself !!! -could this be off?
-
-    anglecalibration.set_base_peak_angle(base_peak_angle);
-
     std::vector<std::string> filelist(1001); // 1001
 
     size_t i = 0;
@@ -174,23 +139,49 @@ int main() {
         return "ang1dnSi0p3mm_" + fmt::format("{:04}", i++) + ".h5";
     });
 
+#ifdef ANGCAL_PLOT
+    // uncomment if you want to see all frames and select a base peak
+    /*
+    PlotHelper temp_plotter(
+        std::make_shared<AngleCalibration>(anglecalibration));
+    plot_module_in_angle_for_all_frames(anglecalibration, temp_plotter,
+                                        mythen_file_reader, filelist, 3);
+    */
+#endif
+
+    const double base_peak_angle = -31.73; // 36.0568;
+    // 35.550; // angpeak=69.225 - maybe select
+    // one yourself !!! -could this be off?
+
+    anglecalibration.set_base_peak_angle(base_peak_angle);
+
     // plot some stuff
     MythenFrame frame = mythen_file_reader.read_frame("ang1dnSi0p3mm_0170.h5");
 
 #ifdef ANGCAL_PLOT
-    PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
-
-    std::string plot_title = "Photon Counts";
-
     plot_photon_counts(frame.photon_counts.view(),
-                       {0, mythen_detector_ptr->num_strips()}, plot_title,
+                       {0, mythen_detector_ptr->num_strips()}, "Photon Counts",
                        mythen_detector_ptr);
 
-    plotter.pause();
+    PlotHelper::pause();
+
+    // normalize photon counts
+    NDArray<double, 1> normalized_photon_counts{frame.photon_counts.shape()};
+    for (ssize_t index = 0; index < frame.photon_counts.size(); ++index) {
+        normalized_photon_counts(index) =
+            frame.photon_counts(index) * inverse_normalized_flatfield(index);
+    }
+
+    plot_photon_counts(normalized_photon_counts.view(),
+                       {0, mythen_detector_ptr->num_strips()},
+                       "Normalized Photon Counts", mythen_detector_ptr);
+
+    PlotHelper::pause();
 #endif
 
 // plot everything redistributed to fixed angle width bins
 #ifdef ANGCAL_PLOT
+    PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
 
     auto new_fixed_angle_width_bins_photon_counts =
         anglecalibration.redistribute_photon_counts_to_fixed_angle_width_bins(
@@ -222,18 +213,10 @@ int main() {
 #ifdef ANGCAL_PLOT
     module_index = 3;
     auto base_peak_for_module =
-        get_base_peak_for_module(anglecalibration, module_index, frame);
-    plotter.plot_base_peak_of_module(module_index, base_peak_for_module.view());
+        get_base_peak_region_of_interest(anglecalibration, module_index, frame);
+    plotter.plot_base_peak_region_of_interest(module_index,
+                                              base_peak_for_module.view());
 #endif
 
-#ifdef ANGCAL_PLOT
-    /*
-    module_index = 8;
-    plot_module_in_angle_for_all_frames(anglecalibration, plotter,
-                                        mythen_file_reader, filelist,
-                                        module_index, 5);
-    */
-#endif
-
-    anglecalibration.calibrate(filelist, base_peak_angle);
+    // anglecalibration.calibrate(filelist, base_peak_angle);
 }
