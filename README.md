@@ -47,7 +47,7 @@ make install
  cmake .. -DCMAKE_PREFIX_PATH=/where/to/put/angcal
 ```
 
-### Example Usage
+## Example Usage
 
 A toy example of a calibration can be found in https://github.com/slsdetectorgroup/anglecalibration/blob/main/examples/example_calibration.cpp 
 
