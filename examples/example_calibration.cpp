@@ -7,6 +7,12 @@
 #include "PlotHelpers.hpp"
 #endif
 
+/**
+ * How to run: All data for this example can be found in the github directory
+ * https://gitea.psi.ch/angcal/VariaMay2025 before running execute: export
+ * ANGCAL_TEST_PATH=Path_to_git_repository
+ *
+ */
 inline auto data_path() {
     if (const char *env_p = std::getenv("ANGCAL_TEST_DATA")) {
         return std::filesystem::path(env_p);
@@ -59,6 +65,10 @@ get_base_peak_for_module(const AngleCalibration &anglecalibration,
 
 // TODO change MythenFileReader to not take path
 #ifdef ANGCAL_PLOT
+/*
+ * plots the module for all frames where module is within base_peak_boundary of
+ * the module
+ */
 void plot_module_in_angle_for_all_frames(
     const AngleCalibration &anglecalibration, const PlotHelper &plotter,
     MythenFileReader &mythenfilereader, std::vector<std::string> &filelist,
@@ -97,9 +107,7 @@ void plot_module_in_angle_for_all_frames(
 
 int main() {
 
-    auto file_path = data_path();
-
-    // auto acquisition_path = data_path() / "VariaMay2025/Antonio20250512";
+    auto file_path = data_path() / "Antonio20250512" / "angcal_M3_Mar21_2";
 
     assert(std::filesystem::exists(file_path));
 
@@ -116,9 +124,9 @@ int main() {
 
     LOG(TLogLevel::logDEBUG) << "read bad channels";
 
+    /*
     std::string unconnected_modules_filename = file_path / "ModOut.txt";
 
-    /*
     auto unconnected_modules =
         read_unconnected_modules(unconnected_modules_filename);
 
@@ -171,16 +179,6 @@ int main() {
 
 #ifdef ANGCAL_PLOT
     PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
-/*
-    // frame.photon_counts *=
-// flat_field_ptr->get_inverse_normalized_flatfield(); -> only stores
-// the first 14 connected modules - flatfield stores all modules
-NDArray<double, 1> normalized_photon_counts(frame.photon_counts.shape());
-for (ssize_t i = 0; i < frame.photon_counts.size(); ++i) {
-    normalized_photon_counts(i) =
-        frame.photon_counts(i) *
-        flat_field_ptr->get_inverse_normalized_flatfield()(i);
-}
 
     std::string plot_title = "Photon Counts";
 
@@ -188,22 +186,20 @@ for (ssize_t i = 0; i < frame.photon_counts.size(); ++i) {
                        {0, mythen_detector_ptr->num_strips()}, plot_title,
                        mythen_detector_ptr);
 
-    plot_photon_counts(normalized_photon_counts.view(),
-                       {0, mythen_detector_ptr->num_strips()}, plot_title,
-                       mythen_detector_ptr);
-    */
+    plotter.pause();
 #endif
 
 // plot everything redistributed to fixed angle width bins
 #ifdef ANGCAL_PLOT
-    /*
+
     auto new_fixed_angle_width_bins_photon_counts =
         anglecalibration.redistribute_photon_counts_to_fixed_angle_width_bins(
             frame);
 
     plotter.plot_redistributed_photon_counts(
         new_fixed_angle_width_bins_photon_counts.view());
-    */
+
+    plotter.pause();
 #endif
 
     size_t module_index = 3;
@@ -224,15 +220,11 @@ for (ssize_t i = 0; i < frame.photon_counts.size(); ++i) {
     // plot base peak for one module
 
 #ifdef ANGCAL_PLOT
-    /*
     module_index = 3;
     auto base_peak_for_module =
         get_base_peak_for_module(anglecalibration, module_index, frame);
     plotter.plot_base_peak_of_module(module_index, base_peak_for_module.view());
-    */
 #endif
-
-    module_index = 7;
 
 #ifdef ANGCAL_PLOT
     /*
@@ -241,10 +233,7 @@ for (ssize_t i = 0; i < frame.photon_counts.size(); ++i) {
                                         mythen_file_reader, filelist,
                                         module_index, 5);
     */
-
 #endif
 
-    anglecalibration.calibrate(filelist, base_peak_angle, 3);
-
-    // anglecalibration.calibrate(filelist, base_peak_angle);
+    anglecalibration.calibrate(filelist, base_peak_angle);
 }
