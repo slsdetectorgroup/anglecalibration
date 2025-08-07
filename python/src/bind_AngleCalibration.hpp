@@ -82,7 +82,7 @@ void define_AngleCalibration_binding(py::module &m) {
                  auto result = new NDArray<double, 1>(
                      self.redistributed_photon_counts_in_base_peak_ROI(
                          frame, module_index));
-                 return_image_data(result);
+                 return return_image_data(result);
              })
 
         .def("redistribute_photon_counts_to_fixed_angle_width_bins",
@@ -91,7 +91,7 @@ void define_AngleCalibration_binding(py::module &m) {
                  auto result = new NDArray<double, 1>(
                      self.redistribute_photon_counts_to_fixed_angle_width_bins(
                          frame, module_index));
-                 return_image_data(result);
+                 return return_image_data(result);
              })
 
         .def("redistribute_photon_counts_to_fixed_angle_width_bins",
@@ -99,6 +99,6 @@ void define_AngleCalibration_binding(py::module &m) {
                  auto result = new NDArray<double, 1>(
                      self.redistribute_photon_counts_to_fixed_angle_width_bins(
                          frame));
-                 return_image_data(result);
+                 return return_image_data(result);
              });
 }

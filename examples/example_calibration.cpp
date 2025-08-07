@@ -37,8 +37,6 @@ int main() {
 
     assert(std::filesystem::exists(bad_channels_filename));
 
-    auto bad_channels = mythen_detector_ptr->get_bad_channels();
-
     mythen_detector_ptr->read_bad_channels_from_file(bad_channels_filename);
 
     LOG(TLogLevel::logDEBUG) << "read bad channels";

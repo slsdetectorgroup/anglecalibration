@@ -194,7 +194,7 @@ class FlatField {
         return normalized_flat_field.view();
     }
 
-    void inverse_normalized_flatfield() {
+    void calculate_inverse_normalized_flatfield() {
         double mean = calculate_mean();
 
         inverse_normalized_flat_field = NDArray<double, 1>(flat_field.shape());
@@ -212,7 +212,7 @@ class FlatField {
         }
     }
 
-    void normalized_flatfield() {
+    void calculate_normalized_flatfield() {
         double mean = calculate_mean();
 
         normalized_flat_field = NDArray<double, 1>(flat_field.shape());

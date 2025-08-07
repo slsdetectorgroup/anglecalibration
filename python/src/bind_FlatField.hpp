@@ -51,17 +51,32 @@ void define_FlatField_binding(py::module &m) {
                     temp_array); // second copy TODO im copying twice
             })
 
-        .def("inverse_normalized_flatfield",
-             &FlatField::inverse_normalized_flatfield)
+        .def_property(
+            "inverse_normalized_flatfield",
+            [](FlatField &self) {
+                auto result = new NDArray<double, 1>(
+                    self.get_inverse_normalized_flatfield());
+                return return_image_data(result); // maybe return memory view
+            },
+            [](FlatField &self,
+               py::array_t<double, py::array::c_style | py::array::forcecast>
+                   &inverse_normalized_flatfield) {
+                py::buffer_info info = inverse_normalized_flatfield.request();
+                NDView<double, 1> temp_array_view(
+                    reinterpret_cast<double *>(info.ptr),
+                    std::array<ssize_t, 1>{info.shape[0]});
+                NDArray<double, 1> temp_array(
+                    temp_array_view); // first copy //maybe modify buffer //or
+                                      // iterate
+                self.set_inverse_normalized_flatfield(
+                    temp_array); // second copy TODO im copying twice
+            })
 
-        .def("normalized_flatfield", &FlatField::normalized_flatfield)
+        .def("calculate_normalized_flatfield",
+             &FlatField::calculate_normalized_flatfield)
 
-        .def_property_readonly("get_inverse_normalized_flatfield",
-                               [](FlatField &self) {
-                                   auto result = new NDArray<double, 1>(
-                                       self.get_inverse_normalized_flatfield());
-                                   return return_image_data(result);
-                               })
+        .def("calculate_inverse_normalized_flatfield",
+             &FlatField::calculate_inverse_normalized_flatfield)
 
         .def_property_readonly("get_normalized_flatfield", [](FlatField &self) {
             auto result =
