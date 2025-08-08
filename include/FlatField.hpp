@@ -190,6 +190,11 @@ class FlatField {
         return inverse_normalized_flat_field.view();
     }
 
+    void
+    set_normalized_flatfield(const NDArray<double, 1> &normalized_flatfield_) {
+        normalized_flat_field = normalized_flatfield_;
+    }
+
     NDView<double, 1> get_normalized_flatfield() const {
         return normalized_flat_field.view();
     }

@@ -23,7 +23,8 @@
 
 #ifdef ANGCAL_PLOT
 #include "plot_histogram.hpp"
-using PlotHandle = Gnuplot *; // Or reference wrapper
+using PlotHandle =
+    std::shared_ptr<angcal::PlotCalibrationProcess>; // Or reference wrapper
 #else
 using PlotHandle = std::nullptr_t;
 #endif
@@ -36,16 +37,16 @@ class AngleCalibration {
 
   public:
     /**
-     * ptr to MythenDetectorSpecifications storing all specific variables of
-     mythen detector
-     * ptr to FlatField class
-     * @param file_path_ base_path to acquisition files
+     * @param mythen_detector_ ptr to MythenDetectorSpecifications storing all
+     mythen specific parameters
+     * @param flat_field_ ptr to FlatField storing (Note calculate inverse
+     normalized flatfield before usage)
      * @param mythen_file_reader optional, pass if you use custom acquisition
      files - default: reads hdf5 files
      * @param custom_file_ptr optional, pass if you use custom files to store
      initial angle parameters - default: initial angle parameters supports
-     * format module [module_index] center [center] +- [error] conversion
-     [conversion] +- [error] offset [offset] +- [error]
+     * following format module [module_index] center [center] +- [error]
+     conversion [conversion] +- [error] offset [offset] +- [error]
      */
     AngleCalibration(
         std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
@@ -55,15 +56,25 @@ class AngleCalibration {
         std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr_ =
             std::nullopt);
 
-    /** set the histogram bin width [degrees] */
+    /** set the histogram bin width [degrees]
+     * default 0.0036
+     */
     void set_histogram_bin_width(double bin_width);
 
     double get_histogram_bin_width() const;
 
+    /** number of bins of fixed angle width bin histogram */
     ssize_t new_number_of_bins() const;
 
+    /** number of bins covered of base peak region of interest
+     * default 101 bins
+     */
     ssize_t get_base_peak_ROI_num_bins() const;
 
+    /** base peak region of interest boundary e.g. [base_peak - base_peak_ROI,
+     * base_peak + base_peak_ROI] given in bins
+     * default (50 bins)
+     * */
     ssize_t get_base_peak_ROI() const;
 
     std::shared_ptr<MythenDetectorSpecifications>
@@ -75,30 +86,40 @@ class AngleCalibration {
      */
     void read_initial_calibration_from_file(const std::string &filename);
 
-    const DGParameters &get_DGparameters() const;
+    const DGParameters &get_DGparameters() const; // TODO do I need that?
 
     /**
-     * calibrates the DG parameters
+     * @brief calibrates the BC (best computing) parameters
      * @param file_list vector of file_names of acquisition files - detector
      * position should change
      * @param base_peak_angle angle of the selcted base peak given in degrees
-     * (generally base peaks are tabulated peaks based on sample) //TODO: in
-     * radians or degrees?
+     * (generally base peaks are tabulated peaks based on sample)
      */
     void calibrate(const std::vector<std::string> &file_list,
                    const double base_peak_angle);
 
+    /**
+     * @brief calibrates the BC (best computing) parameters for one module
+     * @param file_list vector of file_names of acquisition files - detector
+     * position should change
+     * @param base_peak_angle angle of the selcted base peak given in degrees
+     * (generally base peaks are tabulated peaks based on sample)
+     * @param module_index index of module to be calibrated
+     */
     void calibrate(const std::vector<std::string> &file_list_,
                    const double base_peak_angle_, const size_t module_index);
 
+    // deprecated
     void write_to_file(const std::string &filename,
                        const bool store_nonzero_bins = false,
                        const std::filesystem::path &filepath =
                            std::filesystem::current_path()) const;
 
-    /** check if base_peak is cituated in module
+    /** @brief check if base_peak ROI overlaps with module region
+     * @param detector_angle: detector position at which acquisition is taken
      * @param bounds_in_angle: boundary that is acceptable [degrees]- per
-     * default the base peak ROI width is used
+     * default the base peak ROI width is used (adjustable for debugging) //TODO
+     * deprecated
      * @return true if [base_peak - bound_in_angle, base_peak + bound_in_angle]
      * overlap with the module region in degrees
      */
@@ -106,42 +127,71 @@ class AngleCalibration {
         const size_t module_index, const double detector_angle,
         std::optional<double> bounds_in_angles = std::nullopt) const;
 
+    /**
+     * @brief set angle of base_peak_module to calibrate
+     */
     void set_base_peak_angle(const double base_peak_angle_);
 
     double get_base_peak_angle() const;
 
+    /**
+     * @brief check if a module only has bad channels
+     */
     bool module_is_disconnected(const size_t module_index) const;
 
+    /**
+     * @brief redistribute photon counts to fixed angle width bins
+     */
     NDArray<double, 1> redistribute_photon_counts_to_fixed_angle_width_bins(
         const MythenFrame &frame) const;
 
+    /**
+     * @brief redistribute photon counts to fixed angle width bins for the
+     * specified module region
+     * @param module_index: index of module region to redistribute
+     */
     NDArray<double, 1> redistribute_photon_counts_to_fixed_angle_width_bins(
         const MythenFrame &frame, const size_t module_index) const;
 
+    /**
+     * @brief redistribute photon counts to fixed angle width bins for base peak
+     * region
+     * @param module_index: index of module region to redistribute
+     */
     NDArray<double, 1> redistributed_photon_counts_in_base_peak_ROI(
         const MythenFrame &frame, const size_t module_index) const;
 
-    /** calculates diffraction angle from EE module parameters (used in
+    /** @brief calculates diffraction angle from DG module parameters (used in
      * Beer's Law)
-     * @param center module center
-     * @param conversion module conversion
-     * @param offset module offset
+     * @param module_index
+     * @param detector_angle detector position at which acquisition is taken
      * @param strip_index local strip index of module
-     * @param distance_to_strip distance to strip given by strip_index and
-     * module -> note needs to be small enough to be in the respective module
+     * @param distance_to_strip distance to strip [given in strip bins]
      * @return diffraction angle in degrees
      */
     double diffraction_angle_from_DG_parameters(
         const size_t module_index, const double detector_angle,
         const size_t strip_index, const double distance_to_strip = 0) const;
 
+    /** @brief calculates diffraction angle from BC (best computing) module
+     * parameters (used in Beer's Law)
+     * @param module_index
+     * @param detector_angle detector position at which acquisition is taken
+     * @param strip_index local strip index of module
+     * @param distance_to_strip distance to strip [given in strip bins]
+     * @return diffraction angle in degrees
+     */
     double diffraction_angle_from_BC_parameters(
         const size_t module_index, const double detector_angle,
         const size_t strip_index, const double distance_to_strip = 0) const;
 
-    /** calculates diffraction angle from EE module parameters (used in
+    /** @brief calculates diffraction angle from EE module parameters (used in
      * Beer's Law)
+     * @param module_index
+     * @param detector_angle detector position at which acquisition is taken
      * @param strip_index local strip index of module
+     * @param distance_to_strip distance to strip [given in strip bins]
+     * @return diffraction angle in degrees
      */
     double diffraction_angle_from_EE_parameters(
         const double module_center_distance, const double normal_distance,
@@ -149,30 +199,48 @@ class AngleCalibration {
         const size_t strip_index, const double distance_to_strip = 0) const;
 
   private:
-    /** calculated the strip width expressed as angle [degrees]
+    /** @brief calculated the strip width expressed as angle [degrees] from DG
+     * module parameters
+     * @param moudle_index index of module
      * @param strip_index local strip index of module
      */
     double angular_strip_width_from_DG_parameters(
         const size_t module_index, const size_t local_strip_index) const;
 
+    /** @brief calculated the strip width expressed as angle [degrees] from BC
+     * module parameters
+     * @param moudle_index index of module
+     * @param strip_index local strip index of module
+     */
     double angular_strip_width_from_BC_parameters(
         const size_t module_index, const size_t local_strip_index) const;
 
+    /** @brief calculated the strip width expressed as angle [degrees] from EE
+     * module parameters
+     * @param moudle_index index of module
+     * @param strip_index local strip index of module
+     */
     double angular_strip_width_from_EE_parameters(
         const double module_center_distance, const double normal_distance,
         const double angle, const size_t local_strip_index) const;
 
-    /** converts global strip index to local strip index of that module */
+    // TODO deprecated
+    /** @brief converts global strip index to local strip index of that module
+     */
     size_t global_to_local_strip_index_conversion(
         const size_t global_strip_index) const;
 
     /**
-     * redistributes photon counts around region of interest of base peak to
+     * @brief redistributes photon counts around designated region to
      * fixed angle width bins
+     * @tparam base_peak_ROI_only: false (use module region), true: (only use
+     * base peak ROI)
      * @param module_index index of module
-     * @param frame MythenFrame storing data from acquisition
-     * @param new_fixed_angle_width_bin_histogram accumulate new photon counts
-     * (histogram covers region of interest around base peak)
+     * @param frame data from acquisition
+     * @param fixed_angle_width_bin_photon_counts stores redistributed photon
+     * counts for fixed angle width bin
+     * @param fixed_angle_width_bins_photon_counts_variance stores variance
+     * @param S0, S1, S2 used to calculate similarity criterion between peaks
      */
     template <bool base_peak_ROI_only = false>
     void redistribute_photon_counts_to_fixed_angle_width_bins(
@@ -183,12 +251,18 @@ class AngleCalibration {
         std::optional<NDView<double, 1>> S1 = std::nullopt,
         std::optional<NDView<double, 1>> S2 = std::nullopt) const;
 
+    /**
+     * @brief redistributes photon counts to fixed angle width bins around base
+     * peak for all acquisitions in file_list and calculates the similarity
+     * between the found base peaks
+     */
     double calculate_similarity_of_peaks(const size_t module_index,
                                          PlotHandle gp = nullptr) const;
 
     /**
-     * compares multiple ROI around peaks and calculates similarity/variance
-     * based on goodness_of_fit and weighted average
+     * compares multiple base peak ROIS from different acquisitions and
+     * calculate similarity/variance based on goodness_of_fit and weighted
+     * average
      * @param S0 photon_varaince over all runs
      * @param S1 photon_variance*photon_count over all runs
      * @param S2 photon_variance*photon_count² over all runs
@@ -201,6 +275,13 @@ class AngleCalibration {
 
     // TODO: also a bad design - make shift_parameter configurable - consider
     // having second class Optimization
+    /**
+     * optimizes BC parameters of given module based on similarity criterion
+     * @param shift_parameter1 parameter step for parameter angle between module
+     * center and module normal (angle_center_module_normal)
+     * @param shift_parameter2 parameter step for parameter distance between
+     * module center and sample (module_center_sample_distances)
+     */
     void optimization_algorithm(const size_t module_index,
                                 PlotHandle gp = nullptr,
                                 const double shift_parameter1 = 0.01,
@@ -210,26 +291,37 @@ class AngleCalibration {
     DGParameters DGparameters{};
     BCParameters BCparameters{};
 
+    /**
+     * detector specifications
+     */
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector{};
 
     std::shared_ptr<FlatField> flat_field{};
 
-    NDArray<double, 1> new_photon_counts{};
-    NDArray<double, 1> new_photon_count_errors{};
+    /**
+     * bin width of fixed angle bin histogram [degrees]
+     */
+    double histogram_bin_width = 0.0036;
 
-    double histogram_bin_width = 0.0036; // [degrees]
+    /**
+     * region of interest of base peak given in bins
+     * [base_peak_angle_in_bins - base_peak_roi, base_peak_angle_in_bins +
+     * base_peak_roi]
+     */
+    ssize_t base_peak_roi = 50;
 
-    // TODO add in constructor or setter
-    ssize_t base_peak_roi = 50; // base_peak_as_bin_index +/- base_peak_roi -
-                                // region of interest around base peak
-
+    // TODO maybe deprecated - only compute in member function
     ssize_t num_bins{};
 
-    double base_peak_angle{}; // center of base peak in angles to use for
-                              // calibration
+    /**
+     * center of base peak to use for calibration [degrees]
+     */
+    double base_peak_angle{};
 
-    std::vector<std::string>
-        file_list{}; // list of acquisition files used for calibration
+    /**
+     * list of acquisition files used for calibration
+     */
+    std::vector<std::string> file_list{};
 
     std::shared_ptr<MythenFileReader>
         mythen_file_reader{}; // TODO replace by FileInterface ptr

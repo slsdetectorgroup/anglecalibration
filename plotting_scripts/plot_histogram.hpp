@@ -54,41 +54,6 @@ void plot_photon_counts(
     gp.send1d(plot_data);
 }
 
-inline void
-initialize_plot(Gnuplot &gp, const std::string &plot_title,
-                const std::string &xlabel = "Diffraction Angle [degree]",
-                const std::string &ylabel = "Photon Counts") {
-
-    gp << "set terminal qt " << plot_window++ << " persist\n";
-
-    gp << "set title \"" << plot_title << "\"\n";
-
-    gp << "set xlabel \"" << xlabel << "\"\n";
-    gp << "set ylabel \"" << ylabel << "\"\n";
-
-    gp << "plot sin(x) with lines lc rgb 'white' notitle \n"; // dummy
-    // gp << "plot NaN title ''\n";
-
-    // gp << "set multiplot \n";
-}
-
-template <typename Func>
-inline void append_to_plot(Gnuplot &gp,
-                           const aare::NDView<double, 1> photon_counts,
-                           const std::pair<size_t, size_t> bin_range,
-                           Func &&bin_index_to_angle_conversion,
-                           const std::string &datasetname) {
-
-    std::ofstream out(datasetname);
-    for (size_t bin = bin_range.first; bin < bin_range.second; ++bin) {
-        out << bin_index_to_angle_conversion(bin) << " " << photon_counts(bin)
-            << "\n";
-    }
-
-    gp << "replot '" << datasetname << "' using 1:2 with lines notitle\n";
-    gp.flush();
-}
-
 // maybe add a range
 // TODO add st::enable_if for FUnc
 template <typename Func>
@@ -114,5 +79,62 @@ inline void plot_photon_counts_for_fixed_angle_width_bins(
 
     gp.flush();
 }
+
+class PlotCalibrationProcess {
+
+  public:
+    PlotCalibrationProcess(
+        const std::string &plot_title,
+        const std::string &xlabel = "Diffraction Angle [degree]",
+        const std::string &ylabel = "Photon Counts") {
+        gp << "set terminal qt " << plot_window++ << " persist\n";
+
+        gp << "set title \"" << plot_title << "\"\n";
+
+        gp << "set xlabel \"" << xlabel << "\"\n";
+        gp << "set ylabel \"" << ylabel << "\"\n";
+
+        gp << "plot sin(x) with lines lc rgb 'white' notitle \n"; // dummy
+        // gp << "plot NaN title ''\n";
+
+        // gp << "set multiplot \n";
+    }
+
+    ~PlotCalibrationProcess() {
+        gp << "quit\n";
+        gp.flush();
+    }
+
+    inline void clear() {
+        gp << "clear\n";
+        gp.flush();
+        gp << "plot sin(x) with lines lc rgb 'white' lw 0 notitle \n"; // dummy
+                                                                       // value
+    }
+
+    inline void flush() { gp.flush(); }
+
+    template <typename Func>
+    inline void append_to_plot(const aare::NDView<double, 1> photon_counts,
+                               const std::pair<size_t, size_t> bin_range,
+                               Func &&bin_index_to_angle_conversion,
+                               const std::string &datasetname) {
+
+        std::ofstream out(datasetname);
+        for (size_t bin = bin_range.first; bin < bin_range.second; ++bin) {
+            out << bin_index_to_angle_conversion(bin) << " "
+                << photon_counts(bin) << "\n";
+        }
+
+        gp << "replot '" << datasetname << "' using 1:2 with lines notitle\n";
+        gp.flush();
+    }
+
+  private:
+    Gnuplot gp;
+    static size_t plot_window;
+};
+
+inline size_t PlotCalibrationProcess::plot_window = 0;
 
 } // namespace angcal

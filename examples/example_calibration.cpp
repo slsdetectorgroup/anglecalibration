@@ -66,10 +66,10 @@ int main() {
     flatfieldfilereader.open(flatfield_filename);
     flatfieldfilereader.read_into(inverse_normalized_flatfield.buffer(), 8);
     flat_field_ptr->set_inverse_normalized_flatfield(
-        inverse_normalized_flatfield);
+        inverse_normalized_flatfield); // mmh ugly workaround copied twice
 
 #ifdef ANGCAL_PLOT
-    plot_photon_counts(inverse_normalized_flatfield.view(),
+    plot_photon_counts(flat_field_ptr->get_inverse_normalized_flatfield(),
                        {0, mythen_detector_ptr->num_strips()},
                        "Inverse normalized flatfield", mythen_detector_ptr);
     PlotHelper::pause();
@@ -127,7 +127,8 @@ int main() {
     NDArray<double, 1> normalized_photon_counts{frame.photon_counts.shape()};
     for (ssize_t index = 0; index < frame.photon_counts.size(); ++index) {
         normalized_photon_counts(index) =
-            frame.photon_counts(index) * inverse_normalized_flatfield(index);
+            frame.photon_counts(index) *
+            flat_field_ptr->get_inverse_normalized_flatfield()(index);
     }
 
     plot_photon_counts(normalized_photon_counts.view(),
@@ -176,7 +177,9 @@ int main() {
             frame, module_index);
     plotter.plot_base_peak_region_of_interest(module_index,
                                               base_peak_for_module.view());
+    plotter.pause();
 #endif
 
+    anglecalibration.calibrate(filelist, base_peak_angle, 3);
     // anglecalibration.calibrate(filelist, base_peak_angle);
 }

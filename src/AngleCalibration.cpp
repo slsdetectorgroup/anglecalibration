@@ -2,6 +2,7 @@
 
 #include "logger.hpp"
 
+#include <csignal>
 #include <cstdlib>
 #include <filesystem>
 
@@ -11,6 +12,25 @@
 #endif
 
 namespace angcal {
+
+#ifdef ANGCAL_PLOT
+inline void handle_sigint(int) {
+    LOG(TLogLevel::logINFO) << "\nSIGINT caught — shutting down...\n";
+    std::exit(EXIT_SUCCESS); // cleans up all heap allocated objects
+}
+struct SignalHandler {
+    SignalHandler() {
+        std::signal(
+            SIGINT,
+            handle_sigint); // used for proper clean up //actually not
+                            // properly cleaned up - e.g. memory of
+                            // flatfield DGParameters never freed. - need to
+                            // call AngleCalibration destructor before hand
+                            // - so should I define in AngleCalibration?
+    }
+};
+inline SignalHandler signalhandler;
+#endif
 
 AngleCalibration::AngleCalibration(
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
@@ -258,7 +278,7 @@ bool AngleCalibration::base_peak_is_in_module(
 
 double
 AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
-                                                PlotHandle gp) const {
+                                                PlotHandle plot) const {
 
     ssize_t num_bins_in_ROI = 2 * base_peak_roi + 1;
     // used to calculate similarity criterion between peaks of different
@@ -273,11 +293,19 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
         std::filesystem::current_path().parent_path() / "build" / "data";
     if (!std::filesystem::exists(data_file_path))
         std::filesystem::create_directories(data_file_path);
-    *gp << "clear\n";
-    gp->flush();
-    *gp << "plot sin(x) with lines lc rgb 'white' lw 0 notitle \n"; // dummy
-                                                                    // value
+    plot->clear();
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 #endif
+
+    LOG(TLogLevel::logDEBUG1)
+        << "angle between module center and sample-module normal: "
+        << BCparameters.angle_center_module_normal(module_index);
+    LOG(TLogLevel::logDEBUG1)
+        << "sample-module center distance: "
+        << BCparameters.module_center_sample_distances(module_index);
+    LOG(TLogLevel::logDEBUG1)
+        << "angle between module center and beam direction: "
+        << BCparameters.angle_center_beam(module_index);
 
     size_t num_runs = 0;
     for (const auto &file : file_list) {
@@ -316,10 +344,10 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
                 std::filesystem::path(file).stem().string() + ".dat";
             auto dataset_name = data_file_path / filename;
 
-            append_to_plot(*gp, fixed_angle_width_bins_photon_counts.view(),
-                           {0, 2 * base_peak_roi + 1},
-                           bin_to_diffraction_angle_base_peak_ROI_only,
-                           dataset_name);
+            plot->append_to_plot(fixed_angle_width_bins_photon_counts.view(),
+                                 {0, 2 * base_peak_roi + 1},
+                                 bin_to_diffraction_angle_base_peak_ROI_only,
+                                 dataset_name);
 #endif
             ++num_runs;
         }
@@ -329,21 +357,12 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
     if (num_runs == 0) {
         LOG(TLogLevel::logDEBUG) << "there was no frame where base peak ROI "
                                     "overlapped with module region";
-        LOG(TLogLevel::logDEBUG)
-            << "angle between module center and sample-module normal: "
-            << BCparameters.angle_center_module_normal(module_index);
-        LOG(TLogLevel::logDEBUG)
-            << "sample-module center distance: "
-            << BCparameters.module_center_sample_distances(module_index);
-        LOG(TLogLevel::logDEBUG)
-            << "angle between module center and beam direction: "
-            << BCparameters.angle_center_beam(module_index);
     }
 
 #ifdef ANGCAL_PLOT
-    gp->flush(); // make plot appear
+    plot->flush(); // make plot appear
     std::this_thread::sleep_for(
-        std::chrono::milliseconds(500)); // let gnuplot update
+        std::chrono::milliseconds(1000)); // let gnuplot update
 #endif
 
     // TODO: give a warning if there was no acquisition for a module
@@ -377,11 +396,11 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
                 << "starting calibration for module " << module_index;
 
 #ifdef ANGCAL_PLOT
-            Gnuplot gp;
             std::string plot_title =
                 fmt::format("Base Peaks for {} ", module_index);
-            initialize_plot(gp, plot_title);
-            optimization_algorithm(module_index, &gp);
+            optimization_algorithm(
+                module_index,
+                std::make_shared<PlotCalibrationProcess>(plot_title));
 #else
             optimization_algorithm(module_index);
 #endif
@@ -404,11 +423,10 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
             << "starting calibration for module " << module_index;
 
 #ifdef ANGCAL_PLOT
-        Gnuplot gp;
         std::string plot_title =
             fmt::format("Base Peaks for {} ", module_index);
-        initialize_plot(gp, plot_title);
-        optimization_algorithm(module_index, &gp);
+        optimization_algorithm(
+            module_index, std::make_shared<PlotCalibrationProcess>(plot_title));
 #else
         optimization_algorithm(module_index);
 #endif
@@ -542,9 +560,9 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
 
                 ++iteration_index;
 
-                DGparameters.centers(module_index) +=
+                BCparameters.angle_center_module_normal(module_index) +=
                     shift_parameters[parameter_index].first;
-                DGparameters.conversions(module_index) +=
+                BCparameters.module_center_sample_distances(module_index) +=
                     shift_parameters[parameter_index].second;
                 // TODO: pass parameters directly
                 next_similarity_of_peaks =
@@ -556,9 +574,9 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
                     parameter_index = 0;
                     // break;
                 } else {
-                    DGparameters.centers(module_index) -=
+                    BCparameters.angle_center_module_normal(module_index) -=
                         shift_parameters[parameter_index].first;
-                    DGparameters.conversions(module_index) -=
+                    BCparameters.module_center_sample_distances(module_index) -=
                         shift_parameters[parameter_index].second;
                 }
             }
@@ -575,7 +593,9 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
             LOG(TLogLevel::logDEBUG) << elem << ", ";
         });
 
-        PlotHelper::pause();
+#ifndef ANGCAL_PYTHON_BINDINGS
+        PlotHelper::pause(); // dont know if handled properly more for debugging
+#endif
         // deviates from Antonios code
         // calculate Hessian matrix
         // TODO: sp_are only the parameters not the value !!
@@ -644,15 +664,19 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
         double scale_factor = std::min(
             1.0,
             1. / std::max(std::abs(steepest_descent.first /
-                                   DGparameters.centers(module_index)),
+                                   BCparameters.angle_center_module_normal(
+                                       module_index)),
                           std::abs(steepest_descent.second /
-                                   DGparameters.conversions(module_index))));
+                                   BCparameters.module_center_sample_distances(
+                                       module_index))));
 
         steepest_descent.first *= scale_factor;
         steepest_descent.second *= scale_factor;
 
-        DGparameters.centers(module_index) += steepest_descent.first;
-        DGparameters.conversions(module_index) += steepest_descent.second;
+        BCparameters.angle_center_module_normal(module_index) +=
+            steepest_descent.first;
+        BCparameters.module_center_sample_distances(module_index) +=
+            steepest_descent.second;
 
         bool found_best_parameters = false;
 
@@ -664,8 +688,9 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
 
             // TODO what if im stuck in here
             if (next_similarity_of_peaks > previous_similarity_of_peaks) {
-                DGparameters.centers(module_index) -= steepest_descent.first;
-                DGparameters.conversions(module_index) -=
+                BCparameters.angle_center_module_normal(module_index) -=
+                    steepest_descent.first;
+                BCparameters.module_center_sample_distances(module_index) -=
                     steepest_descent.second;
             }
 
@@ -674,8 +699,10 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
             // TODO what if im stuck in here
             steepest_descent.first *= 0.5;
             steepest_descent.second *= 0.5;
-            DGparameters.centers(module_index) += steepest_descent.first;
-            DGparameters.conversions(module_index) += steepest_descent.second;
+            BCparameters.angle_center_beam(module_index) +=
+                steepest_descent.first;
+            BCparameters.module_center_sample_distances(module_index) +=
+                steepest_descent.second;
 
             LOG(TLogLevel::logDEBUG1)
                 << fmt::format("Iteration {} with peak similarity of {}",
