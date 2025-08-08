@@ -24,6 +24,17 @@ inline auto data_path() {
 
 using namespace angcal;
 
+std::pair<double, double>
+get_detector_range(MythenFileReader &mythen_file_reader,
+                   const std::vector<std::string> &file_list) {
+    double first_frame =
+        mythen_file_reader.read_frame(file_list[0]).detector_angle;
+    double last_frame =
+        mythen_file_reader.read_frame(file_list[file_list.size() - 1])
+            .detector_angle; // assuming frames are in order
+    return std::make_pair(first_frame, last_frame);
+}
+
 int main() {
 
     auto file_path = data_path() / "Antonio20250512" / "angcal_M3_Mar21_2";
@@ -96,6 +107,12 @@ int main() {
                ("ang1dnSi0p3mm_" + fmt::format("{:04}", i++) + ".h5");
     });
 
+    auto [left_angle, right_angle] =
+        get_detector_range(mythen_file_reader, filelist);
+
+    LOG(TLogLevel::logINFO)
+        << fmt::format("detector range: [{},{}]", left_angle, right_angle);
+
 #ifdef ANGCAL_PLOT
     // uncomment if you want to see all frames and select a base peak
     /*
@@ -106,7 +123,9 @@ int main() {
     */
 #endif
 
-    const double base_peak_angle = -31.73; // 36.0568;
+    const double base_peak_angle =
+        -31.73; // 36.0568; //TODO some modules arent in the detector - but it
+                // is in detector range
     // 35.550; // angpeak=69.225 - maybe select
     // one yourself !!! -could this be off?
 
