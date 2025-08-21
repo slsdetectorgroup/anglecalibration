@@ -110,10 +110,10 @@ class AngleCalibration {
                    const double base_peak_angle_, const size_t module_index);
 
     // deprecated
+    template <typename T>
     void write_to_file(const std::string &filename,
-                       const bool store_nonzero_bins = false,
-                       const std::filesystem::path &filepath =
-                           std::filesystem::current_path()) const;
+                       const std::filesystem::path &filepath,
+                       const NDView<T, 1> data) const;
 
     /** @brief check if base_peak ROI overlaps with module region
      * @param detector_angle: detector position at which acquisition is taken
@@ -342,6 +342,10 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     double right_boundary_roi_base_peak =
         mythen_detector->max_angle(); // dummy values
 
+    NDArray<double, 1> fraction_covered_by_strip(
+        std::array<ssize_t, 1>{new_number_of_bins()},
+        0.0); // fraction of strip
+
     if constexpr (base_peak_ROI_only) {
         ssize_t base_peak_as_bin_index = static_cast<ssize_t>(
             (base_peak_angle) /
@@ -354,6 +358,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             (base_peak_as_bin_index + base_peak_roi + 0.5) *
             histogram_bin_width; // in degrees
     }
+
     for (size_t strip_index = 0;
          strip_index < mythen_detector->strips_per_module(); ++strip_index) {
 
@@ -366,11 +371,11 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         }
 
         double left_strip_boundary_angle = diffraction_angle_from_BC_parameters(
-            module_index, frame.detector_angle, strip_index, -0.5);
+            module_index, frame.detector_angle, strip_index, -0.5); // -0.5
 
         double right_strip_boundary_angle =
             diffraction_angle_from_BC_parameters(
-                module_index, frame.detector_angle, strip_index, 0.5);
+                module_index, frame.detector_angle, strip_index, +0.5);
 
         if (base_peak_ROI_only &&
             (left_strip_boundary_angle > right_boundary_roi_base_peak ||
@@ -395,9 +400,15 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                             2)));
 
         double strip_width_angle =
-            angular_strip_width_from_BC_parameters(module_index, strip_index);
+            std::abs(right_strip_boundary_angle - left_strip_boundary_angle);
+        // angular_strip_width_from_BC_parameters(module_index, strip_index);
 
-        double correction_factor = histogram_bin_width / strip_width_angle;
+        double correction_factor =
+            histogram_bin_width >= strip_width_angle
+                ? 1.0
+                : histogram_bin_width /
+                      strip_width_angle; // coverage factor of one bin of the
+                                         // strip
 
         ssize_t left_bin_index_covered_by_strip = static_cast<ssize_t>(
             left_strip_boundary_angle /
@@ -425,16 +436,20 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         size_t proper_bin_index =
             0; // the computed bin indices dont start at zero but arange around
                // zero depending on the sign if the diffraction angle
+
         for (ssize_t bin_index = left_bin_index_covered_by_strip;
              bin_index <= right_bin_index_covered_by_strip; ++bin_index) {
 
+            // some strips dont cover an entire bin or extend over multiple bins
             double bin_coverage =
                 std::abs(std::min(right_strip_boundary_angle,
-                                  (bin_index + 0.5) * histogram_bin_width) -
+                                  (bin_index + 1) * histogram_bin_width) -
                          std::max(left_strip_boundary_angle,
-                                  (bin_index - 0.5) * histogram_bin_width));
+                                  (bin_index)*histogram_bin_width));
 
-            double bin_coverage_factor = bin_coverage / histogram_bin_width;
+            double bin_coverage_factor =
+                bin_coverage / histogram_bin_width; // how much of the strip is
+                                                    // covered by the bin
 
             // convert to bin index
             if constexpr (base_peak_ROI_only) {
@@ -453,6 +468,9 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             double corrected_photon_counts =
                 flatfield_normalized_photon_counts * correction_factor *
                 bin_coverage_factor;
+
+            fraction_covered_by_strip(proper_bin_index) =
+                bin_coverage_factor * correction_factor;
 
             double corrected_photon_counts_variance =
                 photon_counts_variance /
@@ -482,6 +500,35 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             }
         }
     }
+
+    auto data_file_path =
+        std::filesystem::current_path().parent_path() / "data";
+    if (!std::filesystem::exists(data_file_path))
+        std::filesystem::create_directories(data_file_path);
+    write_to_file("fraction_covered_by_strip_" + std::to_string(module_index) +
+                      ".txt",
+                  data_file_path,
+                  fraction_covered_by_strip.view()); // TODO: remove this - only
+                                                     // for debugging
+}
+
+template <typename T>
+void AngleCalibration::write_to_file(const std::string &filename,
+                                     const std::filesystem::path &filepath,
+                                     const NDView<T, 1> data) const {
+
+    std::ofstream output_file(filepath / filename);
+
+    if (!output_file) {
+        LOG(angcal::TLogLevel::logERROR) << "Error opening file!" << std::endl;
+    }
+
+    output_file << std::fixed << std::setprecision(15);
+
+    for (ssize_t i = 0; i < new_number_of_bins(); ++i) {
+        output_file << data[i] << std::endl;
+    }
+    output_file.close();
 }
 
 } // namespace angcal
