@@ -125,12 +125,17 @@ size_t AngleCalibration::global_to_local_strip_index_conversion(
 
 // TODO: mmh maybe template these on parameter type - use case distinction
 double AngleCalibration::diffraction_angle_from_DG_parameters(
-    const size_t module_index, const double detector_angle,
-    const size_t strip_index, const double distance_to_strip) const {
+    const size_t module_index, const double detector_angle, size_t strip_index,
+    const double distance_to_strip) const {
 
     double offset = DGparameters.offsets(module_index);
     double center = DGparameters.centers(module_index);
     double conversion = DGparameters.conversions(module_index);
+
+    strip_index =
+        std::signbit(conversion)
+            ? MythenDetectorSpecifications::strips_per_module() - strip_index
+            : strip_index; // TODO: are the values sored in reserve?
 
     return offset +
            180.0 / M_PI *
@@ -593,7 +598,7 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
             LOG(TLogLevel::logDEBUG) << elem << ", ";
         });
 
-#ifndef ANGCAL_PYTHON_BINDINGS
+#ifdef ANGCAL_PLOT
         PlotHelper::pause(); // dont know if handled properly more for debugging
 #endif
         // deviates from Antonios code
@@ -735,36 +740,5 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
         ++iteration_index;
     }
 }
-
-// deprecated
-/*
-void AngleCalibration::write_to_file(
-    const std::string &filename, const bool store_nonzero_bins,
-    const std::filesystem::path &filepath) const {
-
-    std::ofstream output_file(filepath / filename);
-
-    if (!output_file) {
-        LOG(angcal::TLogLevel::logERROR) << "Error opening file!" << std::endl;
-    }
-
-    output_file << std::fixed << std::setprecision(15);
-
-    for (ssize_t i = 0; i < num_bins; ++i) {
-        if (new_photon_counts[i] <= std::numeric_limits<double>::epsilon() &&
-            store_nonzero_bins) {
-            continue;
-        }
-
-        output_file << std::floor(mythen_detector->min_angle() /
-                                  histogram_bin_width) *
-                               histogram_bin_width +
-                           i * histogram_bin_width
-                    << " " << new_photon_counts[i] << " "
-                    << new_photon_count_errors[i] << std::endl;
-    }
-    output_file.close();
-}
-*/
 
 } // namespace angcal
