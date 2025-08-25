@@ -24,6 +24,10 @@ void plot_photon_counts(
     // TODO: change to size_t
     std::vector<std::pair<int, T>> plot_data;
     const size_t num_bins = bin_range.second - bin_range.first;
+
+    LOG(TLogLevel::logDEBUG) << "plotting " << num_bins << " bins from "
+                             << bin_range.first << " to " << bin_range.second;
+
     plot_data.reserve(num_bins);
 
     for (size_t bin = bin_range.first; bin < bin_range.second; ++bin) {
@@ -52,6 +56,9 @@ void plot_photon_counts(
     gp << "plot '-' using 1:2 with lines lc rgb 'orange' notitle \n";
 
     gp.send1d(plot_data);
+
+    std::cout << "Press Enter to continue...\n";
+    std::cin.get();
 }
 
 // maybe add a range
@@ -110,6 +117,11 @@ class PlotCalibrationProcess {
         gp.flush();
         gp << "plot sin(x) with lines lc rgb 'white' lw 0 notitle \n"; // dummy
                                                                        // value
+    }
+
+    void static pause() {
+        std::cout << "Press Enter to continue...\n";
+        std::cin.get();
     }
 
     inline void flush() { gp.flush(); }

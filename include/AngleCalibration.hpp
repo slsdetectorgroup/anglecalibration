@@ -72,10 +72,10 @@ class AngleCalibration {
     ssize_t get_base_peak_ROI_num_bins() const;
 
     /** base peak region of interest boundary e.g. [base_peak - base_peak_ROI,
-     * base_peak + base_peak_ROI] given in bins
-     * default (50 bins)
+     * base_peak + base_peak_ROI] given in angles [degrees]
+     * default (0.05)
      * */
-    ssize_t get_base_peak_ROI() const;
+    double get_base_peak_ROI() const;
 
     std::shared_ptr<MythenDetectorSpecifications>
     get_detector_specifications() const;
@@ -171,7 +171,7 @@ class AngleCalibration {
      */
     double diffraction_angle_from_DG_parameters(
         const size_t module_index, const double detector_angle,
-        const size_t strip_index, const double distance_to_strip = 0) const;
+        size_t strip_index, const double distance_to_strip = 0) const;
 
     /** @brief calculates diffraction angle from BC (best computing) module
      * parameters (used in Beer's Law)
@@ -204,8 +204,9 @@ class AngleCalibration {
      * @param moudle_index index of module
      * @param strip_index local strip index of module
      */
-    double angular_strip_width_from_DG_parameters(
-        const size_t module_index, const size_t local_strip_index) const;
+    double
+    angular_strip_width_from_DG_parameters(const size_t module_index,
+                                           size_t local_strip_index) const;
 
     /** @brief calculated the strip width expressed as angle [degrees] from BC
      * module parameters
@@ -304,11 +305,11 @@ class AngleCalibration {
     double histogram_bin_width = 0.0036;
 
     /**
-     * region of interest of base peak given in bins
-     * [base_peak_angle_in_bins - base_peak_roi, base_peak_angle_in_bins +
+     * region of interest of base peak given in angles
+     * [base_peak_angle - base_peak_roi, base_peak_angle +
      * base_peak_roi]
      */
-    ssize_t base_peak_roi = 50;
+    double base_peak_roi = 0.1;
 
     // TODO maybe deprecated - only compute in member function
     ssize_t num_bins{};
@@ -347,16 +348,12 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         0.0); // fraction of strip
 
     if constexpr (base_peak_ROI_only) {
-        ssize_t base_peak_as_bin_index = static_cast<ssize_t>(
-            (base_peak_angle) /
-            histogram_bin_width); // TODO: in antonios code actually rounded
-                                  // to nearest integer
-        left_boundary_roi_base_peak =
-            (base_peak_as_bin_index - base_peak_roi - 0.5) *
-            histogram_bin_width; // in degrees
+
+        left_boundary_roi_base_peak = (base_peak_angle - base_peak_roi -
+                                       0.5 * histogram_bin_width); // in degrees
         right_boundary_roi_base_peak =
-            (base_peak_as_bin_index + base_peak_roi + 0.5) *
-            histogram_bin_width; // in degrees
+            (base_peak_angle + base_peak_roi +
+             0.5 * histogram_bin_width); // in degrees
     }
 
     for (size_t strip_index = 0;
@@ -423,13 +420,13 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         if constexpr (base_peak_ROI_only) {
 
             left_bin_index_covered_by_strip = std::max(
-                static_cast<ssize_t>(base_peak_angle / histogram_bin_width) -
-                    base_peak_roi,
+                static_cast<ssize_t>((base_peak_angle - base_peak_roi) /
+                                     histogram_bin_width),
                 left_bin_index_covered_by_strip); // -
                                                   // mythen_detector->min_angle()/histogram_bin_width
             right_bin_index_covered_by_strip = std::min(
-                static_cast<ssize_t>(base_peak_angle / histogram_bin_width) +
-                    base_peak_roi,
+                static_cast<ssize_t>((base_peak_angle + base_peak_roi) /
+                                     histogram_bin_width),
                 right_bin_index_covered_by_strip);
         }
 
@@ -454,9 +451,10 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             // convert to bin index
             if constexpr (base_peak_ROI_only) {
                 proper_bin_index =
-                    bin_index - (static_cast<ssize_t>(base_peak_angle /
-                                                      histogram_bin_width) -
-                                 base_peak_roi); // bin index starts at zero
+                    bin_index -
+                    (static_cast<ssize_t>(
+                        (base_peak_angle - base_peak_roi) /
+                        histogram_bin_width)); // bin index starts at zero
             } else {
                 proper_bin_index =
                     bin_index -
@@ -525,7 +523,7 @@ void AngleCalibration::write_to_file(const std::string &filename,
 
     output_file << std::fixed << std::setprecision(15);
 
-    for (ssize_t i = 0; i < new_number_of_bins(); ++i) {
+    for (ssize_t i = 0; i < data.size(); ++i) {
         output_file << data[i] << std::endl;
     }
     output_file.close();

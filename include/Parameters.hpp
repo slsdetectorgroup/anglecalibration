@@ -7,6 +7,7 @@
 
 namespace angcal {
 
+// TODO add abstract base class for parameters
 /**
  * geometric parameters
  */

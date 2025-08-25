@@ -5,4 +5,5 @@ set_target_properties(example PROPERTIES
         OUTPUT_NAME run_example
 )
 
-target_sources(example PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/example_calibration.cpp)
+target_sources(example PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/example_calibration.cpp )
+
