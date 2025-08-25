@@ -62,10 +62,10 @@ double AngleCalibration::get_histogram_bin_width() const {
 }
 
 ssize_t AngleCalibration::get_base_peak_ROI_num_bins() const {
-    return 2 * base_peak_roi + 1;
+    return 2 * static_cast<ssize_t>(base_peak_roi / histogram_bin_width) + 1;
 }
 
-ssize_t AngleCalibration::get_base_peak_ROI() const { return base_peak_roi; }
+double AngleCalibration::get_base_peak_ROI() const { return base_peak_roi; }
 
 std::shared_ptr<MythenDetectorSpecifications>
 AngleCalibration::get_detector_specifications() const {
@@ -262,9 +262,7 @@ bool AngleCalibration::base_peak_is_in_module(
     std::optional<double> bounds_in_angles) const {
 
     if (!bounds_in_angles.has_value()) {
-        bounds_in_angles =
-            base_peak_roi *
-            histogram_bin_width; // take ROI of base peak in angles
+        bounds_in_angles = base_peak_roi; // take ROI of base peak in angles
     }
 
     double left_module_boundary_angle =
@@ -276,16 +274,19 @@ bool AngleCalibration::base_peak_is_in_module(
         "module_boundaries_in_angle for module {} [{}, {}]\n", module_index,
         left_module_boundary_angle, right_module_boundary_angle);
 
-    // TODO check bounds with base_peak_hwid
-    return !(base_peak_angle + *bounds_in_angles < left_module_boundary_angle ||
-             base_peak_angle - *bounds_in_angles > right_module_boundary_angle);
+    // TODO check bounds with base_peak_hwid - TODO: I changed it such that it
+    // needs to be fully in module - otherwise similarity criterion gets
+    // distorted
+    return (base_peak_angle + *bounds_in_angles < right_module_boundary_angle &&
+            left_module_boundary_angle < base_peak_angle - *bounds_in_angles);
 }
 
 double
 AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
                                                 PlotHandle plot) const {
 
-    ssize_t num_bins_in_ROI = 2 * base_peak_roi + 1;
+    ssize_t num_bins_in_ROI =
+        2 * static_cast<ssize_t>(base_peak_roi / histogram_bin_width) + 1;
     // used to calculate similarity criterion between peaks of different
     // acquisition S_index = sum_i^num_runs
     // photon_count^index*photon_variance
@@ -302,18 +303,10 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 #endif
 
-    LOG(TLogLevel::logDEBUG1)
-        << "angle between module center and sample-module normal: "
-        << BCparameters.angle_center_module_normal(module_index);
-    LOG(TLogLevel::logDEBUG1)
-        << "sample-module center distance: "
-        << BCparameters.module_center_sample_distances(module_index);
-    LOG(TLogLevel::logDEBUG1)
-        << "angle between module center and beam direction: "
-        << BCparameters.angle_center_beam(module_index);
-
     size_t num_runs = 0;
     for (const auto &file : file_list) {
+
+        LOG(TLogLevel::logDEBUG1) << "file: " << file;
 
         MythenFrame frame = mythen_file_reader->read_frame(file);
 
@@ -339,20 +332,22 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
 #ifdef ANGCAL_PLOT
             auto bin_to_diffraction_angle_base_peak_ROI_only =
                 [this](const size_t bin_index) {
-                    return (static_cast<ssize_t>(bin_index) -
-                            static_cast<ssize_t>(this->base_peak_roi)) *
-                               this->histogram_bin_width +
-                           this->base_peak_angle;
+                    return bin_index * this->histogram_bin_width -
+                           this->base_peak_roi + this->base_peak_angle;
                 };
 
             std::string filename =
                 std::filesystem::path(file).stem().string() + ".dat";
             auto dataset_name = data_file_path / filename;
 
-            plot->append_to_plot(fixed_angle_width_bins_photon_counts.view(),
-                                 {0, 2 * base_peak_roi + 1},
-                                 bin_to_diffraction_angle_base_peak_ROI_only,
-                                 dataset_name);
+            plot->append_to_plot(
+                fixed_angle_width_bins_photon_counts.view(),
+                {0,
+                 2 * static_cast<ssize_t>(base_peak_roi / histogram_bin_width) +
+                     1},
+                bin_to_diffraction_angle_base_peak_ROI_only, dataset_name);
+
+            plot->pause();
 #endif
             ++num_runs;
         }
@@ -402,7 +397,7 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
 
 #ifdef ANGCAL_PLOT
             std::string plot_title =
-                fmt::format("Base Peaks for {} ", module_index);
+                fmt::format("Base Peaks for module {} ", module_index);
             optimization_algorithm(
                 module_index,
                 std::make_shared<PlotCalibrationProcess>(plot_title));
@@ -429,7 +424,7 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
 
 #ifdef ANGCAL_PLOT
         std::string plot_title =
-            fmt::format("Base Peaks for {} ", module_index);
+            fmt::format("Base Peaks for module {} ", module_index);
         optimization_algorithm(
             module_index, std::make_shared<PlotCalibrationProcess>(plot_title));
 #else
@@ -559,7 +554,7 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
             for (parameter_index = 0; parameter_index < shift_parameters.size();
                  ++parameter_index) {
 
-                LOG(TLogLevel::logDEBUG1) << fmt::format(
+                LOG(TLogLevel::logINFO) << fmt::format(
                     "Iteration {} with peak similarity of {}", iteration_index,
                     previous_similarity_of_peaks);
 
@@ -576,8 +571,8 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
                 if (next_similarity_of_peaks < previous_similarity_of_peaks) {
                     // update centers for real
                     previous_similarity_of_peaks = next_similarity_of_peaks;
-                    parameter_index = 0;
-                    // break;
+                    // parameter_index = 0;
+                    //  break;
                 } else {
                     BCparameters.angle_center_module_normal(module_index) -=
                         shift_parameters[parameter_index].first;
@@ -603,7 +598,6 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
 #endif
         // deviates from Antonios code
         // calculate Hessian matrix
-        // TODO: sp_are only the parameters not the value !!
 
         double Dy =
             (sp[7] - sp[6] + sp[1] - sp[0] + sp[3] - sp[2]) /
@@ -709,7 +703,7 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
             BCparameters.module_center_sample_distances(module_index) +=
                 steepest_descent.second;
 
-            LOG(TLogLevel::logDEBUG1)
+            LOG(TLogLevel::logINFO)
                 << fmt::format("Iteration {} with peak similarity of {}",
                                iteration_index, previous_similarity_of_peaks);
 
