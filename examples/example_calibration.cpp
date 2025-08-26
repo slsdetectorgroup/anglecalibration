@@ -110,16 +110,6 @@ int main() {
     //  inverse_flatfield is only properly allocated when calling
     //  inverse_flatfield
 
-    NDArray<double, 1> inverse_normalized_flatfield(
-        std::array<ssize_t, 1>{mythen_detector_ptr->num_strips()});
-    CustomFlatFieldFile flatfieldfilereader;
-    flatfieldfilereader.open(flatfield_filename);
-    flatfieldfilereader.read_into(inverse_normalized_flatfield.buffer(), 8);
-    flat_field_ptr->set_inverse_normalized_flatfield(
-        inverse_normalized_flatfield); // mmh ugly workaround copied twice
-
-    /*
-    // TODO: actually dont know if it stores the inverse or not
     NDArray<double, 1> normalized_flatfield(
         std::array<ssize_t, 1>{mythen_detector_ptr->num_strips()});
     CustomFlatFieldFile flatfieldfilereader;
@@ -134,7 +124,6 @@ int main() {
     }
     flat_field_ptr->set_inverse_normalized_flatfield(
         inverse_normalized_flatfield);
-    */
 
 #ifdef ANGCAL_PLOT
     /*
