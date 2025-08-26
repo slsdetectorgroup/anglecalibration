@@ -71,7 +71,13 @@ class AngleCalibration {
      */
     ssize_t get_base_peak_ROI_num_bins() const;
 
-    /** base peak region of interest boundary e.g. [base_peak - base_peak_ROI,
+    /** set base peak region of interest e.g. [base_peak - base_peak_ROI,
+     * base_peak + base_peak_ROI] given in angles [degrees]
+     * default (0.05)
+     * */
+    void set_base_peak_ROI(const double base_peak_roi_);
+
+    /** base peak region of interest e.g. [base_peak - base_peak_ROI,
      * base_peak + base_peak_ROI] given in angles [degrees]
      * default (0.05)
      * */
@@ -309,7 +315,7 @@ class AngleCalibration {
      * [base_peak_angle - base_peak_roi, base_peak_angle +
      * base_peak_roi]
      */
-    double base_peak_roi = 0.1;
+    double base_peak_roi = 0.05;
 
     // TODO maybe deprecated - only compute in member function
     ssize_t num_bins{};
@@ -435,14 +441,16 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                // zero depending on the sign if the diffraction angle
 
         for (ssize_t bin_index = left_bin_index_covered_by_strip;
-             bin_index <= right_bin_index_covered_by_strip; ++bin_index) {
+             bin_index < right_bin_index_covered_by_strip; ++bin_index) {
 
             // some strips dont cover an entire bin or extend over multiple bins
             double bin_coverage =
                 std::abs(std::min(right_strip_boundary_angle,
-                                  (bin_index + 1) * histogram_bin_width) -
+                                  (bin_index + 0.5) * histogram_bin_width) -
                          std::max(left_strip_boundary_angle,
-                                  (bin_index)*histogram_bin_width));
+                                  (bin_index - 0.5) *
+                                      histogram_bin_width)); // bin_index + 0.5,
+                                                             // bin_index - 0.5
 
             double bin_coverage_factor =
                 bin_coverage / histogram_bin_width; // how much of the strip is
@@ -499,6 +507,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         }
     }
 
+    /*
     auto data_file_path =
         std::filesystem::current_path().parent_path() / "data";
     if (!std::filesystem::exists(data_file_path))
@@ -508,6 +517,8 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                   data_file_path,
                   fraction_covered_by_strip.view()); // TODO: remove this - only
                                                      // for debugging
+
+    */
 }
 
 template <typename T>

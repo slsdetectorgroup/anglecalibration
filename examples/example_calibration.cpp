@@ -161,7 +161,7 @@ int main() {
 
     LOG(TLogLevel::logDEBUG) << "read initial parameters from file";
 
-    std::vector<std::string> filelist(1500); // 1500
+    std::vector<std::string> filelist(1501); // 1500
 
     size_t i = 0;
     std::generate(filelist.begin(), filelist.end(),
@@ -194,7 +194,9 @@ int main() {
 
     anglecalibration.set_base_peak_angle(base_peak_angle);
 
-    anglecalibration.set_histogram_bin_width(0.01);
+    anglecalibration.set_base_peak_ROI(0.18);
+
+    // anglecalibration.set_histogram_bin_width(0.01);
 
     // plot some stuff
     MythenFrame frame = mythen_file_reader.read_frame(
@@ -260,17 +262,17 @@ int main() {
     // plot base peak for one module
 
 #ifdef ANGCAL_PLOT
+
     auto base_peak_for_module =
         anglecalibration.redistributed_photon_counts_in_base_peak_ROI(
             frame, module_index);
 
-    anglecalibration.write_to_file("basepeakroi", "./",
-                                   base_peak_for_module.view());
     plotter.plot_base_peak_region_of_interest(module_index,
                                               base_peak_for_module.view());
     plotter.pause();
+
 #endif
 
-    anglecalibration.calibrate(filelist, base_peak_angle, module_index);
-    //     anglecalibration.calibrate(filelist, base_peak_angle);
+    // anglecalibration.calibrate(filelist, base_peak_angle, module_index);
+    anglecalibration.calibrate(filelist, base_peak_angle);
 }

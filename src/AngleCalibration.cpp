@@ -65,6 +65,10 @@ ssize_t AngleCalibration::get_base_peak_ROI_num_bins() const {
     return 2 * static_cast<ssize_t>(base_peak_roi / histogram_bin_width) + 1;
 }
 
+void AngleCalibration::set_base_peak_ROI(const double base_peak_roi_) {
+    base_peak_roi = base_peak_roi_;
+}
+
 double AngleCalibration::get_base_peak_ROI() const { return base_peak_roi; }
 
 std::shared_ptr<MythenDetectorSpecifications>
@@ -347,7 +351,7 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
                      1},
                 bin_to_diffraction_angle_base_peak_ROI_only, dataset_name);
 
-            plot->pause();
+            // plot->pause();
 #endif
             ++num_runs;
         }
@@ -549,49 +553,46 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
 
         // TODO can i get rid of the break or does it need to be in that
         // order due to convergence
-        size_t parameter_index = 0;
-        while (parameter_index < shift_parameters.size()) {
-            for (parameter_index = 0; parameter_index < shift_parameters.size();
-                 ++parameter_index) {
 
-                LOG(TLogLevel::logINFO) << fmt::format(
-                    "Iteration {} with peak similarity of {}", iteration_index,
-                    previous_similarity_of_peaks);
+        for (size_t parameter_index = 0;
+             parameter_index < shift_parameters.size(); ++parameter_index) {
 
-                ++iteration_index;
+            LOG(TLogLevel::logINFO)
+                << fmt::format("Iteration {} with peak similarity of {}",
+                               iteration_index, previous_similarity_of_peaks);
 
-                BCparameters.angle_center_module_normal(module_index) +=
+            ++iteration_index;
+
+            BCparameters.angle_center_module_normal(module_index) +=
+                shift_parameters[parameter_index].first;
+            BCparameters.module_center_sample_distances(module_index) +=
+                shift_parameters[parameter_index].second;
+            // TODO: pass parameters directly
+            next_similarity_of_peaks =
+                calculate_similarity_of_peaks(module_index, gp);
+            sp[parameter_index] = next_similarity_of_peaks;
+            /*
+            BCparameters.angle_center_module_normal(module_index) -=
+                shift_parameters[parameter_index].first;
+            BCparameters.module_center_sample_distances(module_index) -=
+                shift_parameters[parameter_index].second;
+            */
+
+            if (next_similarity_of_peaks < previous_similarity_of_peaks) {
+                // update centers for real
+                previous_similarity_of_peaks = next_similarity_of_peaks;
+                // parameter_index = 0;
+                //  break;
+            } else {
+                BCparameters.angle_center_module_normal(module_index) -=
                     shift_parameters[parameter_index].first;
-                BCparameters.module_center_sample_distances(module_index) +=
+                BCparameters.module_center_sample_distances(module_index) -=
                     shift_parameters[parameter_index].second;
-                // TODO: pass parameters directly
-                next_similarity_of_peaks =
-                    calculate_similarity_of_peaks(module_index, gp);
-                sp[parameter_index] = next_similarity_of_peaks;
-                if (next_similarity_of_peaks < previous_similarity_of_peaks) {
-                    // update centers for real
-                    previous_similarity_of_peaks = next_similarity_of_peaks;
-                    // parameter_index = 0;
-                    //  break;
-                } else {
-                    BCparameters.angle_center_module_normal(module_index) -=
-                        shift_parameters[parameter_index].first;
-                    BCparameters.module_center_sample_distances(module_index) -=
-                        shift_parameters[parameter_index].second;
-                }
             }
         }
 
         LOG(TLogLevel::logINFO)
             << "peak similarity: " << previous_similarity_of_peaks;
-
-        LOG(TLogLevel::logINFO)
-            << "fine tune parameters in direction of steepest descent";
-
-        LOG(TLogLevel::logDEBUG) << "peak_similarities: ";
-        std::for_each(sp.begin(), sp.end(), [](const auto &elem) {
-            LOG(TLogLevel::logDEBUG) << elem << ", ";
-        });
 
 #ifdef ANGCAL_PLOT
         PlotHelper::pause(); // dont know if handled properly more for debugging
@@ -656,9 +657,9 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
             ((Dxx + regularization_term) * Dy - Dyx * Dx) *
                 inverse_determinant);
 
-        LOG(TLogLevel::logDEBUG)
-            << fmt::format("direction of steepest descent: [{},{}]",
-                           steepest_descent.first, steepest_descent.second);
+        LOG(TLogLevel::logINFO) << fmt::format(
+            " fine tune parameters in direction of steepest descent: [{},{}]",
+            steepest_descent.first, steepest_descent.second);
 
         double scale_factor = std::min(
             1.0,
@@ -698,7 +699,7 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
             // TODO what if im stuck in here
             steepest_descent.first *= 0.5;
             steepest_descent.second *= 0.5;
-            BCparameters.angle_center_beam(module_index) +=
+            BCparameters.angle_center_module_normal(module_index) +=
                 steepest_descent.first;
             BCparameters.module_center_sample_distances(module_index) +=
                 steepest_descent.second;
@@ -726,10 +727,6 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
         //(some_other_criterion <
         // 0.001); // TODO: should these tolerances also be configurable -
         // maybe pass as function argument
-
-        LOG(TLogLevel::logINFO)
-            << fmt::format("Iteration {} with peak similarity of {}",
-                           iteration_index, previous_similarity_of_peaks);
 
         ++iteration_index;
     }

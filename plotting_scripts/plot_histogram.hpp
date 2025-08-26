@@ -25,9 +25,6 @@ void plot_photon_counts(
     std::vector<std::pair<int, T>> plot_data;
     const size_t num_bins = bin_range.second - bin_range.first;
 
-    LOG(TLogLevel::logDEBUG) << "plotting " << num_bins << " bins from "
-                             << bin_range.first << " to " << bin_range.second;
-
     plot_data.reserve(num_bins);
 
     for (size_t bin = bin_range.first; bin < bin_range.second; ++bin) {
@@ -47,7 +44,7 @@ void plot_photon_counts(
 
     Gnuplot gp;
 
-    gp << "set terminal qt persist\n";
+    gp << "set terminal qt \n"; // persist\n";
 
     gp << "set title \" " << plot_title << " \" \n";
 
@@ -94,7 +91,7 @@ class PlotCalibrationProcess {
         const std::string &plot_title,
         const std::string &xlabel = "Diffraction Angle [degree]",
         const std::string &ylabel = "Photon Counts") {
-        gp << "set terminal qt " << plot_window++ << " persist\n";
+        gp << "set terminal qt " << plot_window++ << " \n"; // persist
 
         gp << "set title \"" << plot_title << "\"\n";
 
