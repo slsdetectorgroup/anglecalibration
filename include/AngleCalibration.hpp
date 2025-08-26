@@ -355,10 +355,10 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
 
     if constexpr (base_peak_ROI_only) {
 
-        left_boundary_roi_base_peak = (base_peak_angle - base_peak_roi -
+        left_boundary_roi_base_peak = (base_peak_angle - base_peak_roi +
                                        0.5 * histogram_bin_width); // in degrees
         right_boundary_roi_base_peak =
-            (base_peak_angle + base_peak_roi +
+            (base_peak_angle + base_peak_roi -
              0.5 * histogram_bin_width); // in degrees
     }
 
@@ -406,34 +406,41 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             std::abs(right_strip_boundary_angle - left_strip_boundary_angle);
         // angular_strip_width_from_BC_parameters(module_index, strip_index);
 
+        /*
         double correction_factor =
             histogram_bin_width >= strip_width_angle
                 ? 1.0
                 : histogram_bin_width /
                       strip_width_angle; // coverage factor of one bin of the
                                          // strip
+        */
 
-        ssize_t left_bin_index_covered_by_strip = static_cast<ssize_t>(
-            left_strip_boundary_angle /
-            histogram_bin_width); // -
-                                  // mythen_detector->min_angle()/histogram_bin_width
+        double photon_counts_per_bin = flatfield_normalized_photon_counts *
+                                       histogram_bin_width / strip_width_angle;
 
-        ssize_t right_bin_index_covered_by_strip = static_cast<ssize_t>(
-            right_strip_boundary_angle /
-            histogram_bin_width); // -
-                                  // mythen_detector->min_angle()/histogram_bin_width
+        double photon_counts_variance_per_bin =
+            photon_counts_variance * (strip_width_angle / histogram_bin_width) *
+            (strip_width_angle / histogram_bin_width);
+
+        ssize_t left_bin_index_covered_by_strip{};
+
+        ssize_t right_bin_index_covered_by_strip{};
 
         if constexpr (base_peak_ROI_only) {
-
-            left_bin_index_covered_by_strip = std::max(
-                static_cast<ssize_t>((base_peak_angle - base_peak_roi) /
-                                     histogram_bin_width),
-                left_bin_index_covered_by_strip); // -
-                                                  // mythen_detector->min_angle()/histogram_bin_width
-            right_bin_index_covered_by_strip = std::min(
-                static_cast<ssize_t>((base_peak_angle + base_peak_roi) /
-                                     histogram_bin_width),
-                right_bin_index_covered_by_strip);
+            left_bin_index_covered_by_strip =
+                static_cast<ssize_t>(round(std::max(left_boundary_roi_base_peak,
+                                                    left_strip_boundary_angle) /
+                                           histogram_bin_width));
+            right_bin_index_covered_by_strip = static_cast<ssize_t>(
+                round(std::min(right_boundary_roi_base_peak,
+                               right_strip_boundary_angle) /
+                      histogram_bin_width));
+        } else {
+            left_bin_index_covered_by_strip = static_cast<ssize_t>(
+                round(left_strip_boundary_angle /
+                      histogram_bin_width)); // in Antonios code its rounded
+            right_bin_index_covered_by_strip = static_cast<ssize_t>(
+                round(right_strip_boundary_angle / histogram_bin_width));
         }
 
         size_t proper_bin_index =
@@ -448,9 +455,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                 std::abs(std::min(right_strip_boundary_angle,
                                   (bin_index + 0.5) * histogram_bin_width) -
                          std::max(left_strip_boundary_angle,
-                                  (bin_index - 0.5) *
-                                      histogram_bin_width)); // bin_index + 0.5,
-                                                             // bin_index - 0.5
+                                  (bin_index - 0.5) * histogram_bin_width));
 
             double bin_coverage_factor =
                 bin_coverage / histogram_bin_width; // how much of the strip is
@@ -472,16 +477,15 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             }
 
             double corrected_photon_counts =
-                flatfield_normalized_photon_counts * correction_factor *
-                bin_coverage_factor;
+                photon_counts_per_bin * bin_coverage_factor;
 
-            fraction_covered_by_strip(proper_bin_index) =
-                bin_coverage_factor * correction_factor;
+            fraction_covered_by_strip(proper_bin_index) += bin_coverage_factor;
 
             double corrected_photon_counts_variance =
-                photon_counts_variance /
-                std::pow(correction_factor * bin_coverage_factor,
-                         2); // TODO no idea if this is correct
+                photon_counts_variance_per_bin /
+                std::pow(bin_coverage_factor,
+                         2); // TODO In Antonios code its actually multiplied !!
+                             // - why though?
 
             fixed_angle_width_bins_photon_counts(proper_bin_index) +=
                 corrected_photon_counts;
@@ -497,7 +501,10 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             }
             if (S1.has_value()) {
                 S1.value()(proper_bin_index) +=
-                    corrected_photon_counts * corrected_photon_counts_variance;
+                    corrected_photon_counts *
+                    corrected_photon_counts_variance; // TODO correction factor
+                                                      // is squared now doesnt
+                                                      // happen in Antonios code
             }
             if (S2.has_value()) {
                 S2.value()(proper_bin_index) +=
@@ -517,7 +524,6 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                   data_file_path,
                   fraction_covered_by_strip.view()); // TODO: remove this - only
                                                      // for debugging
-
     */
 }
 
