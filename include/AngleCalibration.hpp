@@ -393,7 +393,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         double some_flatfield_error = 1.0; // TODO: some dummy value - implement
 
         // I guess it measures the
-        // expcected noise - where is the formula -used as the variance
+        // expcected noise - where is the formula - used as the variance
         double photon_counts_variance =
             1. / (std::pow(flatfield_normalized_photon_counts, 2) *
                   (1. / (frame.photon_counts(global_strip_index) + 1) +
@@ -460,7 +460,6 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             double bin_coverage_factor =
                 bin_coverage / histogram_bin_width; // how much of the strip is
                                                     // covered by the bin
-
             // convert to bin index
             if constexpr (base_peak_ROI_only) {
                 proper_bin_index =
@@ -477,40 +476,45 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             }
 
             double corrected_photon_counts =
-                photon_counts_per_bin * bin_coverage_factor;
+                photon_counts_per_bin; //* bin_coverage_factor;
 
             fraction_covered_by_strip(proper_bin_index) += bin_coverage_factor;
 
             double corrected_photon_counts_variance =
-                photon_counts_variance_per_bin /
-                std::pow(bin_coverage_factor,
-                         2); // TODO In Antonios code its actually multiplied !!
-                             // - why though?
+                photon_counts_variance_per_bin; //*
+            // std::pow(bin_coverage_factor,
+            // 2); // this seems to be a correction factor but does not really
+            // redistribute it as it is not multiplied but only multiplied once
 
             fixed_angle_width_bins_photon_counts(proper_bin_index) +=
-                corrected_photon_counts;
-
-            fixed_angle_width_bins_photon_counts_variance(proper_bin_index) +=
+                bin_coverage_factor * corrected_photon_counts *
                 corrected_photon_counts_variance;
 
-            // S_index = sum_i^num_runs
-            // photon_count^index*photon_variance
-            if (S0.has_value()) {
-                S0.value()(proper_bin_index) +=
-                    corrected_photon_counts_variance;
-            }
-            if (S1.has_value()) {
-                S1.value()(proper_bin_index) +=
-                    corrected_photon_counts *
-                    corrected_photon_counts_variance; // TODO correction factor
-                                                      // is squared now doesnt
-                                                      // happen in Antonios code
-            }
-            if (S2.has_value()) {
-                S2.value()(proper_bin_index) +=
-                    corrected_photon_counts * corrected_photon_counts *
-                    corrected_photon_counts_variance;
-            }
+            fixed_angle_width_bins_photon_counts_variance(proper_bin_index) +=
+                corrected_photon_counts_variance * bin_coverage_factor;
+        }
+    }
+
+    // S_index = sum_i^num_runs
+    // photon_count^index*photon_variance
+    for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.size(); ++i) {
+        fixed_angle_width_bins_photon_counts(i) /=
+            fixed_angle_width_bins_photon_counts_variance(
+                i); // y_k what exactly is
+                    // that?
+
+        if (S0.has_value()) {
+            S0.value()(i) += fixed_angle_width_bins_photon_counts_variance(i);
+        }
+        if (S1.has_value()) {
+            S1.value()(i) += fixed_angle_width_bins_photon_counts(i) *
+                             fixed_angle_width_bins_photon_counts_variance(i);
+        }
+        if (S2.has_value()) {
+            S2.value()(i) += fixed_angle_width_bins_photon_counts(i) *
+                             fixed_angle_width_bins_photon_counts(i) *
+                             fixed_angle_width_bins_photon_counts_variance(i);
+            ;
         }
     }
 
