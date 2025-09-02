@@ -498,10 +498,14 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     // S_index = sum_i^num_runs
     // photon_count^index*photon_variance
     for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.size(); ++i) {
-        fixed_angle_width_bins_photon_counts(i) /=
-            fixed_angle_width_bins_photon_counts_variance(
-                i); // y_k what exactly is
-                    // that?
+        fixed_angle_width_bins_photon_counts(i) =
+            fixed_angle_width_bins_photon_counts_variance(i) <
+                    std::numeric_limits<double>::epsilon()
+                ? 0.0
+                : fixed_angle_width_bins_photon_counts(i) /
+                      fixed_angle_width_bins_photon_counts_variance(
+                          i); // y_k what exactly is
+                              // that?
 
         if (S0.has_value()) {
             S0.value()(i) += fixed_angle_width_bins_photon_counts_variance(i);
@@ -514,7 +518,6 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             S2.value()(i) += fixed_angle_width_bins_photon_counts(i) *
                              fixed_angle_width_bins_photon_counts(i) *
                              fixed_angle_width_bins_photon_counts_variance(i);
-            ;
         }
     }
 
