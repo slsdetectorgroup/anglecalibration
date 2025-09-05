@@ -46,6 +46,8 @@ option(ANGCAL_FETCH_HDF5 "Use FetchContent to download hdf5-devel" OFF)
 option(ANGCAL_FETCH_AARE "Use FetchContent to download aare from github" OFF)
 option(ANGCAL_FETCH_CATCH "Use FetchContent to download catch2" ON)
 option(ANGCAL_FETCH_PYBIND11 "Use FetchContent to download pybind11" ON)
+option(ANGCAL_FETCH_BOOST "Use FetchContent to download boost-iostreams" OFF)
+
 
 
 if(ANGCAL_FETCH_AARE)
@@ -61,6 +63,8 @@ if(ANGCAL_FETCH_AARE)
     ) #mmh is this the way to go I think I will define the same compiler options twice now? can directly use aare_compiler_flags instead of compiler_flags
     message(STATUS "target: aare")
 else()
+    set(AARE_INSTALL_PATH "/usr/local/aare" CACHE PATH "Installation directory for AARE")
+    list(APPEND CMAKE_PREFIX_PATH ${AARE_INSTALL_PATH}) 
     message(STATUS "looking for aare in: ${CMAKE_PREFIX_PATH}")
     find_package(aare REQUIRED) 
     message(STATUS "found aare: ${AARE_INCLUDE_DIRS}")
