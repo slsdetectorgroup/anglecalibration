@@ -6,10 +6,27 @@ Library for angle calibration of CPS Mythen detector.
 
 
 .. toctree::
-    :maxdepth: 3
-    :caption: Contents:
+    :maxdepth: 1
+    :caption: Installation
 
     installation
-    pythonapi
-    cppapi
+
+.. toctree:: 
+    :maxdepth: 1
+    :caption: Python API 
+
+    pyMythenDetectorSpecifications 
+    pyAngleCalibration
+
+
+.. toctree:: 
+    :maxdepth: 1 
+    :caption: C++ API 
+
+    MythenFileReader
+    SimpleFileInterface
+    MythenDetectorSpecifications
+    AngleCalibration
+    
+
     

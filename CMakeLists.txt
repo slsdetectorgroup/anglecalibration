@@ -61,7 +61,7 @@ if(ANGCAL_FETCH_AARE)
     ) #mmh is this the way to go I think I will define the same compiler options twice now? can directly use aare_compiler_flags instead of compiler_flags
     message(STATUS "target: aare")
 else()
-    message(STATUS "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
+    message(STATUS "looking for aare in: ${CMAKE_PREFIX_PATH}")
     find_package(aare REQUIRED) 
     message(STATUS "found aare: ${AARE_INCLUDE_DIRS}")
 

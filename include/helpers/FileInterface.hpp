@@ -8,7 +8,7 @@
 #include "logger.hpp"
 
 /**
- * @brief very simple FileInterface to read from simple ascii files or raw files
+ * @brief Simple FileInterface to read from simple ascii files or raw files
  * into a bytestream
  * @note some functions are pure virtual and must be implemented by the derived
  * classes

@@ -26,6 +26,15 @@ class MythenDetectorSpecifications {
   public:
     // TODO: constructor that reads from a config file
 
+    /**
+     * @brief constructor for MythenDetectorSpecifications
+     * @param custom_file_ptr (optional) pass Filereader to read bad channels
+     * file default If none is provided bad channel file is expected to be a
+     * text file where each line stores the channel index of a bad channel.
+     * Consecutive bad channels can be stored in one line by seperating the
+     * first and last channel index of the bad channel block e.g.
+     * bad_channel_index0-bad_channel_index1.)
+     */
     MythenDetectorSpecifications(
         std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr =
             std::nullopt) {
@@ -38,6 +47,19 @@ class MythenDetectorSpecifications {
             NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips()}, false);
     }
 
+    /**
+     * @brief constructor for MythenDetectorSpecifications
+     * @param max_modules Number of modules in detector (default 48).
+     * @param exposure_time Exposure time [s].
+     * @param num_counters Number of counters active.
+     * @param bloffset
+     * @param custom_file_ptr (optional) pass Filereader to read bad channels
+     * file default If none is provided bad channel file is expected to be a
+     * text file where each line stores the channel index of a bad channel.
+     * Consecutive bad channels can be stored in one line by seperating the
+     * first and last channel index of the bad channel block e.g.
+     * bad_channel_index0-bad_channel_index1.)
+     */
     MythenDetectorSpecifications(
         const size_t max_modules, const double exposure_time,
         const double num_counters = 1, double bloffset = 1.532,
@@ -55,7 +77,7 @@ class MythenDetectorSpecifications {
     }
 
     /**
-     * read bad channels from file
+     * @brief read bad channels from file
      * @warning only works if member custom_file_ptr supports reading the format
      */
     void read_bad_channels_from_file(const std::string &filename) {
@@ -89,6 +111,12 @@ class MythenDetectorSpecifications {
 
     NDView<bool, 1> get_bad_channels() const { return bad_channels.view(); }
 
+    /**
+     * @brief set bad channels
+     * @param bad_channels_ boolean NDArray of size of total number of
+     * strips/channels in detector, stores 'TRUE' if strip is a bad channel
+     * otherwise 'FALSE'
+     */
     void set_bad_channels(const NDArray<bool, 1> &bad_channels_) {
         bad_channels = bad_channels_;
     }
@@ -101,6 +129,10 @@ class MythenDetectorSpecifications {
 
     static constexpr size_t strips_per_module() { return strips_per_module_; }
 
+    /**
+     * @brief number of modules in detector
+     * (default '48')
+     */
     size_t max_modules() const { return max_modules_; }
 
     size_t num_counters() const { return num_counters_; }
@@ -115,29 +147,58 @@ class MythenDetectorSpecifications {
 
     static constexpr double max_angle() { return max_angle_; }
 
+    /**
+     * @brief total number of strips/channels in detector
+     */
     ssize_t num_strips() const { return max_modules_ * strips_per_module_; }
 
   private:
+    /**
+     * number of strips/channels per module
+     */
     static constexpr size_t strips_per_module_ = 1280;
-    static constexpr double pitch_ = 0.05; // strip width [mm]
+    /**
+     * Strip/channel width of Mythen detector [mm]
+     */
+    static constexpr double pitch_ = 0.05;
+    /** Minimum potential detector angle
+     *(measured as displacement of first strip) [degree]
+     */
     static constexpr double min_angle_ =
         -180.0; // maybe shoudnt be static but configurable
-    static constexpr double max_angle_ = 180.0;
-    static constexpr double dtt0_ =
-        0.0; // oke in Antonios code I think it is called sceps_dp sceps_DP
-             // = 1.0d-8// No idea what this is - probably configurable
 
+    /** Maximum potential detector angle
+     *(measured as displacement of first strip) [degree]
+     */
+    static constexpr double max_angle_ = 180.0;
+    static constexpr double dtt0_ = 0.0;
+
+    /**
+     * number of modules in detector
+     */
     size_t max_modules_ = 48;
 
+    /**
+     * num counters active in detector
+     */
     size_t num_counters_ = 1;
 
+    /**
+     * exposure time [s]
+     */
     double exposure_time_ = 5.0; // TODO: could read from acquired file but
                                  // maybe should be configurable
     double bloffset_ = 1.532; // what is this? detector offset relative to what?
 
+    /** Array of size strips/channels in detector, stores 'TRUE' if strip is a
+     * bad channel otherwise 'FALSE'
+     */
     NDArray<bool, 1> bad_channels{};
     NDArray<ssize_t, 1> m_unconnected_modules{}; // list of unconnected modules
 
+    /**
+     * file interface to read bad channels file
+     */
     std::shared_ptr<SimpleFileInterface> m_custom_file_ptr =
         std::make_shared<CustomBadChannelsFile>();
 };

@@ -31,10 +31,12 @@ class MythenFileReader : public HDF5FileReader {
   public:
     MythenFileReader() = default;
 
+    /**
+     * read acquisition file from hdf5
+     * @return MythenFrame storing the photon counts, channel mask,
+     * detector_angle
+     */
     MythenFrame read_frame(const std::string &file_name) {
-        // TODO not a good design fixed number of digits in file name for frame
-        // number -> pad with zeros
-        //  not even sure if files have the same name
 
         MythenFrame frame;
         open_file(file_name);
