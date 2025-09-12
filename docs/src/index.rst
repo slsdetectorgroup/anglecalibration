@@ -4,6 +4,12 @@ Mythen Angular Calibration
 
 Library for angle calibration of CPS Mythen detector. 
 
+.. toctree:: 
+    :maxdepth: 1
+    :caption: Theory
+
+    theory
+
 
 .. toctree::
     :maxdepth: 1

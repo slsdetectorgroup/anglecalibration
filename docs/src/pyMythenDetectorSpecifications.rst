@@ -27,5 +27,3 @@ MythenDetectorSpecifications contains all detector specific parameters, such as 
     :member-order: bysource
 
 
-..
-    :autoclass_content: both

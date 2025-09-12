@@ -227,6 +227,34 @@ void AngleCalibration::set_base_peak_angle(const double base_peak_angle_) {
 
 double AngleCalibration::get_base_peak_angle() const { return base_peak_angle; }
 
+void AngleCalibration::calculate_average_photon_counts() {
+    NDArray<size_t, 1> num_frames_with_base_peak_in_module(
+        std::array<ssize_t, 1>{mythen_detector->max_modules()});
+    NDArray<double, 1> average_photon_counts(
+        std::array<ssize_t, 1>{mythen_detector->max_modules()});
+
+    for (const auto &file : file_list) {
+        MythenFrame frame = mythen_file_reader->read_frame(file);
+
+        for (size_t module_index; module_index < mythen_detector->max_modules();
+             ++module_index) {
+            if (base_peak_is_in_module(module_index, frame.detector_angle)) {
+                num_frames_with_base_peak_in_module(module_index) += 1;
+                average_photon_counts(module_index) = std::accumulate(
+                    frame.photon_counts.begin() +
+                        module_index * mythen_detector->strips_per_module(),
+                    frame.photon_counts.end() +
+                        (module_index + 1) *
+                            mythen_detector->strips_per_module(),
+                    1.0); // mmh why 1.0 though?
+            }
+        }
+    }
+
+    
+    // scale with average over all runs
+}
+
 double AngleCalibration::similarity_criterion(const NDView<double, 1> S0,
                                               const NDView<double, 1> S1,
                                               const NDView<double, 1> S2,

@@ -21,7 +21,7 @@ max_angle : double
     (measured as displacement of first strip) [degree]
     (-180.0 deg) 
 bad_channels : numpy.ndarray of bool, shape (n_channels,)
-    Expected size: number of channels/strips in the detector
+    Expected size: number of channels/strips in the detector.
     Each element is ``True`` if the channel is bad, otherwise ``False``.)
 pitch: double 
     Read-only static. Strip/channel width of Mythen detector [mm] 

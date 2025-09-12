@@ -296,7 +296,7 @@ class AngleCalibration {
                                          PlotHandle gp = nullptr) const;
 
     /**
-     * compares multiple base peak ROIS from different acquisitions and
+     * @brief compares multiple base peak ROIS from different acquisitions and
      * calculate similarity/variance based on goodness_of_fit and weighted
      * average //TODO explain better
      * @param S0 photon_varaince over all runs
@@ -314,7 +314,7 @@ class AngleCalibration {
     // TODO: also a bad design - make shift_parameter configurable - consider
     // having second class Optimization
     /**
-     * optimizes BC parameters of given module based on similarity criterion
+     * @brief optimizes BC parameters of given module based on similarity criterion
      * @param gp plot wrapper for gnuplot plot to visualize calibration process
      * (default nullptr)
      * @param shift_parameter1 parameter step for parameter angle between module
@@ -328,6 +328,12 @@ class AngleCalibration {
                                 PlotHandle gp = nullptr,
                                 const double shift_parameter1 = 0.01,
                                 const double shift_parameter2 = 0.005);
+
+
+    /**
+     * @brief calculates average photon counts over all runs and strips 
+     */
+    void calculate_average_photon_counts(); 
 
   private:
     DGParameters DGparameters{};
@@ -439,7 +445,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             (frame.photon_counts(global_strip_index) + 1) *
             flat_field->get_inverse_normalized_flatfield()(global_strip_index);
 
-        double some_flatfield_error = 1.0; // TODO: some dummy value - implement
+        double some_flatfield_error = 1.0; // TODO: some dummy value - implement read from file
 
         // I guess it measures the
         // expcected noise - where is the formula - used as the variance

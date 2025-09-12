@@ -32,9 +32,9 @@ class MythenFileReader : public HDF5FileReader {
     MythenFileReader() = default;
 
     /**
-     * read acquisition file from hdf5
+     * @brief read acquisition file from hdf5
      * @return MythenFrame storing the photon counts, channel mask,
-     * detector_angle
+     * detector position [degrees]
      */
     MythenFrame read_frame(const std::string &file_name) {
 

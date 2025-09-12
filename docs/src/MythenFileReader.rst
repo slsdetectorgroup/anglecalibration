@@ -8,7 +8,7 @@ File reader to read acquisition files stored as hdf5. The filereader inherits fr
 `DetectorAngle` storing the detector position in degrees and `CounterMask` storing which counters are active. The field `CounterMask` stores an integer representation of a 3-digit bit string, where each bit is set to 1 if the counter is active. 
 
 Example
--------
+^^^^^^^
 
 .. code-block:: text 
 
