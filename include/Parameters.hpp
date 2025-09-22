@@ -7,15 +7,16 @@
 
 namespace angcal {
 
-// TODO add abstract base class for parameters
 /**
- * geometric parameters
+ * base class
  */
-struct EEParameters {
+struct Parameters {
 
-    EEParameters() = default;
+    ~Parameters() = default;
 
-    EEParameters(const ssize_t n_modules) {
+    Parameters() = default;
+
+    Parameters(const ssize_t n_modules) {
         parameters =
             aare::NDArray<double, 2>(std::array<ssize_t, 2>{n_modules, 3});
     }
@@ -30,15 +31,30 @@ struct EEParameters {
         return parameters(module_index, parameter_index);
     }
 
+    aare::NDArray<double, 2> parameters{};
+};
+
+// TODO add abstract base class for parameters
+/**
+ * geometric parameters
+ */
+struct EEParameters : public Parameters {
+
+    ~EEParameters() = default;
+
+    EEParameters() = default;
+
+    EEParameters(const ssize_t n_modules) : Parameters(n_modules) {};
+
     /**
      * normal distance between sample and detector (R)
      */
     double &normal_distances(const size_t module_index) {
-        return parameters(module_index, 0);
+        return Parameters::operator()(module_index, 0);
     }
 
     double normal_distances(const size_t module_index) const {
-        return parameters(module_index, 0);
+        return Parameters::operator()(module_index, 0);
     }
 
     /**
@@ -46,47 +62,34 @@ struct EEParameters {
      * (D)
      */
     double &module_center_distances(const size_t module_index) {
-        return parameters(module_index, 1);
+        return Parameters::operator()(module_index, 1);
     }
     double module_center_distances(const size_t module_index) const {
-        return parameters(module_index, 1);
+        return Parameters::operator()(module_index, 1);
     }
 
     /** angles between undiffracted beam and orthogonal sample projection on
      * detector (phi)
      */
     double &angles(const size_t module_index) {
-        return parameters(module_index, 2);
+        return Parameters::operator()(module_index, 2);
     }
 
     double angles(const size_t module_index) const {
-        return parameters(module_index, 2);
+        return Parameters::operator()(module_index, 0);
     }
-
-    aare::NDArray<double, 2> parameters{};
 };
 
 /**
  * best computing parameters
  */
-struct BCParameters {
+struct BCParameters : public Parameters {
+
+    ~BCParameters() = default;
 
     BCParameters() = default;
 
-    BCParameters(const ssize_t n_modules) {
-        parameters =
-            aare::NDArray<double, 2>(std::array<ssize_t, 2>{n_modules, 3});
-    }
-
-    double &operator()(const size_t module_index,
-                       const size_t parameter_index) {
-        return parameters(module_index, parameter_index);
-    }
-
-    double operator()(const size_t module_index,
-                      const size_t parameter_index) const {
-        return parameters(module_index, parameter_index);
-    }
+    BCParameters(const ssize_t n_modules) : Parameters(n_modules) {};
 
     /** angle between center of module and module normal (from sample) (delta)
      */
@@ -119,31 +122,63 @@ struct BCParameters {
         return parameters(module_index, 2);
     }
 
-    aare::NDArray<double, 2> parameters{};
+    /*
+    std::tuple<double, double, double>
+    convert_to_DGParameters(const size_t module_index) const {
+        double center =
+            180.0 / M_PI *
+            atan((centers(module_index) -
+                  0.5 * MythenDetectorSpecifications::strips_per_module()) *
+                 std::abs(conversions(
+                     module_index))); // TODO in Antonios code it is minus?
+
+        double distance_module_center_sample =
+            MythenDetectorSpecifications::pitch() /
+            std::abs(conversions(module_index)) *
+            std::sqrt(
+                1 +
+                std::pow(
+                    std::abs(conversions(module_index)) *
+                        (centers(module_index) -
+                         0.5 *
+                             MythenDetectorSpecifications::strips_per_module()),
+                    2));
+        double angle_beam_module_center =
+            offsets(module_index) +
+            180.0 / M_PI * std::abs(conversions(module_index)) *
+                centers(module_index) -
+            angle_center_module_normal;
+
+        return std::make_tuple(angle_center_module_normal,
+                               distance_module_center_sample,
+                               angle_beam_module_center);
+    }
+
+    void convert_to_DGParameters(DGParameters &dgparameters) const {
+        for (ssize_t module_index = 0;
+             module_index < dgparameters.parameters.shape(0); ++module_index) {
+            auto [center, conversion, offset] =
+                convert_to_DGParameters(module_index);
+            dgparameters.centers(module_index) = center;
+            dgparameters.conversions(module_index) = conversion;
+            dgparameters.offsets(module_index) = offset;
+        }
+    }
+
+    */
 };
 
 // TODO add units
 /**
  * historical Detector Group parameters
  */
-struct DGParameters {
+struct DGParameters : public Parameters {
+
+    ~DGParameters() = default;
 
     DGParameters() = default;
 
-    DGParameters(const ssize_t n_modules) {
-        parameters =
-            aare::NDArray<double, 2>(std::array<ssize_t, 2>{n_modules, 3});
-    }
-
-    double &operator()(const size_t module_index,
-                       const size_t parameter_index) {
-        return parameters(module_index, parameter_index);
-    }
-
-    double operator()(const size_t module_index,
-                      const size_t parameter_index) const {
-        return parameters(module_index, parameter_index);
-    }
+    DGParameters(const ssize_t n_modules) : Parameters(n_modules) {};
 
     /**
      * orthogonal projection of sample onto
@@ -255,8 +290,6 @@ struct DGParameters {
 
         return EEparameters;
     }
-
-    aare::NDArray<double, 2> parameters{};
 };
 
 } // namespace angcal
