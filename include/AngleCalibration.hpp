@@ -272,14 +272,15 @@ class AngleCalibration {
      * @param fixed_angle_width_bin_photon_counts stores redistributed photon
      * counts for fixed angle width bin scaled by variance and flatfield
      * corrected
-     * @param fixed_angle_width_bins_photon_counts_variance stores variance
+     * @param inverse_fixed_angle_width_bins_photon_counts_variance stores
+     * inverse variance
      * @param S0, S1, S2 used to calculate similarity criterion between peaks
      */
     template <bool base_peak_ROI_only = false>
     void redistribute_photon_counts_to_fixed_angle_width_bins(
         const size_t module_index, const MythenFrame &frame,
         NDView<double, 1> fixed_angle_width_bins_photon_counts,
-        NDView<double, 1> fixed_angle_width_bins_photon_counts_variance,
+        NDView<double, 1> inverse_fixed_angle_width_bins_photon_counts_variance,
         std::optional<NDView<double, 1>> S0 = std::nullopt,
         std::optional<NDView<double, 1>> S1 = std::nullopt,
         std::optional<NDView<double, 1>> S2 = std::nullopt) const;
@@ -299,9 +300,9 @@ class AngleCalibration {
      * @brief compares multiple base peak ROIS from different acquisitions and
      * calculate similarity/variance based on goodness_of_fit and weighted
      * average //TODO explain better
-     * @param S0 photon_varaince over all runs
-     * @param S1 photon_variance*photon_count over all runs
-     * @param S2 photon_variance*photon_count² over all runs
+     * @param S0 inverse photon_varaince over all runs
+     * @param S1 inverse_photon_variance*photon_count over all runs
+     * @param S2 inverse_photon_variance*photon_count² over all runs
      * @param num_runs number of frames for which base peak ROI is covered by
      * the respective module
      * @return similarity criterion
@@ -314,7 +315,8 @@ class AngleCalibration {
     // TODO: also a bad design - make shift_parameter configurable - consider
     // having second class Optimization
     /**
-     * @brief optimizes BC parameters of given module based on similarity criterion
+     * @brief optimizes BC parameters of given module based on similarity
+     * criterion
      * @param gp plot wrapper for gnuplot plot to visualize calibration process
      * (default nullptr)
      * @param shift_parameter1 parameter step for parameter angle between module
@@ -329,11 +331,16 @@ class AngleCalibration {
                                 const double shift_parameter1 = 0.01,
                                 const double shift_parameter2 = 0.005);
 
-
     /**
-     * @brief calculates average photon counts over all runs and strips 
+     * @brief calculated the corrected photon counts and its variance for a
+     * given raw photon count
+     * @param photon_counts raw photon counts
+     * @return pair {corrected photon counts, inverse variance of corrected
+     * photon counts}
      */
-    void calculate_average_photon_counts(); 
+    std::pair<double, double>
+    calculate_corrected_photon_counts(const double photon_counts,
+                                      const size_t global_strip_index) const;
 
   private:
     DGParameters DGparameters{};
@@ -396,7 +403,7 @@ template <bool base_peak_ROI_only>
 void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     const size_t module_index, const MythenFrame &frame,
     NDView<double, 1> fixed_angle_width_bins_photon_counts,
-    NDView<double, 1> fixed_angle_width_bins_photon_counts_variance,
+    NDView<double, 1> inverse_fixed_angle_width_bins_photon_counts_variance,
     std::optional<NDView<double, 1>> S0, std::optional<NDView<double, 1>> S1,
     std::optional<NDView<double, 1>> S2) const {
     double left_boundary_roi_base_peak =
@@ -404,9 +411,14 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     double right_boundary_roi_base_peak =
         mythen_detector->max_angle(); // dummy values
 
-    NDArray<double, 1> fraction_covered_by_strip(
-        std::array<ssize_t, 1>{new_number_of_bins()},
-        0.0); // fraction of strip
+    ssize_t number_of_bins = new_number_of_bins();
+    if constexpr (base_peak_ROI_only) {
+        number_of_bins = get_base_peak_ROI_num_bins();
+    }
+
+    NDArray<double, 1> sum_statistical_weights(
+        std::array<ssize_t, 1>{number_of_bins},
+        0.0); // used to nromalize statistical weights
 
     if constexpr (base_peak_ROI_only) {
 
@@ -441,21 +453,12 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             continue; // skip strip if not in ROI
         }
 
-        double flatfield_normalized_photon_counts =
-            (frame.photon_counts(global_strip_index) + 1) *
-            flat_field->get_inverse_normalized_flatfield()(global_strip_index);
-
-        double some_flatfield_error = 1.0; // TODO: some dummy value - implement read from file
-
-        // I guess it measures the
-        // expcected noise - where is the formula - used as the variance
-        double photon_counts_variance =
-            1. / (std::pow(flatfield_normalized_photon_counts, 2) *
-                  (1. / (frame.photon_counts(global_strip_index) + 1) +
-                   std::pow(some_flatfield_error *
-                                flat_field->get_inverse_normalized_flatfield()(
-                                    global_strip_index),
-                            2)));
+        auto [corrected_photon_counts,
+              inverse_corrected_photon_counts_variance] =
+            calculate_corrected_photon_counts(
+                frame.photon_counts(global_strip_index),
+                global_strip_index); // TODO: mind its probably the inverse
+                                     // already
 
         double strip_width_angle =
             std::abs(right_strip_boundary_angle - left_strip_boundary_angle);
@@ -470,12 +473,13 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                                          // strip
         */
 
-        double photon_counts_per_bin = flatfield_normalized_photon_counts *
-                                       histogram_bin_width / strip_width_angle;
+        double photon_counts_per_bin =
+            corrected_photon_counts * histogram_bin_width / strip_width_angle;
 
-        double photon_counts_variance_per_bin =
-            photon_counts_variance * (strip_width_angle / histogram_bin_width) *
-            (strip_width_angle / histogram_bin_width);
+        double inverse_photon_counts_variance_per_bin =
+            inverse_corrected_photon_counts_variance *
+            std::pow(strip_width_angle / histogram_bin_width,
+                     2); // Var(aX) = a^2 Var(X)
 
         ssize_t left_bin_index_covered_by_strip{};
 
@@ -530,49 +534,55 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                         histogram_bin_width); // bin index starts at zero
             }
 
-            double corrected_photon_counts =
-                photon_counts_per_bin; //* bin_coverage_factor;
-
-            fraction_covered_by_strip(proper_bin_index) += bin_coverage_factor;
-
-            double corrected_photon_counts_variance =
-                photon_counts_variance_per_bin; //*
-            // std::pow(bin_coverage_factor,
-            // 2); // this seems to be a correction factor but does not really
-            // redistribute it as it is not multiplied but only multiplied once
+            double statistical_weight =
+                bin_coverage_factor *
+                inverse_photon_counts_variance_per_bin; // TODO cant be the
+                                                        // inverse
 
             fixed_angle_width_bins_photon_counts(proper_bin_index) +=
-                bin_coverage_factor * corrected_photon_counts *
-                corrected_photon_counts_variance;
+                statistical_weight * photon_counts_per_bin;
 
-            fixed_angle_width_bins_photon_counts_variance(proper_bin_index) +=
-                corrected_photon_counts_variance * bin_coverage_factor;
+            inverse_fixed_angle_width_bins_photon_counts_variance(
+                proper_bin_index) +=
+                inverse_photon_counts_variance_per_bin *
+                bin_coverage_factor; // statistical_weigth² *
+                                     // corrected_photon_counts_variance
+
+            sum_statistical_weights(proper_bin_index) += statistical_weight;
         }
     }
 
     // S_index = sum_i^num_runs
     // photon_count^index*photon_variance
+    // normalize statistical weights
     for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.size(); ++i) {
         fixed_angle_width_bins_photon_counts(i) =
-            fixed_angle_width_bins_photon_counts_variance(i) <
-                    std::numeric_limits<double>::epsilon()
+            sum_statistical_weights(i) < std::numeric_limits<double>::epsilon()
                 ? 0.0
                 : fixed_angle_width_bins_photon_counts(i) /
-                      fixed_angle_width_bins_photon_counts_variance(
-                          i); // y_k what exactly is
-                              // that?
+                      sum_statistical_weights(i); // y_k
+
+        inverse_fixed_angle_width_bins_photon_counts_variance(i) =
+            inverse_fixed_angle_width_bins_photon_counts_variance(i) <
+                    std::numeric_limits<double>::epsilon()
+                ? 0.0
+                : std::pow(sum_statistical_weights(i), 2) /
+                      inverse_fixed_angle_width_bins_photon_counts_variance(i);
 
         if (S0.has_value()) {
-            S0.value()(i) += fixed_angle_width_bins_photon_counts_variance(i);
+            S0.value()(i) +=
+                inverse_fixed_angle_width_bins_photon_counts_variance(i);
         }
         if (S1.has_value()) {
-            S1.value()(i) += fixed_angle_width_bins_photon_counts(i) *
-                             fixed_angle_width_bins_photon_counts_variance(i);
+            S1.value()(i) +=
+                fixed_angle_width_bins_photon_counts(i) *
+                inverse_fixed_angle_width_bins_photon_counts_variance(i);
         }
         if (S2.has_value()) {
-            S2.value()(i) += fixed_angle_width_bins_photon_counts(i) *
-                             fixed_angle_width_bins_photon_counts(i) *
-                             fixed_angle_width_bins_photon_counts_variance(i);
+            S2.value()(i) +=
+                fixed_angle_width_bins_photon_counts(i) *
+                fixed_angle_width_bins_photon_counts(i) *
+                inverse_fixed_angle_width_bins_photon_counts_variance(i);
         }
     }
 

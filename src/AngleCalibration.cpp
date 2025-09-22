@@ -227,6 +227,7 @@ void AngleCalibration::set_base_peak_angle(const double base_peak_angle_) {
 
 double AngleCalibration::get_base_peak_angle() const { return base_peak_angle; }
 
+/*
 void AngleCalibration::calculate_average_photon_counts() {
     NDArray<size_t, 1> num_frames_with_base_peak_in_module(
         std::array<ssize_t, 1>{mythen_detector->max_modules()});
@@ -251,9 +252,9 @@ void AngleCalibration::calculate_average_photon_counts() {
         }
     }
 
-    
     // scale with average over all runs
 }
+*/
 
 double AngleCalibration::similarity_criterion(const NDView<double, 1> S0,
                                               const NDView<double, 1> S1,
@@ -313,6 +314,31 @@ bool AngleCalibration::base_peak_is_in_module(
             left_module_boundary_angle < base_peak_angle - *bounds_in_angles);
 }
 
+std::pair<double, double> AngleCalibration::calculate_corrected_photon_counts(
+    const double photon_counts, const size_t global_strip_index) const {
+
+    double flatfield_normalized_photon_counts =
+        (photon_counts + 1) *
+        flat_field->get_inverse_normalized_flatfield()(global_strip_index);
+
+    double some_flatfield_error =
+        1.0; // TODO: some dummy value - implement read from file
+
+    // I guess it measures the
+    // expcected noise - where is the formula - used as the variance
+    double inverse_photon_counts_variance =
+        1. / (std::pow(flatfield_normalized_photon_counts, 2) *
+              (1. / (photon_counts + 1) +
+               std::pow(some_flatfield_error *
+                            flat_field->get_inverse_normalized_flatfield()(
+                                global_strip_index),
+                        2))); // this is probably the inverse - for easier
+                              // multiplication - division by variance
+
+    return std::pair(flatfield_normalized_photon_counts,
+                     inverse_photon_counts_variance);
+}
+
 double
 AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
                                                 PlotHandle plot) const {
@@ -349,8 +375,9 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
 
             NDArray<double, 1> fixed_angle_width_bins_photon_counts(
                 std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-            NDArray<double, 1> fixed_angle_width_bins_photon_counts_variance(
-                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+            NDArray<double, 1>
+                inverse_fixed_angle_width_bins_photon_counts_variance(
+                    std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
             // calculates flatfield normalized photon counts and
             // photon_count_variance for ROI around base_peak and
             // redistributes to fixed angle width bins
@@ -358,8 +385,8 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
             redistribute_photon_counts_to_fixed_angle_width_bins<true>(
                 module_index, frame,
                 fixed_angle_width_bins_photon_counts.view(),
-                fixed_angle_width_bins_photon_counts_variance.view(), S0.view(),
-                S1.view(), S2.view());
+                inverse_fixed_angle_width_bins_photon_counts_variance.view(),
+                S0.view(), S1.view(), S2.view());
 
 #ifdef ANGCAL_PLOT
             auto bin_to_diffraction_angle_base_peak_ROI_only =

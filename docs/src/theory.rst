@@ -191,19 +191,19 @@ The weighted average is then given by:
 
     I_{red, i} = \sum_{si \in T} \alpha'_{si, i} * I_{corr}(si), 
     
-where the normalized statistical weights :math:`\alpha'_{strip\_index}` are given by: 
+where the normalized statistical weights :math:`\alpha'_{si,i}` are given by: 
 
 .. math::
 
     \alpha'_{si, i} = \frac{c_{si,i} * \sigma_{corr}^{-2}(si)}{\sum_{si \in T} c_{si,i} * \sigma_{corr}^{-2}(si)}.
     
 
-The parameter :math:`c_{si, bin}` denotes the bin coverage factor e.g. how much of the bin is covered by the strip: 
+The parameter :math:`c_{si, i}` denotes the bin coverage factor e.g. how much of the bin is covered by the strip: 
 
 .. math:: 
 
-    c_{si, i} = \frac{\min(\theta_{B_{si + 0.5}}, (i + 0.5)*w_{bin}) 
- - \max(\theta_{B_{si - 0.5}}, (i - 0.5)*w_{bin}) }{w_{bin}}. 
+    c_{si, i} = \frac{\min(\theta_{B_{si + 0.5}}, (i + 0.5)*w_{i}) 
+ - \max(\theta_{B_{si - 0.5}}, (i - 0.5)*w_{i}) }{w_{i}}. 
 
 The resulting variance for the redistributed photon counts is then given by: 
 
