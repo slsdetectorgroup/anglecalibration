@@ -104,6 +104,8 @@ class AngleCalibration {
      */
     const DGParameters &get_DGparameters() const; // TODO do I need that?
 
+    const BCParameters &get_BCparameters() const;
+
     /**
      * @brief calibrates the BC (best computing) parameters for all modules
      * @param file_list vector of file_names of acquisition files
@@ -211,19 +213,20 @@ class AngleCalibration {
      */
     double diffraction_angle_from_BC_parameters(
         const size_t module_index, const double detector_angle,
-        const size_t strip_index, const double distance_to_strip = 0) const;
+        size_t strip_index, const double distance_to_strip = 0) const;
 
     /** @brief calculates diffraction angle from EE module parameters (used in
      * Beer's Law)
      * @param detector_angle detector position [degrees]
-     * @param strip_index local strip index of module e.g. 0-1279
+     * @param strip_index global strip index of module
      * @param distance_to_strip distance to strip [given in strips]
      * @return diffraction angle [degrees]
      */
     double diffraction_angle_from_EE_parameters(
         const double module_center_distance, const double normal_distance,
         const double angle, const double detector_angle,
-        const size_t strip_index, const double distance_to_strip = 0) const;
+        const size_t global_strip_index,
+        const double distance_to_strip = 0) const;
 
   private:
     /** @brief calculated the strip width expressed as angle from DG

@@ -81,10 +81,11 @@ int main() {
     LOG(TLogLevel::logDEBUG) << "read bad channels";
 
 #ifdef ANGCAL_PLOT
-    /*
+
     plot_photon_counts(mythen_detector_ptr->get_bad_channels(),
                        {0, mythen_detector_ptr->num_strips()}, "Bad channels",
                        std::nullopt);
+    /*
     plot_photon_counts(mythen_detector_ptr->get_bad_channels(),
                        {3 * mythen_detector_ptr->strips_per_module(),
                         4 * mythen_detector_ptr->strips_per_module()},
@@ -159,11 +160,13 @@ int main() {
                                           fmt::format("{:04}", i++) + ".h5");
                   });
 
+    /*
     auto [left_angle, right_angle] =
         get_detector_range(mythen_file_reader, filelist);
 
     LOG(TLogLevel::logINFO)
         << fmt::format("detector range: [{},{}]", left_angle, right_angle);
+    */
 
 #ifdef ANGCAL_PLOT
     // uncomment if you want to see all frames and select a base peak
@@ -191,6 +194,7 @@ int main() {
     MythenFrame frame = mythen_file_reader.read_frame(
         file_path / acquisition_fileprefix.append("0850.h5")); // 0170.h5
 
+    size_t module_index = 0;
 #ifdef ANGCAL_PLOT
 
     // normalize photon counts
@@ -206,11 +210,12 @@ int main() {
                        {0, mythen_detector_ptr->num_strips()},
                        "Normalized Photon Counts", mythen_detector_ptr);
 
-    plot_photon_counts(normalized_photon_counts.view(),
-                       {0 * mythen_detector_ptr->strips_per_module(),
-                        1 * mythen_detector_ptr->strips_per_module()},
-                       "Normalized Photon Counts for module 0",
-                       mythen_detector_ptr);
+    plot_photon_counts(
+        normalized_photon_counts.view(),
+        {module_index * mythen_detector_ptr->strips_per_module(),
+         (module_index + 1) * mythen_detector_ptr->strips_per_module()},
+        fmt::format("Normalized Photon Counts for module {}", module_index),
+        mythen_detector_ptr);
 
 #endif
 
@@ -230,7 +235,6 @@ int main() {
     */
 #endif
 
-    size_t module_index = 0;
 // plot one module for fixed angle width bins
 #ifdef ANGCAL_PLOT
     // plot module

@@ -123,6 +123,88 @@ TEST_CASE("create flatfield", "[anglecalibration], [flatfield], [.files]") {
               21); // virtual data 2 angles, 3 frames - 21 as increasing numbers
 }
 
+TEST_CASE("check diffraction angle", "[anglecalibration]") {
+
+    std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
+        std::make_shared<MythenDetectorSpecifications>();
+
+    auto file_path = test_data_path();
+
+    AngleCalibration anglecalibration(mythen_detector_ptr,
+                                      std::shared_ptr<FlatField>{});
+
+    std::string initial_angles_filename =
+        test_data_path() / "AngleCalibration_Test_Data" / "AntoniosTestData" /
+        "angcal_Mar2021_P10.off";
+
+    REQUIRE(std::filesystem::exists(initial_angles_filename));
+
+    anglecalibration.read_initial_calibration_from_file(
+        initial_angles_filename); // DG parameters
+
+    auto [module_index, local_strip_index] = GENERATE(
+        std::make_pair<ssize_t>(1, 0), std::make_pair<ssize_t>(5, 20),
+        std::make_pair<ssize_t>(15, 1250), std::make_pair<ssize_t>(47, 1278),
+        std::make_pair<ssize_t>(28, 100));
+
+    double diffraction_angle_DG_param =
+        anglecalibration.diffraction_angle_from_DG_parameters(
+            module_index, 0.0, local_strip_index, 0.0);
+
+    double diffraction_angle_BC_param =
+        anglecalibration.diffraction_angle_from_BC_parameters(
+            module_index, 0.0, local_strip_index, 0.0);
+
+    auto [module_center_distance, normal_distance, angle] =
+        anglecalibration.get_DGparameters().convert_to_EEParameters(
+            module_index);
+
+    ssize_t global_strip_index =
+        module_index * MythenDetectorSpecifications::strips_per_module() +
+        local_strip_index;
+    double diffraction_angle_EE_param =
+        anglecalibration.diffraction_angle_from_EE_parameters(
+            module_center_distance, normal_distance, angle, 0.0,
+            global_strip_index, 0.0);
+
+    CHECK(diffraction_angle_EE_param ==
+          Catch::Approx(diffraction_angle_DG_param));
+
+    CHECK(diffraction_angle_BC_param ==
+          Catch::Approx(diffraction_angle_DG_param));
+}
+
+TEST_CASE("diffraction angle of clockwise and counterclockwise modules",
+          "[anglecalibration]") {
+
+    std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
+        std::make_shared<MythenDetectorSpecifications>();
+
+    auto file_path = test_data_path();
+
+    AngleCalibration anglecalibration(mythen_detector_ptr,
+                                      std::shared_ptr<FlatField>{});
+
+    std::string initial_angles_filename =
+        test_data_path() / "AngleCalibration_Test_Data" / "AntoniosTestData" /
+        "angcal_Mar2021_P10.off";
+
+    REQUIRE(std::filesystem::exists(initial_angles_filename));
+
+    anglecalibration.read_initial_calibration_from_file(
+        initial_angles_filename); // DG parameters
+
+    double diffraction_angle_BC_param_clockwise_module =
+        anglecalibration.diffraction_angle_from_BC_parameters(0, 0.0, 1);
+
+    double diffraction_angle_BC_param_counterclockwise_module =
+        anglecalibration.diffraction_angle_from_BC_parameters(47, 0.0, 1278);
+
+    // TODO: not sure if this should hold
+    CHECK(diffraction_angle_BC_param_clockwise_module ==
+          Catch::Approx(diffraction_angle_BC_param_counterclockwise_module));
+}
+
 TEST_CASE("check parameter conversion", "[anglecalibration]") {
 
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
@@ -140,74 +222,84 @@ TEST_CASE("check parameter conversion", "[anglecalibration]") {
     REQUIRE(std::filesystem::exists(initial_angles_filename));
 
     anglecalibration.read_initial_calibration_from_file(
-        initial_angles_filename);
+        initial_angles_filename); // DG parameters
 
     SECTION("clockwise module") {
-        const ssize_t local_strip_index = 1;
         const ssize_t module_index = 0;
 
-        double diffraction_angle_DG_param =
-            anglecalibration.diffraction_angle_from_DG_parameters(
-                module_index, 0.0, local_strip_index);
+        double expected_center =
+            anglecalibration.get_DGparameters()(module_index, 0);
+        double expected_conversion =
+            anglecalibration.get_DGparameters()(module_index, 1);
+        double expected_offset =
+            anglecalibration.get_DGparameters()(module_index, 2);
 
-        double diffraction_angle_BC_param =
-            anglecalibration.diffraction_angle_from_BC_parameters(
-                module_index, 0.0, local_strip_index);
-
-        auto [module_center_distance, normal_distance, angle] =
-            anglecalibration.get_DGparameters().convert_to_EEParameters(
+        auto [center, conversion, offset] =
+            anglecalibration.get_BCparameters().convert_to_DGParameters(
                 module_index);
 
-        double diffraction_angle_EE_param =
-            anglecalibration.diffraction_angle_from_EE_parameters(
-                module_center_distance, normal_distance, angle, 0.0,
-                local_strip_index);
-
-        CHECK(diffraction_angle_EE_param ==
-              Catch::Approx(diffraction_angle_DG_param));
-
-        CHECK(diffraction_angle_BC_param ==
-              Catch::Approx(diffraction_angle_DG_param));
+        CHECK(center == Catch::Approx(expected_center));
+        CHECK(conversion == Catch::Approx(expected_conversion));
+        CHECK(offset == Catch::Approx(expected_offset));
     }
     SECTION("counter clockwise module") {
-        const ssize_t local_strip_index = 1278;
         const ssize_t module_index = 47;
 
-        double diffraction_angle_DG_param =
-            anglecalibration.diffraction_angle_from_DG_parameters(
-                module_index, 0.0, local_strip_index);
+        double expected_center =
+            anglecalibration.get_DGparameters()(module_index, 0);
+        double expected_conversion =
+            anglecalibration.get_DGparameters()(module_index, 1);
+        double expected_offset =
+            anglecalibration.get_DGparameters()(module_index, 2);
 
-        double diffraction_angle_BC_param =
-            anglecalibration.diffraction_angle_from_BC_parameters(
-                module_index, 0.0, local_strip_index);
-
-        auto [module_center_distance, normal_distance, angle] =
-            anglecalibration.get_DGparameters().convert_to_EEParameters(
+        auto [center, conversion, offset] =
+            anglecalibration.get_BCparameters().convert_to_DGParameters(
                 module_index);
 
-        double diffraction_angle_EE_param =
-            anglecalibration.diffraction_angle_from_EE_parameters(
-                module_center_distance, normal_distance, angle, 0.0,
-                local_strip_index);
-
-        CHECK(diffraction_angle_EE_param ==
-              Catch::Approx(diffraction_angle_DG_param));
-
-        CHECK(diffraction_angle_BC_param ==
-              Catch::Approx(diffraction_angle_DG_param));
+        CHECK(center == Catch::Approx(expected_center));
+        CHECK(conversion == Catch::Approx(expected_conversion));
+        CHECK(offset == Catch::Approx(expected_offset));
     }
-    SECTION("clockwise and counterclockwise module have the same diffraction "
-            "angle") {
-        double diffraction_angle_BC_param_clockwise_module =
-            anglecalibration.diffraction_angle_from_BC_parameters(0, 0.0, 1);
+    SECTION("EE parameter conversion") {
+        EEParameters eeparameters_from_DGparameters(
+            anglecalibration.get_DGparameters().num_modules());
+        anglecalibration.get_DGparameters().convert_to_EEParameters(
+            eeparameters_from_DGparameters);
 
-        double diffraction_angle_BC_param_counterclockwise_module =
-            anglecalibration.diffraction_angle_from_BC_parameters(47, 0.0,
-                                                                  1278);
+        EEParameters eeparameters_from_BCparameters(
+            anglecalibration.get_DGparameters().num_modules());
+        anglecalibration.get_BCparameters().convert_to_EEParameters(
+            eeparameters_from_BCparameters);
 
-        // TODO: not sure if this should hold
+        ssize_t module_index = 0;
+
         CHECK(
-            diffraction_angle_BC_param_clockwise_module ==
-            Catch::Approx(diffraction_angle_BC_param_counterclockwise_module));
+            eeparameters_from_DGparameters.angles(module_index) ==
+            Catch::Approx(eeparameters_from_BCparameters.angles(module_index)));
+
+        CHECK(eeparameters_from_DGparameters.module_center_distances(
+                  module_index) ==
+              Catch::Approx(
+                  eeparameters_from_BCparameters.module_center_distances(
+                      module_index)));
+
+        CHECK(eeparameters_from_DGparameters.normal_distances(module_index) ==
+              Catch::Approx(eeparameters_from_BCparameters.normal_distances(
+                  module_index)));
+
+        module_index = 47;
+        CHECK(
+            eeparameters_from_DGparameters.angles(module_index) ==
+            Catch::Approx(eeparameters_from_BCparameters.angles(module_index)));
+
+        CHECK(eeparameters_from_DGparameters.module_center_distances(
+                  module_index) ==
+              Catch::Approx(
+                  eeparameters_from_BCparameters.module_center_distances(
+                      module_index)));
+
+        CHECK(eeparameters_from_DGparameters.normal_distances(module_index) ==
+              Catch::Approx(eeparameters_from_BCparameters.normal_distances(
+                  module_index)));
     }
 }

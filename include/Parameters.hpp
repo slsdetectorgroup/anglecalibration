@@ -7,6 +7,8 @@
 
 namespace angcal {
 
+struct DGParameters; // forward declaration
+
 /**
  * base class
  */
@@ -30,6 +32,8 @@ struct Parameters {
                       const size_t parameter_index) const {
         return parameters(module_index, parameter_index);
     }
+
+    ssize_t num_modules() const { return parameters.shape(0); }
 
     aare::NDArray<double, 2> parameters{};
 };
@@ -91,8 +95,10 @@ struct BCParameters : public Parameters {
 
     BCParameters(const ssize_t n_modules) : Parameters(n_modules) {};
 
-    /** angle between center of module and module normal (from sample) (delta)
+    /** angle between center of module and module normal (from sample) [degrees]
+     * (delta)
      */
+    // TODO: check the order of filling - for optimization
     double &angle_center_module_normal(const size_t module_index) {
         return parameters(module_index, 0);
     }
@@ -112,7 +118,7 @@ struct BCParameters : public Parameters {
     }
 
     /**
-     * diffraction angle betwen center module and beam  (phi)
+     * diffraction angle betwen center module and beam  (phi) [degrees]
      */
     double &angle_center_beam(const size_t module_index) {
         return parameters(module_index, 2);
@@ -122,50 +128,15 @@ struct BCParameters : public Parameters {
         return parameters(module_index, 2);
     }
 
-    /*
     std::tuple<double, double, double>
-    convert_to_DGParameters(const size_t module_index) const {
-        double center =
-            180.0 / M_PI *
-            atan((centers(module_index) -
-                  0.5 * MythenDetectorSpecifications::strips_per_module()) *
-                 std::abs(conversions(
-                     module_index))); // TODO in Antonios code it is minus?
+    convert_to_DGParameters(const size_t module_index) const;
 
-        double distance_module_center_sample =
-            MythenDetectorSpecifications::pitch() /
-            std::abs(conversions(module_index)) *
-            std::sqrt(
-                1 +
-                std::pow(
-                    std::abs(conversions(module_index)) *
-                        (centers(module_index) -
-                         0.5 *
-                             MythenDetectorSpecifications::strips_per_module()),
-                    2));
-        double angle_beam_module_center =
-            offsets(module_index) +
-            180.0 / M_PI * std::abs(conversions(module_index)) *
-                centers(module_index) -
-            angle_center_module_normal;
+    void convert_to_DGParameters(DGParameters &dgparameters) const;
 
-        return std::make_tuple(angle_center_module_normal,
-                               distance_module_center_sample,
-                               angle_beam_module_center);
-    }
+    std::tuple<double, double, double>
+    convert_to_EEParameters(const ssize_t module_index) const;
 
-    void convert_to_DGParameters(DGParameters &dgparameters) const {
-        for (ssize_t module_index = 0;
-             module_index < dgparameters.parameters.shape(0); ++module_index) {
-            auto [center, conversion, offset] =
-                convert_to_DGParameters(module_index);
-            dgparameters.centers(module_index) = center;
-            dgparameters.conversions(module_index) = conversion;
-            dgparameters.offsets(module_index) = offset;
-        }
-    }
-
-    */
+    void convert_to_EEParameters(EEParameters &eeparameters) const;
 };
 
 // TODO add units
@@ -218,78 +189,14 @@ struct DGParameters : public Parameters {
     }
 
     std::tuple<double, double, double>
-    convert_to_BCParameters(const size_t module_index) const {
-        double angle_center_module_normal =
-            180.0 / M_PI *
-            atan((centers(module_index) -
-                  0.5 * MythenDetectorSpecifications::strips_per_module()) *
-                 std::abs(conversions(
-                     module_index))); // TODO in Antonios code it is minus?
-        double distance_module_center_sample =
-            MythenDetectorSpecifications::pitch() /
-            std::abs(conversions(module_index)) *
-            std::sqrt(
-                1 +
-                std::pow(
-                    std::abs(conversions(module_index)) *
-                        (centers(module_index) -
-                         0.5 *
-                             MythenDetectorSpecifications::strips_per_module()),
-                    2));
-        double angle_beam_module_center =
-            offsets(module_index) +
-            180.0 / M_PI * std::abs(conversions(module_index)) *
-                centers(module_index) -
-            angle_center_module_normal;
+    convert_to_BCParameters(const size_t module_index) const;
 
-        return std::make_tuple(angle_center_module_normal,
-                               distance_module_center_sample,
-                               angle_beam_module_center);
-    }
-
-    void convert_to_BCParameters(BCParameters &bcparameters) const {
-        for (ssize_t module_index = 0;
-             module_index < bcparameters.parameters.shape(0); ++module_index) {
-            auto [angle_center_module_normal, distance_module_center_sample,
-                  angle_beam_module_center] =
-                convert_to_BCParameters(module_index);
-            bcparameters.angle_center_module_normal(module_index) =
-                angle_center_module_normal;
-            bcparameters.module_center_sample_distances(module_index) =
-                distance_module_center_sample;
-            bcparameters.angle_center_beam(module_index) =
-                angle_beam_module_center;
-        }
-    }
+    void convert_to_BCParameters(BCParameters &bcparameters) const;
 
     std::tuple<double, double, double>
-    convert_to_EEParameters(const size_t module_index) const {
+    convert_to_EEParameters(const size_t module_index) const;
 
-        const double module_center_distance =
-            centers(module_index) * MythenDetectorSpecifications::pitch();
-        const double normal_distance = MythenDetectorSpecifications::pitch() /
-                                       std::abs(conversions(module_index));
-        const double angle =
-            offsets(module_index) + 180.0 / M_PI * centers(module_index) *
-                                        std::abs(conversions(module_index));
-
-        return std::make_tuple(module_center_distance, normal_distance, angle);
-    }
-
-    EEParameters convert_to_EEParameters() const {
-
-        EEParameters EEparameters(parameters.shape(0));
-
-        for (ssize_t i = 0; i < parameters.shape(0); ++i) {
-            auto [module_center_distance, normal_distance, angle] =
-                convert_to_EEParameters(i);
-            EEparameters.normal_distances(i) = normal_distance;
-            EEparameters.module_center_distances(i) = module_center_distance;
-            EEparameters.angles(i) = angle;
-        }
-
-        return EEparameters;
-    }
+    void convert_to_EEParameters(EEParameters &eeparameters) const;
 };
 
 } // namespace angcal

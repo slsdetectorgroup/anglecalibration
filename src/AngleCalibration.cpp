@@ -87,6 +87,10 @@ const DGParameters &AngleCalibration::get_DGparameters() const {
     return DGparameters;
 }
 
+const BCParameters &AngleCalibration::get_BCparameters() const {
+    return BCparameters;
+}
+
 // TODO: command is connected - maybe use that
 bool AngleCalibration::module_is_disconnected(const size_t module_index) const {
 
@@ -136,23 +140,23 @@ double AngleCalibration::diffraction_angle_from_DG_parameters(
     double center = DGparameters.centers(module_index);
     double conversion = DGparameters.conversions(module_index);
 
-    strip_index =
-        std::signbit(conversion)
-            ? MythenDetectorSpecifications::strips_per_module() - strip_index
-            : strip_index; // TODO: are the values sored in reserve?
+    strip_index = std::signbit(conversion)
+                      ? MythenDetectorSpecifications::strips_per_module() -
+                            strip_index - 1
+                      : strip_index; // TODO: are the values sored in reserve?
 
     return offset +
            180.0 / M_PI *
-               (center * std::abs(conversion) -
+               (center * conversion -
                 std::atan((center - (strip_index + distance_to_strip)) *
-                          std::abs(conversion))) +
+                          conversion)) +
            detector_angle; // + + mythen_detector->dtt0() +
                            // mythen_detector->bloffset();;
 }
 
 double AngleCalibration::diffraction_angle_from_BC_parameters(
-    const size_t module_index, const double detector_angle,
-    const size_t strip_index, const double distance_to_strip) const {
+    const size_t module_index, const double detector_angle, size_t strip_index,
+    const double distance_to_strip) const {
 
     const double angle_module_center_normal =
         BCparameters.angle_center_module_normal(module_index);
@@ -160,6 +164,11 @@ double AngleCalibration::diffraction_angle_from_BC_parameters(
         BCparameters.module_center_sample_distances(module_index);
     const double angle_module_center_beam =
         BCparameters.angle_center_beam(module_index);
+
+    strip_index = std::signbit(DGparameters.conversions(module_index))
+                      ? MythenDetectorSpecifications::strips_per_module() -
+                            strip_index - 1
+                      : strip_index; // TODO: are the values sored in reserve?
 
     return angle_module_center_beam + angle_module_center_normal -
            180.0 / M_PI *
@@ -177,8 +186,11 @@ double AngleCalibration::diffraction_angle_from_BC_parameters(
 
 double AngleCalibration::diffraction_angle_from_EE_parameters(
     const double module_center_distance, const double normal_distance,
-    const double angle, const double detector_angle, const size_t strip_index,
-    const double distance_to_strip) const {
+    const double angle, const double detector_angle,
+    const size_t global_strip_index, const double distance_to_strip) const {
+
+    size_t strip_index = global_to_local_strip_index_conversion(
+        global_strip_index); // local strip index in module
 
     return angle -
            180.0 / M_PI *
