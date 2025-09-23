@@ -3,7 +3,7 @@ AngleCalibration
 ==================
 
 Class to calibrate the mythen detector parameters. For the calibration the "Best computing" BC parameters are used. However, as initial parameters it expects the "historic detector group" DG parameters. 
-See for a more detailed description of the different detector parameters. 
+See :ref:`parametersets` for a more detailed description of the different detector parameters. 
 
 .. note:: 
     The calibration process will automatically be visualized if you compiled with option ``ANGCAL_PLOT`` (:ref:`installation`). 

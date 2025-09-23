@@ -17,6 +17,15 @@ where :math:`\theta_{B}` is the diffraction angle, :math:`\lambda` the wavelengt
 ..
     maybe add example of diffraction pattern measured with mythen 
 
+.. _diffractionpattern:
+
+.. figure:: ../figures/DiffractionPattern.png
+    :target: _figures/DiffractionPattern.png
+    :width: 650px
+    :align: center
+    :alt: Example of Diffraction Pattern taken with Mythen detector. 
+
+    Example of Diffraction Pattern taken with Mythen detector \(only one detector module is shown\). 
 .. 
     is there a difference between intensity spectrum and diffraction pattern? 
 
@@ -30,6 +39,9 @@ The diffraction angle is thus a function of the strip/chip index and the detecto
     
     \theta_B = f_{\sum}\left(\textrm{strip_index}\right)
 
+
+Detcetor parameters
+--------------------
 
 A schemantic representation of Mythen's detector setup is shown in :numref:`detectorsetup`. The Mythen detector consists of multiple modules arranged in a circular fashion. 
 Each module consists of 1280 chips commonly referred to as strips or channels. Each strip has a width of 0.05 mm also referred to as pitch. 
@@ -47,29 +59,107 @@ The detector can be rotated around the sample. Note that the rotation trajectory
 
 
 In :numref:`detectorsetup` the parameter :math:`R_m` represents the ortogonal sample projection onto the module plane, parameter :math:`D_m` represents the distance of the first chip within the module to the sample projection and :math:`\theta_m` represents the angle between the orthogonal sample projection and the direction of the laser beam. 
-Note that these parameters differ for each module but are rotation invariant for rotations around the sample :math:`S`. 
+Note that these parameters differ for each module :math:`m` but are rotation invariant for rotations around the sample :math:`S`. 
 Using the above mentioned parameters :math:`\sum`, also referred to as module parameters, the diffraction angle can be calculated as follows: 
 
 .. math:: 
+    :label: eq:diffractionangle
 
     \theta_B = \phi_m - \arctan\left(\frac{D_m - \textrm{strip_index} * p}{R_m}\right), 
 
 .. 
     mention reverse order 
 
-where p denotes the pitch (internal detector parameter) and :math:`\textrm{strip_index} \in \{0,1,\cdots,1280\}`. 
-Note that there are many more parameter sets to calculate the diffraction angle from. See section for an overview of common parameter sets. 
+where p denotes the pitch (internal detector parameter) and :math:`\textrm{strip_index} \in \{0,1,\cdots,1279\}`. 
+Note that there are many more parameter sets to calculate the diffraction angle from. See section :ref:`parametersets` for an overview of common parameter sets. 
+
+
 
 .. 
     How are the initial parameters known? Geometric measurements deduced from one measured diffraction pattern and theoretical diffraction pattern 
 
 
-However, due to sample displacement, error in wavelength and zero offset the measured diffraction pattern is prone to errors. The detector's module parameters are thus slightly off and need to be calibrated for each module seperately. 
-
+Note that due to sample displacement, error in wavelength and zero offset the measured diffraction pattern is prone to errors. The detector's module parameters are thus slightly off and need to be calibrated for each module seperately. 
 
 .. 
     mmh but these are fixed error's in measurement - its the same for each module and we can correct them if we know the sample displacement and the error in beam direction 
     - need to convert to the measured diffraction angle - were do we get these parameters what are error sources? 
+
+.. _parametersets:
+
+Different Parameter Sets  
+-------------------------
+
+In the previous section the parameterset :math:`\sum(R_m, D_m, \theta_m)` was introduced. We refer to those as the "easy" EE parameters, as they have an easy underlying geometric representation. 
+
+**DG Parameters:** 
+
+Another parameter set are the DG "detector group" parameters :math:`\sum(c_m, k_m, o_m)`. These parameters were used during the initial developement of the Mythen Detector. We refer to :math:`c_m` as center, :math:`o_m` is refered to as offset and :math:`k_m` as conversion. 
+The DG parameters don't have a trivial underlying geometric representation. The conversions between the DG parameters and EE parameters are given in :eq:`eq:conversion_EE_DG`. 
+
+.. math:: 
+    :label: eq:conversion_EE_DG 
+
+    \begin{align}
+        o_m &= \phi_m - \frac{D_m}{R_m}  & \qquad \qquad \qquad \phi_m &= o_m + c_m k_m \\
+        k_m &= \frac{p}{R_m} & \qquad \qquad \qquad R_m &= \frac{p}{k_m} \\
+        c_m &= \frac{D_m}{p} & \qquad \qquad \qquad  D_m &= c_m p \\ 
+    \end{align}
+
+
+.. note:: 
+    The conversion :math:`k_m` is a positive number. Typically it is multiplied by a sign - which indicates if a module has been flipped. While in :numref:`detectorsetup` the strips are indexed from :math:`0 - 1279` and the photon counts are written to the file following this indexing. 
+    However, one can flip the modules and photon counts for strip index 1279 are written first to file. One thus needs to reverse the indexing such that equation :eq:`eq:diffractionangle` still holds. In the above equation the unsigned conversion :math:`k_m` is used. For the EE parameters :math:`R_m` and for the BC parameters :math:`L_m` are positive values and can be multiplied by a sign. 
+
+The formula for the diffraction angle using DG parameters is as follows: 
+
+.. math:: 
+    \theta_B = o_m + c_m k_m - \arctan(k_m(c_m - strip\_index))
+
+**BC Parameters:** 
+
+Another parameter set are the BC "best computing" parameters :math:`\sum(\Psi_m, L_m, \delta_m)`. :math:`L_m` denotes the distance of the module center to the sample. The angle :math:`delta_m` denotes the angle between the module center and the orthogonal projection of the sample onto the module. 
+And the angle :math:`\Psi_m` denotes the angle between the center of the module and the direction of the beam. See  for a schemantic representation of the BC and EE parameters for one module. 
+
+Note that :math:`\Psi_m` is completely independant from the other parameters and only depend on the module center and the beam direction. It can thus be redefined independantly. Therefore the parameters are called "best computing" parameters. 
+
+.. 
+    But do we refine all three? Which do we refine exactly? 
+
+The conversion from EE to BC parameters and vice versa are given in equation :eq:`eq:conversion_EE_BC`. 
+
+.. math:: 
+    :label: eq:conversion_EE_BC 
+
+    \begin{align}
+        \phi_m &= \Psi_m + \delta_m &\qquad \qquad \qquad \Psi_m &= \phi_m - \arctan\left(\frac{D_m - U}{R_m}\right) \\ 
+        R_m &= L_m\cos(\delta_m) &\qquad \qquad \qquad L_m &= \sqrt{{R_m}² + (D_m - U)^{2}} \\
+        D_m &= L_m\sin(\delta_m) + U & \qquad \qquad \qquad \delta_m &= \arctan{\left(\frac{D_m - U}{R_m}\right)} \\
+    \end{align}
+
+:math:`U` denotes the module center :math:`1279 \cdot 0.5\cdot p`. 
+
+The conversion from BC to DG parameters are given in equation :eq:`eq:conversion_BC_DG`: 
+
+.. math:: 
+    :label: eq:conversion_BC_DG
+
+    \begin{align}
+        \Psi_m &= o_m + \frac{180}{\pi} cm km - \arctan((cm - 0.5\cdot N)k_m) &\qquad \quad o_m &= \Psi_m + \delta_m - \frac{180}{\pi} \frac{L_m \sin(\delta_m) + U}{L_m \cos(\delta_m)} \\
+        L_m &= \frac{p}{k_m}\sqrt{1 + (k_m(c_m - 0.5 \cdot N))^{2}} &\qquad \quad k_m &= \frac{p}{L_m \cos(\delta_m)} \\
+        \delta_m &= \arctan\left((cm - 0.5 \cdot N)k_m \right) &\qquad \quad c_m &= \frac{L_m\sin(\delta_m) + U}{p}, 
+    \end{align}
+
+where :math:`N` denotes the number of strips in the module, thus 1280. 
+
+The diffraction angle is given as: 
+
+.. math:: 
+    \theta_B = \Psi_m + \delta_m - \arctan\left(\frac{L_m \sin(\delta_m) + U - p \cdot strip\_index}{L_m \cos(\delta_m)} \right)
+.. 
+    actually we use the abs in all formulas
+
+
 
 Calculating the Diffraction Pattern from the Raw Intensity Spectrum
 ---------------------------------------------------------------------
