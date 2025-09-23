@@ -43,8 +43,6 @@ int main() {
 
     assert(std::filesystem::exists(file_path));
 
-    std::cout << "filepath: " << file_path << std::endl;
-
     // export ANGCAL_TEST_DATA=/home/mazzol_a/ANGCALDATA/angcal22_Jul25/
 
     auto bad_channels_filename = file_path / "bc2025_001_RING.chans";
@@ -56,6 +54,9 @@ int main() {
     auto initial_angles_filename = file_path / "angcal_Jul2025_P12_0p0105.off";
 
     std::string acquisition_fileprefix = "ang1up_22keV_MIX_0p5mm_48M_a_";
+
+    auto output_filename =
+        file_path / "angcal_Jul2025_P12_0p0105_calibrated.off";
 
     // export
     // ANGCAL_TEST_DATA=~/Documents/VariaMay2025/Antonio20250512/angcal_M3_Mar21_2
@@ -267,5 +268,7 @@ int main() {
 #endif
 
     // anglecalibration.calibrate(filelist, base_peak_angle, module_index);
-    anglecalibration.calibrate(filelist, base_peak_angle);
+    anglecalibration.calibrate(filelist, base_peak_angle, output_filename);
+
+    // anglecalibration.write_to_file(output_filename);
 }

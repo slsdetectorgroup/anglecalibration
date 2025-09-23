@@ -13,24 +13,13 @@
 
 namespace angcal {
 
-#ifdef ANGCAL_PLOT
 inline void handle_sigint(int) {
     LOG(TLogLevel::logINFO) << "\nSIGINT caught — shutting down...\n";
-    std::exit(EXIT_SUCCESS); // cleans up all heap allocated objects
+    std::exit(EXIT_SUCCESS);
 }
 struct SignalHandler {
-    SignalHandler() {
-        std::signal(
-            SIGINT,
-            handle_sigint); // used for proper clean up //actually not
-                            // properly cleaned up - e.g. memory of
-                            // flatfield DGParameters never freed. - need to
-                            // call AngleCalibration destructor before hand
-                            // - so should I define in AngleCalibration?
-    }
+    SignalHandler() { std::signal(SIGINT, handle_sigint); }
 };
-inline SignalHandler signalhandler;
-#endif
 
 AngleCalibration::AngleCalibration(
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
@@ -450,12 +439,22 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
 // - multiple loops - or directly store normalized data somewhere instead of
 // computing on the fly
 
-void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
-                                 const double base_peak_angle_) {
+void AngleCalibration::calibrate(
+    const std::vector<std::string> &file_list_, const double base_peak_angle_,
+    std::optional<std::filesystem::path> output_file) {
 
     file_list = file_list_;
 
     base_peak_angle = base_peak_angle_;
+
+    std::ofstream file;
+    if (output_file.has_value()) {
+        file.open(output_file.value(), std::ios::out | std::ios::app);
+        if (file.tellp() == 0) {
+            file << "module,center,conversion,offset\n"; // only write header if
+                                                         // file is empty
+        }
+    }
 
     for (size_t module_index = 0; module_index < mythen_detector->max_modules();
          ++module_index) {
@@ -479,6 +478,17 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
             LOG(TLogLevel::logINFO)
                 << fmt::format("module {} is disconnected", module_index);
         }
+
+        // write to file
+        if (output_file.has_value()) {
+            auto [center, conversion, offset] =
+                BCparameters.convert_to_DGParameters(module_index);
+            append_to_file(file, module_index, center, conversion, offset);
+        }
+    }
+
+    if (output_file.has_value()) {
+        file.close();
     }
 }
 
@@ -797,6 +807,41 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
 
         ++iteration_index;
     }
+}
+
+// TODO: it just writes to a csv/txt file maybe consider using same file format
+// as in m_custom_file_ptr but then user needs to implement more e.g. custom
+// append
+void AngleCalibration::write_to_file(
+    const std::filesystem::path &filename) const {
+
+    std::ofstream output_file(filename);
+
+    if (!output_file) {
+        LOG(angcal::TLogLevel::logERROR) << "Error opening file!" << std::endl;
+    }
+
+    output_file.precision(15);
+
+    output_file << "module, center, conversion, offset" << std::endl; // header
+
+    for (ssize_t module_index = 0; module_index < BCparameters.num_modules();
+         ++module_index) {
+        auto [center, conversion, offset] =
+            BCparameters.convert_to_DGParameters(module_index);
+        append_to_file(output_file, module_index, center, conversion, offset);
+    }
+
+    output_file.close();
+}
+
+void AngleCalibration::append_to_file(std::ofstream &os,
+                                      const size_t module_index,
+                                      const double center,
+                                      const double conversion,
+                                      const double offset) const {
+    os << module_index << "," << center << "," << conversion << "," << offset
+       << std::endl;
 }
 
 } // namespace angcal

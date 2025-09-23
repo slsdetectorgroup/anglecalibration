@@ -110,26 +110,27 @@ class AngleCalibration {
      * @brief calibrates the BC (best computing) parameters for all modules
      * @param file_list vector of file_names of acquisition files
      * @param base_peak_angle angle of the selcted base peak [degrees]
+     * @param output_file optional, if provided the optimized BC parameters are
+     * converted back to DG parameters and are appended to the file (given as
+     * full file path)
      * @warning method only works if mythen_file_reader supports reading the
      * file format
      */
-    void calibrate(const std::vector<std::string> &file_list,
-                   const double base_peak_angle);
+    void
+    calibrate(const std::vector<std::string> &file_list,
+              const double base_peak_angle,
+              std::optional<std::filesystem::path> output_file = std::nullopt);
 
     /**
      * @brief calibrates the BC (best computing) parameters for one module
      * @param file_list vector of file_names of acquisition files
      * @param base_peak_angle angle of the selcted base peak given in degrees
      * @param module_index index of module to be calibrated
+     * @warning method only works if mythen_file_reader supports reading the
+     * file format
      */
     void calibrate(const std::vector<std::string> &file_list_,
                    const double base_peak_angle_, const size_t module_index);
-
-    // TODO deprecated - should be a free function
-    template <typename T>
-    void write_to_file(const std::string &filename,
-                       const std::filesystem::path &filepath,
-                       const NDView<T, 1> data) const;
 
     /** @brief check if base peak ROI is contained within module region
      * @param detector_angle: detector position (offset of first strip from
@@ -227,6 +228,12 @@ class AngleCalibration {
         const double angle, const double detector_angle,
         const size_t global_strip_index,
         const double distance_to_strip = 0) const;
+
+    /** @brief converts optimized best computing parameters back to DG
+     * parameters and writes them to file
+     * @param filename full path tooutput file
+     */
+    void write_to_file(const std::filesystem::path &filename) const;
 
   private:
     /** @brief calculated the strip width expressed as angle from DG
@@ -344,6 +351,13 @@ class AngleCalibration {
     std::pair<double, double>
     calculate_corrected_photon_counts(const double photon_counts,
                                       const size_t global_strip_index) const;
+
+    /**
+     * @brief appends given parameters to file
+     */
+    void append_to_file(std::ofstream &file, const size_t module_index,
+                        const double center, const double conversion,
+                        const double offset) const;
 
   private:
     DGParameters DGparameters{};
@@ -588,37 +602,6 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                 inverse_fixed_angle_width_bins_photon_counts_variance(i);
         }
     }
-
-    /*
-    auto data_file_path =
-        std::filesystem::current_path().parent_path() / "data";
-    if (!std::filesystem::exists(data_file_path))
-        std::filesystem::create_directories(data_file_path);
-    write_to_file("fraction_covered_by_strip_" + std::to_string(module_index) +
-                      ".txt",
-                  data_file_path,
-                  fraction_covered_by_strip.view()); // TODO: remove this - only
-                                                     // for debugging
-    */
-}
-
-template <typename T>
-void AngleCalibration::write_to_file(const std::string &filename,
-                                     const std::filesystem::path &filepath,
-                                     const NDView<T, 1> data) const {
-
-    std::ofstream output_file(filepath / filename);
-
-    if (!output_file) {
-        LOG(angcal::TLogLevel::logERROR) << "Error opening file!" << std::endl;
-    }
-
-    output_file << std::fixed << std::setprecision(15);
-
-    for (ssize_t i = 0; i < data.size(); ++i) {
-        output_file << data[i] << std::endl;
-    }
-    output_file.close();
 }
 
 } // namespace angcal
