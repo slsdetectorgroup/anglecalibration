@@ -20,7 +20,7 @@ where :math:`\theta_{B}` is the diffraction angle, :math:`\lambda` the wavelengt
 .. _diffractionpattern:
 
 .. figure:: ../figures/DiffractionPattern.png
-    :target: _figures/DiffractionPattern.png
+    :target: ../figures/DiffractionPattern.png
     :width: 650px
     :align: center
     :alt: Example of Diffraction Pattern taken with Mythen detector. 
@@ -50,7 +50,7 @@ The detector can be rotated around the sample. Note that the rotation trajectory
 .. _detectorsetup:
 
 .. figure:: ../figures/detectorsetup.png
-    :target: _figures/detectorsetup.png
+    :target: ../figures/detectorsetup.png
     :width: 650px
     :align: center
     :alt: Schemantic setup of Mythen detector and geometric module parameters. 
@@ -119,10 +119,19 @@ The formula for the diffraction angle using DG parameters is as follows:
 **BC Parameters:** 
 
 Another parameter set are the BC "best computing" parameters :math:`\sum(\Psi_m, L_m, \delta_m)`. :math:`L_m` denotes the distance of the module center to the sample. The angle :math:`delta_m` denotes the angle between the module center and the orthogonal projection of the sample onto the module. 
-And the angle :math:`\Psi_m` denotes the angle between the center of the module and the direction of the beam. See  for a schemantic representation of the BC and EE parameters for one module. 
+And the angle :math:`\Psi_m` denotes the angle between the center of the module and the direction of the beam. See :numref:`BCParameters` for a schemantic representation of the BC and EE parameters for one module. 
 
 Note that :math:`\Psi_m` is completely independant from the other parameters and only depend on the module center and the beam direction. It can thus be redefined independantly. Therefore the parameters are called "best computing" parameters. 
 
+.. _BCParameters:
+
+.. figure:: ../figures/BCParameters.png
+    :target: ../figures/BCParameters.png
+    :alt: Schemantic Representation of BC parameters and EE parameters for one module. 
+    :width: 650px
+    :align: center
+
+    Schemantic Representation of BC parameters and EE parameters for one module.
 .. 
     But do we refine all three? Which do we refine exactly? 
 
@@ -163,6 +172,8 @@ The diffraction angle is given as:
 
 Calculating the Diffraction Pattern from the Raw Intensity Spectrum
 ---------------------------------------------------------------------
+
+To obtain the diffraction pattern from the raw intensity spectrum the raw photon counts are corrected and then redistributed to fixed angle width bins. 
 
 Raw Photon Count Correction
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -222,8 +233,8 @@ Note that the variance and expected value then results to :math:`\sigma_{corr}²
 
 MMh i dont know if the correction coefficient's are constants or also probablistic variables. - The flatfield for sure is. 
 
-Conversion to fixed angular strip widths
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Conversion to fixed angular strip width bins
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Based on the module's parameters one can now convert the strip index to the diffraction angle. 
 However, depending on the location of the strip one strip can cover a larger angular region than others. See :numref:`angularstripwidth`. 
 Additionally the angular width of a strip can be quite large. 
@@ -233,7 +244,7 @@ to small resolution histogram bins covering a fixed angle.
 .. _angularstripwidth:
 
 .. figure:: ../figures/angularstripwidth.png
-    :target: _figures/angularstripwidth.png
+    :target: ../figures/angularstripwidth.png
     :width: 650px
     :align: center
     :alt: Depending on the strip the covered angle is much larger. 
@@ -241,7 +252,7 @@ to small resolution histogram bins covering a fixed angle.
     Depending on the strip position relative to the sample the covered strip angle is much larger :math:`\theta_2 > \theta_1`. 
 
 
-The redistributed photon intensity :math:`I_{red, i}` at bin :math:`i` is given by: 
+The redistributed photon intensity :math:`I_{red, i}` at fixed angle width bin :math:`i` is given by: 
 
 .. math:: 
 
@@ -269,7 +280,12 @@ strip's start :math:`\theta_{B_{si - 0.5}}` and endpoint :math:`\theta_{B_{si + 
 .. 
     what if the strip width is smaller than the bin - wrong photon counts 
 
-Note that several strip widths might overlap with one bin. Nor might a strip cover the entire bin. We thus use the weighted average of all the corrected photon counts of strip's :math:`T`, where the strip overlaps with the bin: 
+The resulting variance is then given as: 
+
+.. math:: 
+    \sigma_{red, i}^{2} = \sigma_{red, i}^{2}\left(\frac{w_{bin}}{w_{strip}}\right)^{2}
+
+Note that several strip widths might overlap with one bin. Nor might a strip cover the entire bin. We thus use the weighted average of all the corrected photon counts of strip's, where the strip overlaps with the bin :math:`T`: 
 
 .. math:: 
 
@@ -295,26 +311,56 @@ The parameter :math:`c_{si, i}` denotes the bin coverage factor e.g. how much of
     c_{si, i} = \frac{\min(\theta_{B_{si + 0.5}}, (i + 0.5)*w_{i}) 
  - \max(\theta_{B_{si - 0.5}}, (i - 0.5)*w_{i}) }{w_{i}}. 
 
-The resulting variance for the redistributed photon counts is then given by: 
+Despite charge sharing, we assume that the photon counts per strip :math:`si` are independant of each other. The resulting variance for the redistributed photon counts is then given by: 
 
 .. math:: 
 
     \sigma_{red, i}² = \sum_{si \in T} (\alpha'_{si, i})^{2} * \sigma_{corr}^{2}(si).
 
 
+
 Parameter Calibration
 ----------------------
 
 In order to calibrate the module's parameters we choose one of the peaks 
-in the diffraction pattern, also referred to as base peak. The base peak is denoted by the peak's central diffraction angle :math:`\alpha`. 
-We take several acquisition's of the same sample however with slightly shifted detector position. We shift the detector position by rotating the detector around the sample. 
+in the diffraction pattern, also referred to as base peak. The base peak is denoted by the peak's central diffraction angle :math:`\alpha`. An example of a base peak is depicted in :numref:`base_peak`. 
+We take several acquisition's of the same sample, however with slightly shifted detector position. We shift the detector position by rotating the detector around the sample. 
 Remember that the module's parameters are rotation invariant. 
 In theory this results in the same diffraction pattern as well as the same base peak just
-shifted by the rotation angle, in practice the diffraction patterns are slightly off. 
-We thus minimize the :math:`\chi²`-similarity of the shifted acquired base peaks within one module to get the optimal parameters for each module.
+shifted by the rotation angle, in practice the diffraction patterns are slightly off. See :numref:`overlapping_base_peak` for an example of overlapping base peak regions.
+We thus minimize the Pearsons :math:`\chi²`-similarity of the shifted acquired base peaks within one module to get the optimal parameters for each module.
  
 .. 
     add a figure of overlapping base peak angles, e.g. selected base peak of diffraction angle
+
+
+
+.. container:: figures-side-by-side
+
+   .. figure:: ../figures/DiffractionPattern.png
+      :width: 85%
+      :alt: Diffraction pattern for module 0. 
+      :target: ../figures/DiffractionPattern.png
+
+      Diffraction pattern for module 0. 
+
+   .. figure:: ../figures/base_peak.png
+      :name: base_peak
+      :width: 85%
+      :alt: Selected Base peak around :math:`-49.4786^{\circ}`
+      :target: ../figures/base_peak.png
+
+      Selected base peak around :math:`-49.4786^{\circ}` for a single acquisition of module 0. 
+
+.. _overlapping_base_peak: 
+
+.. figure:: ../figures/overlapping_base_peaks.png
+    :target: ../figures/overlapping_base_peaks.png
+    :width: 650px
+    :align: center
+    :alt: Two base peaks of different acquisitions but for the same module 0.  
+
+    Two base peaks of different acquisitions but for the same module 0. 
 
 To choose the base peak one can either use a tabulated Bragg's angle 
 known by the theoretical structure of the sample or qualitatively select 
@@ -337,19 +383,19 @@ well within the detector rotation range.
 :math:`\chi²`- similarity criterion 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Let :math:`ROI_{\alpha} = \{ \{I_{red,0}, \sigma_{red,0}², \cdots , \{I_{red,N}, \sigma_{red,N}² \} \}` 
+Let :math:`ROI_{\alpha} = \{ \{I_{red,0}, \sigma^{2}_{red,0} \cdots , \{I_{red,N}, \sigma^{2}_{red,N} \} \}` 
 denote redistributed photon intensities within the base peak region 
 of interest, where :math:`N` is the number of bins covered by the 
-base peak region. With M acquisition's we have :math:`M`` regions of interests. 
+base peak region. With M acquisition's we have :math:`M` regions of interests. 
 
 We now want to minimize the Neyman (variance-weighted) :math:`\chi²`-similarity criterion: 
 
 .. math:: 
 
-    \chi_{k}² = \sum_{j=1}^M \frac{(I_{red, k, j} - \mathbb{E}_{k}(\sum))²}{\sigma_{k}^{2}(\sum)}, 
+    \chi^{2}_{k} = \sum_{j=1}^M \frac{(I_{red, k, j} - \mathbb{E}_{k}(\sum))^{2}}{\sigma_{k}^{2}(\sum)}, 
 
 
-where :math:`\sigma_{k}^{2}(\sum)` and :math:`\mathbb{E}_{k}(\sum)` denote the variance and expected value for the bin :math:`k` using the module parameters :math:`\sum`.
+where :math:`I_{red,k,j}` is the redistributed corrected photon intensity for fixed angle width bin :math:`k` and acquisition :math:`j`, :math:`\sigma_{k}^{2}(\sum)` and :math:`\mathbb{E}_{k}(\sum)` denote the variance and expected value for the bin :math:`k` using the module parameters :math:`\sum`.
 With the module's parameter set :math:`R`, :math:`D` and :math:`\phi` these are: 
 
 .. math:: 
@@ -370,9 +416,9 @@ and resulting variance:
 
 .. math:: 
 
-    \sigma_{a_{min,k}} = \frac{1}{\sum_{j=1}^{M} sigma_{red,k,j}^{- 2}}. 
+    \sigma_{a_{min,k}} = \frac{1}{\sum_{j=1}^{M} \sigma_{red,k,j}^{- 2}}. 
 
-The average :math:`chi_k^{2}|a_{min,k}` is then given by the average residual :math:`av\_res_{k}`: 
+The average :math:`\chi_k^{2}|a_{min,k}` is then given by the average residual :math:`av\_res_{k}`: 
 
 .. math:: 
 
@@ -385,13 +431,13 @@ with:
     S_{p,k} = \sum_{j=1}^M I_{red, k, j}^{p} * \sigma_{red, k, j}^{-2}
 
 
-We then scale the variance \sigma_{a_{min,k}} by the average residual. The scaled variances are then summed up for each bin within the base peak region. 
+We then scale the variance :math:`\sigma_{a_{min,k}}` by the average residual. The scaled variances are then summed up for each bin within the base peak region. 
 
 We then get the similarity criterion for different base peak regions:
 
 .. math:: 
 
-    \sum_{k=1}^{N} av\_res_{k} * \sigma_{a_{min,k}}. 
+    \sum_{k=1}^{N} av\_res_{k} * \sigma_{a_{min,k}} 
 
 The goal is to minimize this similarity criterion based on the module parameters :math:`\sum`.
 

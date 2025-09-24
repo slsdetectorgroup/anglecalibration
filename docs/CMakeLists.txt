@@ -33,6 +33,12 @@ configure_file(
     @ONLY
 ) 
 
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/static"
+     DESTINATION "${SPHINX_BUILD}")
+
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/figures"
+     DESTINATION "${SPHINX_BUILD}") 
+
 #creates c++ api using doxygen and breathe 
 add_custom_target(
     docs

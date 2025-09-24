@@ -396,17 +396,18 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
                            this->base_peak_roi + this->base_peak_angle;
                 };
 
-            std::string filename =
-                std::filesystem::path(file).stem().string() + ".dat";
-            auto dataset_name = data_file_path / filename;
+            if (num_runs == 0 || num_runs == 1) {
+                std::string filename =
+                    std::filesystem::path(file).stem().string() + ".dat";
+                auto dataset_name = data_file_path / filename;
 
-            plot->append_to_plot(
-                fixed_angle_width_bins_photon_counts.view(),
-                {0,
-                 2 * static_cast<ssize_t>(base_peak_roi / histogram_bin_width) +
-                     1},
-                bin_to_diffraction_angle_base_peak_ROI_only, dataset_name);
-
+                plot->append_to_plot(
+                    fixed_angle_width_bins_photon_counts.view(),
+                    {0, 2 * static_cast<ssize_t>(base_peak_roi /
+                                                 histogram_bin_width) +
+                            1},
+                    bin_to_diffraction_angle_base_peak_ROI_only, dataset_name);
+            }
             // plot->pause();
 #endif
             ++num_runs;
