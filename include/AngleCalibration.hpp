@@ -219,14 +219,13 @@ class AngleCalibration {
     /** @brief calculates diffraction angle from EE module parameters (used in
      * Beer's Law)
      * @param detector_angle detector position [degrees]
-     * @param strip_index global strip index of module
+     * @param strip_index local strip index of module
      * @param distance_to_strip distance to strip [given in strips]
      * @return diffraction angle [degrees]
      */
     double diffraction_angle_from_EE_parameters(
         const double module_center_distance, const double normal_distance,
-        const double angle, const double detector_angle,
-        const size_t global_strip_index,
+        const double angle, const double detector_angle, size_t strip_index,
         const double distance_to_strip = 0) const;
 
     /** @brief converts optimized best computing parameters back to DG

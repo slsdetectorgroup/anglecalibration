@@ -136,9 +136,9 @@ double AngleCalibration::diffraction_angle_from_DG_parameters(
 
     return offset +
            180.0 / M_PI *
-               (center * conversion -
+               (center * std::abs(conversion) -
                 std::atan((center - (strip_index + distance_to_strip)) *
-                          conversion)) +
+                          std::abs(conversion))) +
            detector_angle; // + + mythen_detector->dtt0() +
                            // mythen_detector->bloffset();;
 }
@@ -154,7 +154,7 @@ double AngleCalibration::diffraction_angle_from_BC_parameters(
     const double angle_module_center_beam =
         BCparameters.angle_center_beam(module_index);
 
-    strip_index = std::signbit(DGparameters.conversions(module_index))
+    strip_index = std::signbit(distance_center_sample)
                       ? MythenDetectorSpecifications::strips_per_module() -
                             strip_index - 1
                       : strip_index; // TODO: are the values sored in reserve?
@@ -162,12 +162,12 @@ double AngleCalibration::diffraction_angle_from_BC_parameters(
     return angle_module_center_beam + angle_module_center_normal -
            180.0 / M_PI *
                std::atan(
-                   (distance_center_sample *
+                   (std::abs(distance_center_sample) *
                         std::sin(M_PI / 180.0 * angle_module_center_normal) +
                     (MythenDetectorSpecifications::strips_per_module() * 0.5 -
                      strip_index - distance_to_strip) *
                         MythenDetectorSpecifications::pitch()) /
-                   (distance_center_sample *
+                   (std::abs(distance_center_sample) *
                     std::cos(M_PI / 180.0 * angle_module_center_normal))) +
            detector_angle; // + + mythen_detector->dtt0() +
                            // mythen_detector->bloffset();
@@ -175,18 +175,20 @@ double AngleCalibration::diffraction_angle_from_BC_parameters(
 
 double AngleCalibration::diffraction_angle_from_EE_parameters(
     const double module_center_distance, const double normal_distance,
-    const double angle, const double detector_angle,
-    const size_t global_strip_index, const double distance_to_strip) const {
+    const double angle, const double detector_angle, size_t strip_index,
+    const double distance_to_strip) const {
 
-    size_t strip_index = global_to_local_strip_index_conversion(
-        global_strip_index); // local strip index in module
+    strip_index = std::signbit(normal_distance)
+                      ? MythenDetectorSpecifications::strips_per_module() -
+                            strip_index - 1
+                      : strip_index;
 
     return angle -
            180.0 / M_PI *
                std::atan((module_center_distance -
                           MythenDetectorSpecifications::pitch() *
                               (strip_index + distance_to_strip)) /
-                         normal_distance) +
+                         std::abs(normal_distance)) +
            detector_angle; //+ mythen_detector->dtt0() +
                            // mythen_detector->bloffset();
 }
@@ -396,18 +398,16 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
                            this->base_peak_roi + this->base_peak_angle;
                 };
 
-            if (num_runs == 0 || num_runs == 1) {
-                std::string filename =
-                    std::filesystem::path(file).stem().string() + ".dat";
-                auto dataset_name = data_file_path / filename;
+            std::string filename =
+                std::filesystem::path(file).stem().string() + ".dat";
+            auto dataset_name = data_file_path / filename;
 
-                plot->append_to_plot(
-                    fixed_angle_width_bins_photon_counts.view(),
-                    {0, 2 * static_cast<ssize_t>(base_peak_roi /
-                                                 histogram_bin_width) +
-                            1},
-                    bin_to_diffraction_angle_base_peak_ROI_only, dataset_name);
-            }
+            plot->append_to_plot(
+                fixed_angle_width_bins_photon_counts.view(),
+                {0,
+                 2 * static_cast<ssize_t>(base_peak_roi / histogram_bin_width) +
+                     1},
+                bin_to_diffraction_angle_base_peak_ROI_only, dataset_name);
             // plot->pause();
 #endif
             ++num_runs;

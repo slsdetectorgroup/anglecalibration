@@ -159,13 +159,10 @@ TEST_CASE("check diffraction angle", "[anglecalibration]") {
         anglecalibration.get_DGparameters().convert_to_EEParameters(
             module_index);
 
-    ssize_t global_strip_index =
-        module_index * MythenDetectorSpecifications::strips_per_module() +
-        local_strip_index;
     double diffraction_angle_EE_param =
         anglecalibration.diffraction_angle_from_EE_parameters(
             module_center_distance, normal_distance, angle, 0.0,
-            global_strip_index, 0.0);
+            local_strip_index, 0.0);
 
     CHECK(diffraction_angle_EE_param ==
           Catch::Approx(diffraction_angle_DG_param));

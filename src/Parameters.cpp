@@ -8,15 +8,18 @@ namespace angcal {
 std::tuple<double, double, double>
 BCParameters::convert_to_DGParameters(const size_t module_index) const {
     double center =
-        module_center_sample_distances(module_index) *
+        std::abs(module_center_sample_distances(module_index)) *
             std::sin(M_PI / 180.0 * angle_center_module_normal(module_index)) /
             MythenDetectorSpecifications::pitch() +
         (MythenDetectorSpecifications::strips_per_module() * 0.5);
 
     double conversion =
         MythenDetectorSpecifications::pitch() /
-        (module_center_sample_distances(module_index) *
+        (std::abs(module_center_sample_distances(module_index)) *
          std::cos(M_PI / 180.0 * angle_center_module_normal(module_index)));
+
+    if (std::signbit(module_center_sample_distances(module_index)))
+        conversion = -conversion;
 
     double offset =
         angle_center_beam(module_index) +
@@ -24,7 +27,7 @@ BCParameters::convert_to_DGParameters(const size_t module_index) const {
         180.0 / M_PI *
             (std::tan(M_PI / 180.0 * angle_center_module_normal(module_index)) +
              MythenDetectorSpecifications::strips_per_module() * 0.5 *
-                 conversion);
+                 std::abs(conversion));
 
     return std::make_tuple(center, conversion, offset);
 }
@@ -46,14 +49,17 @@ BCParameters::convert_to_EEParameters(const ssize_t module_index) const {
                    angle_center_module_normal(module_index);
 
     double module_center_distance =
-        module_center_sample_distances(module_index) *
+        std::abs(module_center_sample_distances(module_index)) *
             std::sin(M_PI / 180.0 * angle_center_module_normal(module_index)) +
         (MythenDetectorSpecifications::strips_per_module() * 0.5) *
             MythenDetectorSpecifications::pitch();
 
     double normal_distance =
-        module_center_sample_distances(module_index) *
+        std::abs(module_center_sample_distances(module_index)) *
         std::cos(M_PI / 180.0 * angle_center_module_normal(module_index));
+
+    if (std::signbit(module_center_sample_distances(module_index)))
+        normal_distance = -normal_distance;
 
     return std::make_tuple(normal_distance, module_center_distance, angle);
 }
@@ -70,24 +76,33 @@ void BCParameters::convert_to_EEParameters(EEParameters &eeparameters) const {
 
 std::tuple<double, double, double>
 DGParameters::convert_to_BCParameters(const size_t module_index) const {
+
     double angle_center_module_normal =
         180.0 / M_PI *
         atan((centers(module_index) -
               0.5 * MythenDetectorSpecifications::strips_per_module()) *
-             conversions(module_index)); // TODO in Antonios code it is minus?
+             std::abs(conversions(
+                 module_index))); // TODO in Antonios code it is minus?
     double distance_module_center_sample =
-        MythenDetectorSpecifications::pitch() / conversions(module_index) *
+        MythenDetectorSpecifications::pitch() /
+        std::abs(conversions(module_index)) *
         std::sqrt(
             1 +
             std::pow(
-                conversions(module_index) *
+                std::abs(conversions(module_index)) *
                     (centers(module_index) -
                      0.5 * MythenDetectorSpecifications::strips_per_module()),
                 2));
-    double angle_beam_module_center =
-        offsets(module_index) +
-        180.0 / M_PI * conversions(module_index) * centers(module_index) -
-        angle_center_module_normal;
+
+    distance_module_center_sample = std::signbit(conversions(module_index))
+                                        ? -distance_module_center_sample
+                                        : distance_module_center_sample;
+
+    double angle_beam_module_center = offsets(module_index) +
+                                      180.0 / M_PI *
+                                          std::abs(conversions(module_index)) *
+                                          centers(module_index) -
+                                      angle_center_module_normal;
 
     return std::make_tuple(angle_center_module_normal,
                            distance_module_center_sample,
@@ -112,11 +127,15 @@ DGParameters::convert_to_EEParameters(const size_t module_index) const {
 
     const double module_center_distance =
         centers(module_index) * MythenDetectorSpecifications::pitch();
-    const double normal_distance =
-        MythenDetectorSpecifications::pitch() / conversions(module_index);
-    const double angle = offsets(module_index) + 180.0 / M_PI *
-                                                     centers(module_index) *
-                                                     conversions(module_index);
+    double normal_distance = MythenDetectorSpecifications::pitch() /
+                             std::abs(conversions(module_index));
+
+    if (std::signbit(conversions(module_index))) {
+        normal_distance = -normal_distance;
+    }
+    const double angle =
+        offsets(module_index) + 180.0 / M_PI * centers(module_index) *
+                                    std::abs(conversions(module_index));
 
     return std::make_tuple(module_center_distance, normal_distance, angle);
 }
