@@ -352,6 +352,13 @@ class AngleCalibration {
                                       const size_t global_strip_index) const;
 
     /**
+     * @brief calculate the rate correction factor taking into account the dead
+     * time
+     * @return rate correction factor
+     */
+    double rate_correction_factor(const double photon_counts, const double expsoure_time) const;
+
+    /**
      * @brief appends given parameters to file
      */
     void append_to_file(std::ofstream &file, const size_t module_index,

@@ -317,6 +317,42 @@ bool AngleCalibration::base_peak_is_in_module(
             left_module_boundary_angle < base_peak_angle - *bounds_in_angles);
 }
 
+double
+AngleCalibration::rate_correction_factor(const double photon_count,
+                                         const double exposure_time) const {
+    const double dead_time = 2.915829802160547e-7; // measured dead-time
+
+    const double maximum_count_rate =
+        std::exp(-1); // theoretical maximum count rate for
+                      // dead_time*measured_photon_counts_per_second
+
+    double photon_counts_per_second = photon_count / exposure_time;
+
+    photon_counts_per_second =
+        std::min(maximum_count_rate, photon_counts_per_second *
+                                         dead_time); // multiply width dead time
+
+    // -actual_count_rate*dead_time = W -> -dead_time*measured_count_rate =
+    // We^{W} -> W: Lambert W function
+
+    // numerical calculation of inverse of Lambart W - function
+    double W_prev_iter = -photon_counts_per_second; // initial guess
+    double W_next_iter{};
+    bool method_converged = false;
+    while (!method_converged) {
+        W_next_iter = photon_counts_per_second * std::exp(W_prev_iter);
+        method_converged = std::abs(W_next_iter - W_prev_iter) <
+                           10 * std::numeric_limits<double>::epsilon();
+        W_prev_iter = W_next_iter;
+    }
+
+    double actual_count_rate = -W_prev_iter;
+
+    return actual_count_rate /
+           photon_counts_per_second; // TODO: its a statistic variable not a
+                                     // constant do I take it into account?
+}
+
 std::pair<double, double> AngleCalibration::calculate_corrected_photon_counts(
     const double photon_counts, const size_t global_strip_index) const {
 
