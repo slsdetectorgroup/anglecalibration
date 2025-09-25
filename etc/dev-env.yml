@@ -11,5 +11,5 @@ dependencies:
   - pybind11
   - numpy
   - matplotlib
-  #- hdf5 
+  - hdf5 
 
