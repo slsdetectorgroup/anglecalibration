@@ -37,7 +37,7 @@ jobs:
         run: |
             mkdir build 
             cd build 
-            cmake .. -DANGCAL_PYTHON_BINDINGS=ON -DANGCAL_DOCS=ON  
+            cmake .. -DANGCAL_PYTHON_BINDINGS=ON -DANGCAL_DOCS=ON -DANGCAL_FETCH_AARE=ON
             make -j2 
             make docs
 
