@@ -3,13 +3,11 @@ channels:
   - conda-forge
 dependencies:
   - anaconda-client
-  - conda-build
   - doxygen 
   - sphinx
   - breathe 
   - sphinx_rtd_theme 
-  - furo 
-  - zeromq 
+  - furo
   - pybind11
   - numpy
   - matplotlib
