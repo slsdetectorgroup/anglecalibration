@@ -37,9 +37,9 @@ jobs:
           channels: conda-forge
           conda-remove-defaults: "true"
 
-      #- uses: awalsh128/cache-apt-pkgs-action@latest
-        #with:
-          #packages: libhdf5-dev
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libhdf5-dev
 
       - name: Build project
         run: |
