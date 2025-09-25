@@ -1,0 +1,64 @@
+# build the documentation and upload
+name: Build documentation with cmake
+
+# leave it for now as updated frequently - otherwise upon release and pull request
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
+    matrix:
+        platform: [ubuntu-latest, ] 
+        python-version: ["3.12",]
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    #conda for python build
+    - name: configure conda 
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          environment-file: etc/dev-env.yml
+          miniforge-version: latest
+          channels: conda-forge
+          conda-remove-defaults: "true"
+
+    - name: Build project
+      run: |
+            mkdir build 
+            cd build 
+            cmake .. -DANGCAL_PYTHON_BINDINGS=ON -DANGCAL_DOCS=ON  
+            make -j2 
+            make docs
+
+    - name: Upload static files as artifact
+        id: deployment
+        uses: actions/upload-pages-artifact@v3 
+        with:
+          path: build/docs/html/
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ${{ matrix.platform }}
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+
+  
+
+
+
