@@ -77,7 +77,7 @@ if(ANGCAL_FETCH_HDF5)
     For Red Hat: sudo dnf install hdf5-devel
     For MacOS: brew install hdf5")
 else()
-    find_package(HDF5 QUIET COMPONENTS CXX)
+    find_package(HDF5 QUIET COMPONENTS CXX REQUIRED)
     if (HDF5_FOUND)
         message(STATUS "Found HDF5: ${HDF5_INCLUDE_DIRS}")
     else()
