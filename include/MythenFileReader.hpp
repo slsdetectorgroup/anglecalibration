@@ -18,7 +18,7 @@ namespace angcal {
 struct MythenFrame {
     NDArray<uint32_t, 1> photon_counts{};
     double detector_angle{};
-    // double reference_intensity{}; not needed
+    double incident_intensity{}; // I_0
     std::array<uint8_t, 3> channel_mask{};
 
     MythenFrame() = default;
@@ -47,13 +47,17 @@ class MythenFileReader : public HDF5FileReader {
         frame.photon_counts =
             dataset_photon_count.store_as_ndarray<uint32_t, 1>();
 
-        //++frame.photon_counts; // Why though?
-
         auto dataset_detector_angle =
             get_dataset("/entry/instrument/NDAttributes/DetectorAngle");
 
         dataset_detector_angle.read_into_buffer(
             reinterpret_cast<std::byte *>(&frame.detector_angle));
+
+        auto dataset_incident_intensity =
+            get_dataset("/entry/instrument/NDAttributes/I0");
+
+        dataset_incident_intensity.read_into_buffer(
+            reinterpret_cast<std::byte *>(&frame.incident_intensity));
 
         auto dataset_channel_number =
             get_dataset("/entry/instrument/NDAttributes/CounterMask");
@@ -79,4 +83,33 @@ class MythenFileReader : public HDF5FileReader {
     }
 };
 
+class MythenFileReader {
+
+  public:
+    MythenFileReader() = default;
+
+    MythenFileReader(const std::string &detector_angles,
+                     const std::string &incident_intensities)
+        : detector_angles_filename(detector_angles),
+          incident_intensities_filename(incident_intensities) {
+
+        // maybe read directly into an NDArray
+        detector_angles_file.open(detector_angles_filename, std::ios_base::in);
+        incident_intensities_file.open(incident_intensities_file, std::ios_base::in);
+        f.read(img.buffer(), img.size() * sizeof(T));
+        f.close();
+    };
+
+    double read_detector_angle(const size_t acquisition_index) {}
+
+  private:
+    std::string detector_angles_filename{};
+    std::string incident_intensities_filename{};
+    // NDArray<double> detector_angles{};
+    // NDArray<uint32_t> incident_intensities{}; // How many bytes do we need?
+    std::ifstream detector_angles_file;
+    std::ifstream incident_intensities_file;
+
+};
+   
 } // namespace angcal

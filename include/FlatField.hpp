@@ -59,7 +59,7 @@ class FlatField {
 
         // TODO is it double or uint32_t
         flat_field = NDArray<uint32_t, 1>(
-            std::array<ssize_t, 1>{mythen_detector->num_strips()}, 0);
+            std::array<ssize_t, 1>{mythen_detector->num_strips()}, 1);
     }
 
     /**
@@ -127,6 +127,80 @@ class FlatField {
     void create_flatfield_from_filelist(const std::filesystem::path &filelist) {
         std::ifstream file_filelist(filelist);
 
+        // calculate average of first flatfield acquisition
+
+        /*
+        double average_flatfield_value{};
+        try {
+            std::string filename;
+            std::getline(file_filelist, filename);
+            m_custom_detector_file_ptr->open(filename);
+            Frame frame(mythen_detector->num_strips(), 1,
+                        aare::Dtype::TypeIndex::UINT32);
+
+            m_custom_detector_file_ptr->read_into(frame.data(),
+                                                  frame.dtype().bytes());
+
+            if (frame.rows() * frame.cols() != mythen_detector->num_strips()) {
+                throw std::runtime_error(
+                    fmt::format("sizes mismatch. Expect a size of "
+                                "{} - frame has a size of {}",
+                                mythen_detector->num_strips(),
+                                frame.rows() * frame.cols()));
+            }
+            for (ssize_t row = 0; row < frame.rows(); ++row)
+                for (ssize_t col = 0; col < frame.cols(); ++col) {
+                    uint32_t photon_counts = *reinterpret_cast<uint32_t *>(
+                                                 frame.pixel_ptr(row, col)) +
+                                             1; // Mighells correction
+                    flat_field(row * frame.cols() + col) +=
+                        photon_counts; // TODO inefficient as one has to
+                                       // copy twice into frame and into
+                                       // flat_field
+                    average_flatfield_value += photon_counts;
+                }
+        } catch (const std::exception &e) {
+            LOG(TLogLevel::logERROR) << "Error: " << e.what() << '\n';
+        }
+
+        average_flatfield_value /= mythen_detector->num_strips();
+        */
+
+        double average_incident_intesity{};
+
+        try {
+            std::string filename;
+
+            std::getline(file_filelist, filename);
+            m_custom_detector_file_ptr->open(filename);
+            Frame frame(mythen_detector->num_strips(), 1,
+                        aare::Dtype::TypeIndex::UINT32);
+
+            m_custom_detector_file_ptr->read_into(frame.data(),
+                                                  frame.dtype().bytes());
+
+            if (frame.rows() * frame.cols() != mythen_detector->num_strips()) {
+                throw std::runtime_error(
+                    fmt::format("sizes mismatch. Expect a size of "
+                                "{} - frame has a size of {}",
+                                mythen_detector->num_strips(),
+                                frame.rows() * frame.cols()));
+            }
+            for (ssize_t row = 0; row < frame.rows(); ++row)
+                for (ssize_t col = 0; col < frame.cols(); ++col) {
+                    uint32_t photon_counts = *reinterpret_cast<uint32_t *>(
+                                                 frame.pixel_ptr(row, col)) +
+                                             1; // Mighells correction
+                    flat_field(row * frame.cols() + col) +=
+                        photon_counts; // TODO inefficient as one has to
+                                       // copy twice into frame and into
+                                       // flat_field
+                    average_flatfield_value += photon_counts;
+                }
+        } catch (const std::exception &e) {
+            LOG(TLogLevel::logERROR) << "Error: " << e.what() << '\n';
+        }
+
         try {
             std::string filename;
             while (std::getline(file_filelist, filename)) {
@@ -148,11 +222,14 @@ class FlatField {
                 for (ssize_t row = 0; row < frame.rows(); ++row)
                     for (ssize_t col = 0; col < frame.cols(); ++col) {
                         flat_field(row * frame.cols() + col) +=
-                            *reinterpret_cast<uint32_t *>(frame.pixel_ptr(
-                                row,
-                                col)); // TODO inefficient as one has to
-                                       // copy twice into frame and into
-                                       // flat_field
+                            (*reinterpret_cast<uint32_t *>(
+                                 frame.pixel_ptr(row,
+                                                 col)) +
+                             1) /
+                            average_flatfield_value; // TODO inefficient as one
+                                                     // has to copy twice into
+                                                     // frame and into
+                                                     // flat_field
                     }
             }
             file_filelist.close();

@@ -215,12 +215,14 @@ The dead time :math:`\tau_d` has been evaluated experimentally.
 **Incident Intensity Correction:** 
 
 The photon counts are corrected by the theoretical incident intensity :math:`I_{0}`. The incident intensity is the theoretical intensity of the laser beam.
-.. mmh its actually something else dont get it is it fixed or per pixel? 
+:math:`I_{0,1s}` is the incident intensity of the first acquisition divided by the exposure time :math:`\tau_{e}`. 
+
+.. It can be measured by adding up all photon counts of one module with no sample present. It changes throughout the acquisitions, but is constant for all modules
 
 .. math:: 
-    I_{I_0,corr} = I * \frac{1}{I_0} 
+    I_{I_0,corr} = I * \frac{I_{0,1s}{I_0} 
 
-Dont know if this is correct.
+.. Why is it scaled with the incident intensity of the first acquisitions
 
 **Solid Angle correction:** 
 
