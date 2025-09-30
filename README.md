@@ -1,5 +1,8 @@
 # AngleCalibration
-C++ library to calibrate PSI Mythen detector 
+C++ library to calibrate PSI Mythen detector. 
+
+## Documentation
+More details about the method, installation and the C++ and Python API can be found in [documentation](https://slsdetectorgroup.github.io/anglecalibration/). 
 
 ## Build and install
 
