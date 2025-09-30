@@ -23,7 +23,7 @@ set_target_properties(tests PROPERTIES
 
 include(CTest)
 include(Catch)
-catch_discover_tests(tests)
+catch_discover_tests(tests TEST_SPEC "*")
 
 target_sources(tests PRIVATE ${TestSources} )
 
