@@ -15,15 +15,10 @@ void define_FlatField_binding(py::module &m) {
              py::arg("MythenDetectorSpecifications"),
              py::arg("file_interface") = std::nullopt)
 
-        .def("create_flatfield_from_rawfilesystem",
-             [](FlatField &self, const std::filesystem::path &file_path) {
-                 self.create_flatfield_from_rawfilesystem(file_path);
-             })
-
         .def("create_flatfield_from_filelist",
-             [](FlatField &self, const std::filesystem::path &file_list) {
-                 self.create_flatfield_from_filelist(file_list);
-             }) // TODO: Can i
+             [](FlatField &self, const std::filesystem::path &file_list, const std::string& incident_intensities) {
+                 self.create_flatfield_from_filelist(file_list, incident_intensities);
+             }) 
 
         .def("read_flatfield_from_file",
              [](FlatField &self, const std::string &filename) {
@@ -33,19 +28,19 @@ void define_FlatField_binding(py::module &m) {
         .def_property(
             "flatfield",
             [](FlatField &self) {
-                auto flatfield = new NDArray<uint32_t, 1>(self.get_flatfield());
+                auto flatfield = new NDArray<double, 2>(self.get_flatfield());
                 return return_image_data(flatfield);
             },
             [](FlatField &self, py::array flatfield) {
                 py::buffer_info info = flatfield.request();
-                if (info.ndim != 1 || info.strides[0] != sizeof(uint32_t) ||
-                    info.itemsize != sizeof(uint32_t)) {
+                if (info.ndim != 2 || info.strides[0] != sizeof(double) ||
+                    info.itemsize != sizeof(double)) {
                     throw std::runtime_error(
-                        "Expected 1D buffer of type uint32_t and stride 1");
+                        "Expected 2D buffer of type double and stride 1");
                 }
-                NDView<uint32_t, 1> temp_array_view(
-                    reinterpret_cast<uint32_t *>(info.ptr),
-                    std::array<ssize_t, 1>{info.shape[0]});
+                NDView<double, 2> temp_array_view(
+                    reinterpret_cast<double *>(info.ptr),
+                    std::array<ssize_t, 2>{info.shape[0], info.shape[1]});
                 NDArray temp_array(temp_array_view); // first copy
                 self.set_flatfield(
                     temp_array); // second copy TODO im copying twice
@@ -54,7 +49,7 @@ void define_FlatField_binding(py::module &m) {
         .def_property(
             "inverse_normalized_flatfield",
             [](FlatField &self) {
-                auto result = new NDArray<double, 1>(
+                auto result = new NDArray<double, 2>(
                     self.get_inverse_normalized_flatfield());
                 return return_image_data(result); // maybe return memory view
             },
@@ -62,10 +57,10 @@ void define_FlatField_binding(py::module &m) {
                py::array_t<double, py::array::c_style | py::array::forcecast>
                    &inverse_normalized_flatfield) {
                 py::buffer_info info = inverse_normalized_flatfield.request();
-                NDView<double, 1> temp_array_view(
+                NDView<double, 2> temp_array_view(
                     reinterpret_cast<double *>(info.ptr),
-                    std::array<ssize_t, 1>{info.shape[0]});
-                NDArray<double, 1> temp_array(
+                    std::array<ssize_t, 2>{info.shape[0], info.shape[1]});
+                NDArray<double, 2> temp_array(
                     temp_array_view); // first copy //maybe modify buffer //or
                                       // iterate
                 self.set_inverse_normalized_flatfield(
@@ -80,7 +75,7 @@ void define_FlatField_binding(py::module &m) {
 
         .def_property_readonly("get_normalized_flatfield", [](FlatField &self) {
             auto result =
-                new NDArray<double, 1>(self.get_normalized_flatfield());
+                new NDArray<double, 2>(self.get_normalized_flatfield());
             return return_image_data(result);
         });
 }

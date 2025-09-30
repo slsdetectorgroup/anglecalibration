@@ -48,11 +48,9 @@ option(ANGCAL_FETCH_CATCH "Use FetchContent to download catch2" ON)
 option(ANGCAL_FETCH_PYBIND11 "Use FetchContent to download pybind11" ON)
 option(ANGCAL_FETCH_BOOST "Use FetchContent to download boost-iostreams" OFF)
 
-
-
 if(ANGCAL_FETCH_AARE)
     FetchContent_Declare(aare GIT_REPOSITORY https://github.com/slsdetectorgroup/aare
-    GIT_TAG main) #how to use newest version 
+    GIT_TAG fix/cmake_fix_compile_width_position_independent_code) #how to use newest version #change to main
     FetchContent_MakeAvailable(aare)
     install(
         TARGETS aare_core
@@ -210,7 +208,7 @@ if(ANGCAL_TESTS)
 endif()
 
 if(ANGCAL_PYTHON_BINDINGS)
-    set_property(TARGET angle_calibration PROPERTY POSITION_INDEPENDENT_CODE ON) #what is this doing
+    set_property(TARGET angle_calibration PROPERTY POSITION_INDEPENDENT_CODE ON) 
 endif()
 
 if(ANGCAL_DOCS)

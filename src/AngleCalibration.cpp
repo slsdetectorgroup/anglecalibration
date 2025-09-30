@@ -358,7 +358,7 @@ std::pair<double, double> AngleCalibration::calculate_corrected_photon_counts(
 
     double flatfield_normalized_photon_counts =
         (photon_counts + 1) *
-        flat_field->get_inverse_normalized_flatfield()(global_strip_index);
+        flat_field->get_inverse_normalized_flatfield()(global_strip_index,0);
 
     double some_flatfield_error =
         1.0; // TODO: some dummy value - implement read from file
@@ -370,7 +370,7 @@ std::pair<double, double> AngleCalibration::calculate_corrected_photon_counts(
               (1. / (photon_counts + 1) +
                std::pow(some_flatfield_error *
                             flat_field->get_inverse_normalized_flatfield()(
-                                global_strip_index),
+                                global_strip_index,0),
                         2))); // this is probably the inverse - for easier
                               // multiplication - division by variance
 

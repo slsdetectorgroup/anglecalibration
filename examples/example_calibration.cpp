@@ -28,13 +28,56 @@ std::pair<double, double>
 get_detector_range(MythenFileReader &mythen_file_reader,
                    const std::vector<std::string> &file_list) {
 
-    double first_frame =
+    double min_detector_angle =
         mythen_file_reader.read_frame(file_list[0]).detector_angle;
-    double last_frame =
+    double max_detector_angle =
         mythen_file_reader.read_frame(file_list[file_list.size() - 1])
             .detector_angle; // assuming frames are in order
 
-    return std::make_pair(first_frame, last_frame);
+    return std::make_pair(max_detector_angle, min_detector_angle);
+}
+
+void get_angle_range_of_module(MythenFileReader &mythen_file_reader,
+                               const std::vector<std::string> &file_list,
+                               AngleCalibration &anglecalibration,
+                               const size_t module_index) {
+
+    double detector_angle =
+        mythen_file_reader.read_frame(file_list[0]).detector_angle;
+    double max_left_module_angle =
+        anglecalibration.diffraction_angle_from_DG_parameters(
+            module_index, detector_angle, 0, -0.5);
+    double max_right_module_angle =
+        anglecalibration.diffraction_angle_from_DG_parameters(
+            module_index, detector_angle, 1279, +0.5);
+
+    double min_left_module_angle = max_left_module_angle;
+    double min_right_module_angle = max_right_module_angle;
+    for (auto &frame : file_list) {
+        detector_angle = mythen_file_reader.read_frame(frame).detector_angle;
+        double left_module_angle =
+            anglecalibration.diffraction_angle_from_DG_parameters(
+                module_index, detector_angle, 0, -0.5);
+        double right_module_angle =
+            anglecalibration.diffraction_angle_from_DG_parameters(
+                module_index, detector_angle, 1279, +0.5);
+
+        if (left_module_angle < min_left_module_angle &&
+            right_module_angle < min_right_module_angle) {
+            min_left_module_angle = left_module_angle;
+            min_right_module_angle = right_module_angle;
+        }
+        if (left_module_angle > max_left_module_angle &&
+            right_module_angle > max_right_module_angle) {
+            max_left_module_angle = left_module_angle;
+            max_right_module_angle = right_module_angle;
+        }
+    }
+
+    LOG(TLogLevel::logINFO) << fmt::format(
+        "minimum module angle: {},{}, maximum module angle: {},{}",
+        min_left_module_angle, min_right_module_angle, max_left_module_angle,
+        max_right_module_angle);
 }
 
 int main() {
@@ -112,27 +155,29 @@ int main() {
     //  inverse_flatfield is only properly allocated when calling
     //  inverse_flatfield
 
-    NDArray<double, 1> normalized_flatfield(
-        std::array<ssize_t, 1>{mythen_detector_ptr->num_strips()});
+    NDArray<double, 2> normalized_flatfield(
+        std::array<ssize_t, 2>{mythen_detector_ptr->num_strips(),2});
     CustomFlatFieldFile flatfieldfilereader;
     flatfieldfilereader.open(flatfield_filename);
     flatfieldfilereader.read_into(normalized_flatfield.buffer(), 8);
 
-    NDArray<double, 1> inverse_normalized_flatfield(
-        std::array<ssize_t, 1>{mythen_detector_ptr->num_strips()});
+    NDArray<double, 2> inverse_normalized_flatfield(
+        std::array<ssize_t, 2>{mythen_detector_ptr->num_strips(), 2});
     for (ssize_t index = 0; index < mythen_detector_ptr->num_strips();
          ++index) {
-        inverse_normalized_flatfield(index) = 1.0 / normalized_flatfield(index);
+        inverse_normalized_flatfield(index, 0) = 1.0 / normalized_flatfield(index, 0);
+        inverse_normalized_flatfield(index, 1) = normalized_flatfield(index, 1); //TODO: dont know how to handle variance
     }
     flat_field_ptr->set_inverse_normalized_flatfield(
         inverse_normalized_flatfield);
 
 #ifdef ANGCAL_PLOT
-    /*
+
     plot_photon_counts(flat_field_ptr->get_inverse_normalized_flatfield(),
                        {0, mythen_detector_ptr->num_strips()},
                        "Inverse normalized flatfield", mythen_detector_ptr);
 
+    /*
     plot_photon_counts(flat_field_ptr->get_inverse_normalized_flatfield(),
                        {3 * mythen_detector_ptr->strips_per_module(),
                         4 * mythen_detector_ptr->strips_per_module()},
@@ -161,13 +206,11 @@ int main() {
                                           fmt::format("{:04}", i++) + ".h5");
                   });
 
-    /*
     auto [left_angle, right_angle] =
         get_detector_range(mythen_file_reader, filelist);
 
     LOG(TLogLevel::logINFO)
         << fmt::format("detector range: [{},{}]", left_angle, right_angle);
-    */
 
 #ifdef ANGCAL_PLOT
     // uncomment if you want to see all frames and select a base peak
@@ -191,9 +234,19 @@ int main() {
 
     // anglecalibration.set_histogram_bin_width(0.01);
 
+    get_angle_range_of_module(mythen_file_reader, filelist, anglecalibration,
+                              0);
+
     // plot some stuff
     MythenFrame frame = mythen_file_reader.read_frame(
         file_path / acquisition_fileprefix.append("0850.h5")); // 0170.h5
+
+    std::cout << "angle_range_detector: "
+              << anglecalibration.diffraction_angle_from_DG_parameters(
+                     0, 0.0, 0, -0.5) -
+                     anglecalibration.diffraction_angle_from_DG_parameters(
+                         23, 0.0, 1279, +0.5)
+              << std::endl;
 
     size_t module_index = 0;
 #ifdef ANGCAL_PLOT

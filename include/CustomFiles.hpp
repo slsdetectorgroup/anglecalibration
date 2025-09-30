@@ -50,8 +50,10 @@ class CustomFlatFieldFile : public SimpleFileInterface {
                    flatfield_error >> val_1 >> val_2) {
                 std::memcpy(image_buf, &flatfield_value,
                             sizeof(flatfield_value));
+                std::memcpy(image_buf, &flatfield_error,
+                            sizeof(flatfield_error));            
 
-                image_buf += data_types_bytes;
+                image_buf += 2*data_types_bytes;
             }
         } catch (const std::exception &e) {
             LOG(TLogLevel::logERROR) << e.what();
