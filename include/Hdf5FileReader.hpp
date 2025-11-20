@@ -136,7 +136,9 @@ class HDF5Dataset {
             throw std::runtime_error("Frame only supports 2d images");
         }
 
-        Frame frame(rows, cols, Dtype(*cpp_type));
+        // Frame frame(rows, cols, Dtype(*cpp_type));
+
+        auto frame = Frame(rows, cols, Dtype(*cpp_type));
 
         read_into_buffer(frame.data());
 

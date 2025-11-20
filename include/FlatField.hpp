@@ -69,21 +69,22 @@ class FlatField {
      * @warning only works if member m_custom_detectot_file_ptr supports reading
      * the format
      */
-    void create_flatfield_from_filelist(const std::filesystem::path &filelist, const std::filesystem::path &incident_intensities) {
+    void create_flatfield_from_filelist(
+        std::shared_ptr<MythenFileReader> file_reader,
+        const std::filesystem::path &filelist) {
         std::ifstream file_filelist(filelist);
 
-        MythenFileReader file_reader(incident_intensities, ""); //TODO needs to be configurable 
-
         double average_incident_intensity{};
-        size_t count = 0; 
+        size_t count = 0;
 
         try {
             std::string filename;
 
-            while(std::getline(file_filelist, filename)) {
-                MythenFrame frame = file_reader.read_frame(filename);
-                
-                if (frame.rows() * frame.cols() != mythen_detector->num_strips()) {
+            while (std::getline(file_filelist, filename)) {
+                MythenFrame frame = file_reader->read_frame(filename);
+
+                if (frame.rows() * frame.cols() !=
+                    mythen_detector->num_strips()) {
                     throw std::runtime_error(
                         fmt::format("sizes mismatch. Expect a size of "
                                     "{} - frame has a size of {}",
@@ -91,30 +92,40 @@ class FlatField {
                                     frame.rows() * frame.cols()));
                 }
                 average_incident_intensity += frame.incident_intensity + 1;
-                ++count; 
+                ++count;
                 for (ssize_t row = 0; row < frame.rows(); ++row)
                     for (ssize_t col = 0; col < frame.cols(); ++col) {
-                        flat_field(row * frame.cols() + col, 0) += (frame.photon_counts(row, col) + 1)/(frame.incident_intensity + 1);
-                             // TODO inefficient as one has to
-                                        // copy twice into frame and into
-                                        // flat_field   
-                        //flatfield variance 
-                        flat_field(row * frame.cols() + col, 1) += std::pow(frame.photon_counts(row, col) + 1,1)/std::pow(frame.incident_intensity + 1,3)  +  (frame.photon_counts(row, col) + 1)/std::pow(frame.incident_intensity + 1, 2);        
+                        flat_field(row * frame.cols() + col, 0) +=
+                            (frame.photon_counts(row, col) + 1) /
+                            (frame.incident_intensity + 1);
+                        // TODO inefficient as one has to
+                        // copy twice into frame and into
+                        // flat_field
+                        // flatfield variance
+                        flat_field(row * frame.cols() + col, 1) +=
+                            std::pow(frame.photon_counts(row, col) + 1, 1) /
+                                std::pow(frame.incident_intensity + 1, 3) +
+                            (frame.photon_counts(row, col) + 1) /
+                                std::pow(frame.incident_intensity + 1, 2);
                     }
             }
         } catch (const std::exception &e) {
             LOG(TLogLevel::logERROR) << "Error: " << e.what() << '\n';
         }
 
-        average_incident_intensity/=count; 
-        double average_incident_intensity_2 = average_incident_intensity*average_incident_intensity;
-        for(ssize_t index = 0; index < flat_field.shape(0); ++index) {
-            flat_field(index, 0) *= average_incident_intensity; // the photon_counts should be scaled by one
-            flat_field(index, 1) *= average_incident_intensity_2; // the photon_counts should be scaled by one
+        average_incident_intensity /= count;
+        double average_incident_intensity_2 =
+            average_incident_intensity * average_incident_intensity;
+        for (ssize_t index = 0; index < flat_field.shape(0); ++index) {
+            flat_field(index, 0) *=
+                average_incident_intensity; // the photon_counts should be
+                                            // scaled by one
+            flat_field(index, 1) *=
+                average_incident_intensity_2; // the photon_counts should be
+                                              // scaled by one
         }
-            
+
         file_filelist.close();
-        
     }
 
     /**
@@ -200,7 +211,7 @@ class FlatField {
         return sum / count;
     }
 
-    NDArray<double, 2> flat_field; 
+    NDArray<double, 2> flat_field;
     NDArray<double, 2> normalized_flat_field;
     NDArray<double, 2> inverse_normalized_flat_field;
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector;

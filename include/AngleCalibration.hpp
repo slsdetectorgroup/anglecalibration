@@ -53,8 +53,7 @@ class AngleCalibration {
     AngleCalibration(
         std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
         std::shared_ptr<FlatField> flat_field_,
-        std::optional<std::shared_ptr<MythenFileReader>> mythen_file_reader_ =
-            std::nullopt,
+        std::shared_ptr<MythenFileReader> mythen_file_reader_,
         std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr_ =
             std::nullopt);
 
@@ -356,7 +355,8 @@ class AngleCalibration {
      * time
      * @return rate correction factor
      */
-    double rate_correction_factor(const double photon_counts, const double expsoure_time) const;
+    double rate_correction_factor(const double photon_counts,
+                                  const double expsoure_time) const;
 
     /**
      * @brief appends given parameters to file
@@ -441,7 +441,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
 
     NDArray<double, 1> sum_statistical_weights(
         std::array<ssize_t, 1>{number_of_bins},
-        0.0); // used to nromalize statistical weights
+        0.0); // used to normalize statistical weights
 
     if constexpr (base_peak_ROI_only) {
 
@@ -470,31 +470,23 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             diffraction_angle_from_BC_parameters(
                 module_index, frame.detector_angle, strip_index, +0.5);
 
-        if (base_peak_ROI_only &&
-            (left_strip_boundary_angle > right_boundary_roi_base_peak ||
-             right_strip_boundary_angle < left_boundary_roi_base_peak)) {
-            continue; // skip strip if not in ROI
+        if constexpr (base_peak_ROI_only) {
+            if (left_strip_boundary_angle > right_boundary_roi_base_peak ||
+                right_strip_boundary_angle < left_boundary_roi_base_peak) {
+                continue; // skip strip if not in ROI
+            }
         }
 
         auto [corrected_photon_counts,
               inverse_corrected_photon_counts_variance] =
             calculate_corrected_photon_counts(
-                frame.photon_counts(global_strip_index),
-                global_strip_index); // TODO: mind its probably the inverse
-                                     // already
+                frame.photon_counts(global_strip_index), global_strip_index);
+
+        inverse_corrected_photon_counts_variance = 1.0;
 
         double strip_width_angle =
             std::abs(right_strip_boundary_angle - left_strip_boundary_angle);
         // angular_strip_width_from_BC_parameters(module_index, strip_index);
-
-        /*
-        double correction_factor =
-            histogram_bin_width >= strip_width_angle
-                ? 1.0
-                : histogram_bin_width /
-                      strip_width_angle; // coverage factor of one bin of the
-                                         // strip
-        */
 
         double photon_counts_per_bin =
             corrected_photon_counts * histogram_bin_width / strip_width_angle;
@@ -526,8 +518,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         }
 
         size_t proper_bin_index =
-            0; // the computed bin indices dont start at zero but arange around
-               // zero depending on the sign if the diffraction angle
+            0; // the computed bin indices dont start at zero
 
         for (ssize_t bin_index = left_bin_index_covered_by_strip;
              bin_index < right_bin_index_covered_by_strip; ++bin_index) {
@@ -558,9 +549,10 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             }
 
             double statistical_weight =
-                bin_coverage_factor *
-                inverse_photon_counts_variance_per_bin; // TODO cant be the
-                                                        // inverse
+                bin_coverage_factor * inverse_photon_counts_variance_per_bin;
+
+            // std::cout << "statistical weight: " << statistical_weight <<
+            // "\n";
 
             fixed_angle_width_bins_photon_counts(proper_bin_index) +=
                 statistical_weight * photon_counts_per_bin;

@@ -20,7 +20,7 @@ TEST_CASE("MythenFileReader using raw file", "[.mythenfilereader][.files]") {
 
     SECTION("read mythen frame from raw file") {
 
-        MythenFileReader file_reader;
+        RawMythenFileReader file_reader{};
 
         auto mythen_data = test_data_path() / "AngleCalibration_Test_Data" /
                            "DummyRawFiles" / "run_2_master_2.json";
@@ -51,13 +51,13 @@ TEST_CASE("MythenFileReader using raw file", "[.mythenfilereader][.files]") {
         REQUIRE(std::filesystem::exists(I0_data));
         REQUIRE(std::filesystem::exists(detector_angles));
 
-        MythenFileReader file_reader(detector_angles, I0_data);
+        RawMythenFileReader file_reader(detector_angles, I0_data);
 
         MythenFrame frame = file_reader.read_frame(mythen_data);
 
         REQUIRE(frame.detector_angle == 1.11);
         REQUIRE(frame.incident_intensity == 1002);
-        REQUIRE(frame.photon_counts().size() == 1280 * 2);
+        REQUIRE(frame.size() == 1280 * 2);
         REQUIRE(frame.channel_mask == std::array<uint8_t, 3>{0, 0, 1});
     }
 }
@@ -72,6 +72,8 @@ TEST_CASE("test custom mythenfilereader", "[.mythenfilereader][.files]") {
 
     auto frame =
         file_reader.read_frame(fpath / "ang1up_22keV_LaB60p3mm_48M_a_0320.h5");
+
+    CHECK(frame.size() == 1280 * 48);
 
     CHECK(frame.detector_angle == 0.99955);
 

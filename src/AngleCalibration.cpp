@@ -24,15 +24,10 @@ struct SignalHandler {
 AngleCalibration::AngleCalibration(
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
     std::shared_ptr<FlatField> flat_field_,
-    std::optional<std::shared_ptr<MythenFileReader>> mythen_file_reader_,
+    std::shared_ptr<MythenFileReader> mythen_file_reader_,
     std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr_)
-    : mythen_detector(mythen_detector_), flat_field(flat_field_) {
-
-    if (mythen_file_reader_.has_value()) {
-        mythen_file_reader = mythen_file_reader_.value();
-    } else {
-        mythen_file_reader = std::make_shared<MythenFileReader>();
-    }
+    : mythen_detector(mythen_detector_), flat_field(flat_field_),
+      mythen_file_reader(mythen_file_reader_) {
 
     if (custom_file_ptr_.has_value()) {
         custom_file_ptr = custom_file_ptr_.value();
@@ -356,9 +351,10 @@ AngleCalibration::rate_correction_factor(const double photon_count,
 std::pair<double, double> AngleCalibration::calculate_corrected_photon_counts(
     const double photon_counts, const size_t global_strip_index) const {
 
+    // flatfield normalization and Mighells statistics
     double flatfield_normalized_photon_counts =
         (photon_counts + 1) *
-        flat_field->get_inverse_normalized_flatfield()(global_strip_index,0);
+        flat_field->get_inverse_normalized_flatfield()(global_strip_index, 0);
 
     double some_flatfield_error =
         1.0; // TODO: some dummy value - implement read from file
@@ -370,7 +366,7 @@ std::pair<double, double> AngleCalibration::calculate_corrected_photon_counts(
               (1. / (photon_counts + 1) +
                std::pow(some_flatfield_error *
                             flat_field->get_inverse_normalized_flatfield()(
-                                global_strip_index,0),
+                                global_strip_index, 0),
                         2))); // this is probably the inverse - for easier
                               // multiplication - division by variance
 
@@ -593,7 +589,7 @@ AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         }
 
         LOG(TLogLevel::logDEBUG1)
-            << fmt::format("module_index {} contibutes", module_index);
+            << fmt::format("module_index {} contributes", module_index);
 
         redistribute_photon_counts_to_fixed_angle_width_bins<false>(
             module_index, frame, fixed_angle_width_bins_photon_counts.view(),

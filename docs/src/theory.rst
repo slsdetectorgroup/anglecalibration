@@ -388,7 +388,7 @@ should be measured by each module multiple times.
 However, the rotation range is limited by the detector setup and the 
 angular range is usually much smaller than :math:`[-180^{\circ}, 180^{\circ}]`. 
 Therefore, choose a base peak angle that can be measured by all modules and is 
-well within the detector rotation range. 
+well within the detector rotation range. For the current Mythen setup at SLS choose a base peak between :math:`[6^{\circ}, 33^{\circ}]`. 
 
 .. 
     Is the measurement error prone or only the conversion 
