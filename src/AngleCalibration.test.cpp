@@ -73,6 +73,7 @@ TEST_CASE("read bad channels",
                       [](const bool element) { return element; }));
 }
 
+/* deprecated need to store error as well
 TEST_CASE("read flatfield", "[anglecalibration][flatfield][.files]") {
 
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
@@ -90,11 +91,12 @@ TEST_CASE("read flatfield", "[anglecalibration][flatfield][.files]") {
 
     auto flatfield_data = flatfield.get_flatfield();
 
-    CHECK(flatfield_data.size() == 61440);
+    CHECK(flatfield_data.size() == 2 * 48 * 1280);
 
-    CHECK(flatfield_data[0] == 0);
-    CHECK(flatfield_data[21] == 4234186);
+    CHECK(flatfield_data(0) == 0);
+    CHECK(flatfield_data(21) == 4234186);
 }
+*/
 
 /*
 TEST_CASE("create flatfield", "[anglecalibration], [flatfield], [.files]") {

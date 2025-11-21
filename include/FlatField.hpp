@@ -56,9 +56,6 @@ class FlatField {
         if (custom_file_ptr.has_value()) {
             m_custom_file_ptr = custom_file_ptr.value();
         }
-
-        flat_field = NDArray<double, 2>(
-            std::array<ssize_t, 2>{mythen_detector->num_strips()}, 2);
     }
 
     /**
@@ -72,6 +69,10 @@ class FlatField {
     void create_flatfield_from_filelist(
         std::shared_ptr<MythenFileReader> file_reader,
         const std::filesystem::path &filelist) {
+
+        flat_field = NDArray<double, 2>(
+            std::array<ssize_t, 2>{mythen_detector->num_strips(), 2});
+
         std::ifstream file_filelist(filelist);
 
         double average_incident_intensity{};
@@ -128,15 +129,37 @@ class FlatField {
         file_filelist.close();
     }
 
+    // TODO: maybe dont support reading at all
+    // caveat user has to pass by value or move otherwise copied twice from
+    // filesystem and then into member variable !!!!
     /**
      * read flatfield from file
      * @warning only works if member m_custom_detectot_file_ptr supports reading
      * the format
      */
     void read_flatfield_from_file(const std::string &filename) {
+        flat_field = NDArray<double, 2>(
+            std::array<ssize_t, 2>{mythen_detector->num_strips(), 2});
         m_custom_file_ptr->open(filename);
         m_custom_file_ptr->read_into(
-            reinterpret_cast<std::byte *>(flat_field.data()), 8);
+            reinterpret_cast<std::byte *>(flat_field.data()),
+            8); // TODO: should be int though !!!
+
+        m_custom_file_ptr->close();
+    }
+
+    /**
+     * read flatfield from file
+     * @warning only works if member m_custom_detectot_file_ptr supports reading
+     * the format
+     */
+    void read_normalized_flatfield_from_file(const std::string &filename) {
+        normalized_flat_field = NDArray<double, 2>(
+            std::array<ssize_t, 2>{mythen_detector->num_strips(), 2});
+        m_custom_file_ptr->open(filename);
+        m_custom_file_ptr->read_into(
+            reinterpret_cast<std::byte *>(normalized_flat_field.data()), 8);
+        m_custom_file_ptr->close();
     }
 
     /**
@@ -146,6 +169,11 @@ class FlatField {
         flat_field = flat_field_;
     }
 
+    void set_flatfield(NDArray<double, 2> &&flat_field_) {
+        flat_field = std::move(flat_field_);
+    }
+
+    // TODO: should it be view? or copy?
     NDArray<double, 2> get_flatfield() const { return flat_field; }
 
     void set_inverse_normalized_flatfield(
@@ -162,23 +190,60 @@ class FlatField {
         normalized_flat_field = normalized_flatfield_;
     }
 
+    void set_normalized_flatfield(NDArray<double, 2> &&normalized_flatfield_) {
+        normalized_flat_field = std::move(normalized_flatfield_);
+    }
+
     NDView<double, 2> get_normalized_flatfield() const {
         return normalized_flat_field.view();
     }
 
+    /**
+     * @brief calculates inverse normalized flatfield
+     * @tparam from_normalized_flat_field false if calculated from normalized
+     * flatfield (default false)
+     */
+    template <bool from_normalized_flat_field = false>
     void calculate_inverse_normalized_flatfield() {
-        double mean = calculate_mean();
 
-        inverse_normalized_flat_field = NDArray<double, 2>(flat_field.shape());
+        double mean = 1.0;
+        if constexpr (!from_normalized_flat_field) {
+            mean = calculate_mean();
+        }
 
-        for (ssize_t i = 0; i < flat_field.size(); ++i) {
-            // TODO maybe collapse if else
-            inverse_normalized_flat_field[i] =
-                (flat_field[i] <= std::numeric_limits<double>::epsilon()
-                     ? 0.0
-                     : mean / flat_field[i]);
+        inverse_normalized_flat_field = NDArray<double, 2>(
+            std::array<ssize_t, 2>{mythen_detector->num_strips(), 2});
 
-            if (inverse_normalized_flat_field[i] <
+        if constexpr (from_normalized_flat_field) {
+            if (normalized_flat_field.size() == 0) {
+                throw std::runtime_error(
+                    "cannot calculate inverse normalized flatfield from "
+                    "normalized flatfield - normalized flatfield hasnt been "
+                    "set");
+            }
+        }
+
+        for (ssize_t i = 0; i < mythen_detector->num_strips(); ++i) {
+            if constexpr (from_normalized_flat_field) {
+                inverse_normalized_flat_field(i, 0) =
+                    (normalized_flat_field(i, 0) <=
+                             std::numeric_limits<double>::epsilon()
+                         ? 0.0
+                         : mean / normalized_flat_field(i, 0));
+                inverse_normalized_flat_field(i, 1) =
+                    normalized_flat_field(i, 1) *
+                    std::pow(inverse_normalized_flat_field(i, 0),
+                             2); // error propagation // Note: uses variance
+                                 // error e.g. squared!!
+            } else {
+                inverse_normalized_flat_field(i, 0) =
+                    (flat_field(i, 0) <= std::numeric_limits<double>::epsilon()
+                         ? 0.0
+                         : mean / flat_field(i, 0));
+                // TODO: error propagation
+            }
+
+            if (inverse_normalized_flat_field(i, 0) <
                 std::numeric_limits<double>::epsilon())
                 mythen_detector->get_bad_channels()[i] = true;
         }
@@ -190,14 +255,16 @@ class FlatField {
         normalized_flat_field = NDArray<double, 2>(flat_field.shape());
 
         for (ssize_t i = 0; i < flat_field.size(); ++i) {
-            normalized_flat_field[i] = flat_field[i] / mean;
-            if (normalized_flat_field[i] <
+            normalized_flat_field(i, 0) = flat_field(i, 0) / mean;
+            // TODO: error propagation
+            if (normalized_flat_field(i, 0) <
                 std::numeric_limits<double>::epsilon())
-                mythen_detector->get_bad_channels()[i] = true;
+                mythen_detector->get_bad_channels()(i) = true;
         }
     }
 
   private:
+    // TODO: is flatfield now 2d or 1d - update accordingly everywhere
     double calculate_mean() const {
         auto [sum, count] = std::accumulate(
             flat_field.begin(), flat_field.end(),

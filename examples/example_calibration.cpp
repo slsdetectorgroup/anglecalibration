@@ -97,6 +97,42 @@ void get_angle_range_of_module(
         max_right_module_angle, module_index);
 }
 
+#ifdef ANGCAL_PLOT
+/**
+ * @brief select base peak by plotting module 0 redistributed to fixed
+ * angle-width bins for each frame in filelist with a detector angle between
+ * 6° and 33°
+ */
+void select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
+                      std::shared_ptr<MythenFileReader> mythen_file_reader,
+                      const std::vector<std::string> &filelist) {
+    PlotHelper plotter(anglecalibration);
+
+    std::shared_ptr<Gnuplot> gp = std::make_shared<Gnuplot>();
+
+    for (const auto &file : filelist) {
+
+        LOG(TLogLevel::logINFO) << fmt::format("reading file {}", file);
+        auto frame = mythen_file_reader->read_frame(file);
+
+        if (frame.detector_angle > 6.0 || frame.detector_angle > 33.0) {
+
+            // plot module
+            auto module_redistributed_to_fixed_angle_bins =
+                anglecalibration
+                    ->redistribute_photon_counts_to_fixed_angle_width_bins(
+                        frame, 0);
+
+            plotter.plot_module_redistributed_to_fixed_angle_width_bins(
+                0, module_redistributed_to_fixed_angle_bins.view(),
+                frame.detector_angle, gp);
+
+            plotter.pause();
+        }
+    }
+}
+#endif
+
 int main() {
 
     auto file_path = data_path();
@@ -162,45 +198,17 @@ int main() {
     std::shared_ptr<FlatField> flat_field_ptr =
         std::make_shared<FlatField>(mythen_detector_ptr);
 
-    // TODO: do I want to pass an inverse flatfield or only read flatfield and
-    // calculate in Flatfield class
-    //  inverse_flatfield is only properly allocated when calling
-    //  inverse_flatfield
+    LOG(TLogLevel::logINFO) << "read normalized flatfield from file";
 
-    LOG(TLogLevel::logINFO) << "read flatfield from file";
+    // TODO: probably normalized flatfield is stored or inverse?
+    // TODO: maybe allocate normalized flatfield somewhere else and directly
+    // read into it- decouble filesystem from FlatField class completely
+    // Flatfield and normalized flatfield use different file formats e.g. no
+    // error stored in flatfield - flatfield is a simple mythenfile!!!! - not a
+    // txt file
+    flat_field_ptr->read_normalized_flatfield_from_file(flatfield_filename);
 
-    NDArray<double, 2> normalized_flatfield(
-        std::array<ssize_t, 2>{mythen_detector_ptr->num_strips(), 2});
-    CustomFlatFieldFile flatfieldfilereader;
-    flatfieldfilereader.open(flatfield_filename);
-    flatfieldfilereader.read_into(normalized_flatfield.buffer(), 8);
-
-    NDArray<double, 2> inverse_normalized_flatfield(
-        std::array<ssize_t, 2>{mythen_detector_ptr->num_strips(), 2});
-    for (ssize_t index = 0; index < mythen_detector_ptr->num_strips();
-         ++index) {
-        inverse_normalized_flatfield(index, 0) =
-            1.0 / normalized_flatfield(index, 0);
-        inverse_normalized_flatfield(index, 1) = normalized_flatfield(
-            index, 1); // TODO: dont know how to handle variance
-    }
-    flat_field_ptr->set_inverse_normalized_flatfield(
-        inverse_normalized_flatfield);
-
-#ifdef ANGCAL_PLOT
-    /*
-    plot_photon_counts(flat_field_ptr->get_inverse_normalized_flatfield(),
-                       {0, mythen_detector_ptr->num_strips()},
-                       "Inverse normalized flatfield", mythen_detector_ptr);
-    */
-    /*
-    plot_photon_counts(flat_field_ptr->get_inverse_normalized_flatfield(),
-                       {3 * mythen_detector_ptr->strips_per_module(),
-                        4 * mythen_detector_ptr->strips_per_module()},
-                       "Inverse normalized flatfield for module 3",
-                       mythen_detector_ptr);
-    */
-#endif
+    flat_field_ptr->calculate_inverse_normalized_flatfield<true>();
 
     auto mythen_file_reader = std::make_shared<CustomMythenFileReader>();
 
@@ -228,37 +236,14 @@ int main() {
         << fmt::format("detector range: [{},{}]", left_angle, right_angle);
 
 #ifdef ANGCAL_PLOT
-    PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
-
-    std::shared_ptr<Gnuplot> gp = std::make_shared<Gnuplot>();
-
-    for (const auto &file : filelist) {
-        auto frame = mythen_file_reader->read_frame(file);
-
-        if (frame.detector_angle > 6.0 || frame.detector_angle > 33.0) {
-
-            LOG(TLogLevel::logINFO) << "file: " << file;
-
-            // plot module
-            auto module_redistributed_to_fixed_angle_bins =
-                anglecalibration
-                    .redistribute_photon_counts_to_fixed_angle_width_bins(frame,
-                                                                          0);
-
-            plotter.plot_module_redistributed_to_fixed_angle_width_bins(
-                0, module_redistributed_to_fixed_angle_bins.view(),
-                frame.detector_angle, gp);
-
-            plotter.pause();
-        }
-    }
-
+    // select_base_peak(std::make_shared<AngleCalibration>(anglecalibration),
+    // mythen_file_reader, filelist);
 #endif
 
     // take a tabulated peak as base peak
     // or take a base peak for module 0 that is well inside the detector range
     // and not at the module boundaries
-    const double base_peak_angle = -49.4786;
+    const double base_peak_angle = 17.599; // 26.7731, 20.5902, 14.0686
 
     anglecalibration.set_base_peak_angle(base_peak_angle);
 
@@ -266,15 +251,9 @@ int main() {
 
     // anglecalibration.set_histogram_bin_width(0.01);
 
-    /*
-    for (size_t module_index = 0; module_index < 48; ++module_index)
-        get_angle_range_of_module(mythen_file_reader, filelist,
-                                  anglecalibration, module_index);
-    */
-
     // plot some stuff
     MythenFrame frame = mythen_file_reader->read_frame(
-        file_path / acquisition_fileprefix.append("0850.h5")); // 0170.h5
+        file_path / acquisition_fileprefix.append("0165.h5")); // 0170.h5
 
     LOG(TLogLevel::logINFO) << fmt::format(
         "angle range of detector: {}",
@@ -283,6 +262,7 @@ int main() {
                                                                   +0.5));
 
     size_t module_index = 0;
+
 #ifdef ANGCAL_PLOT
 
     // normalize photon counts
@@ -311,6 +291,8 @@ int main() {
 // plot everything redistributed to fixed angle width bins
 #ifdef ANGCAL_PLOT
 
+    PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
+
     auto new_fixed_angle_width_bins_photon_counts =
         anglecalibration.redistribute_photon_counts_to_fixed_angle_width_bins(
             frame);
@@ -331,13 +313,12 @@ int main() {
 
     plotter.plot_module_redistributed_to_fixed_angle_width_bins(
         module_index, module_redistributed_to_fixed_angle_bins.view(),
-        frame.detector_angle, gp);
+        frame.detector_angle);
 
     plotter.pause();
 #endif
 
-    // plot base peak for one module
-
+// plot base peak for one module
 #ifdef ANGCAL_PLOT
 
     auto base_peak_for_module =

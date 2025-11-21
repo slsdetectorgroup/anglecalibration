@@ -40,7 +40,7 @@ The diffraction angle is thus a function of the strip/chip index and the detecto
     \theta_B = f_{\sum}\left(\textrm{strip_index}\right)
 
 
-Detcetor parameters
+Detector parameters
 --------------------
 
 A schemantic representation of Mythen's detector setup is shown in :numref:`detectorsetup`. The Mythen detector consists of multiple modules arranged in a circular fashion. 
@@ -219,8 +219,9 @@ The photon counts are corrected by the theoretical incident intensity :math:`I_{
 
 .. It can be measured by adding up all photon counts of one module with no sample present. It changes throughout the acquisitions, but is constant for all modules
 
-.. math:: 
-    I_{I_0,corr} = I * \frac{I_{0,1s}{I_0} 
+.. math::
+    I_{I_0,corr} = I * \frac{I_{0,1s}}{I_0}
+    
 
 .. Why is it scaled with the incident intensity of the first acquisitions
 
@@ -389,6 +390,10 @@ However, the rotation range is limited by the detector setup and the
 angular range is usually much smaller than :math:`[-180^{\circ}, 180^{\circ}]`. 
 Therefore, choose a base peak angle that can be measured by all modules and is 
 well within the detector rotation range. For the current Mythen setup at SLS choose a base peak between :math:`[6^{\circ}, 33^{\circ}]`. 
+
+.. Note:: 
+    The sample is placed at angle :math:`0^{\circ}`. Positive angles mean the module is below the horizontal sample plane and negative angles above the horizontal sample plane. 
+    Thus rotating the detector in clockwise order decreases the angle. (Mythen setup at SLS)
 
 .. 
     Is the measurement error prone or only the conversion 

@@ -36,9 +36,9 @@ counter_mask_to_channel_indices(uint8_t counter_mask) {
 }
 
 struct MythenFrame : public aare::Frame {
-    // NDArray<uint32_t, 1> photon_counts{};
     double detector_angle{};
     uint64_t incident_intensity{}; // I_0
+    double exposure_time{};        // in seconds
     std::array<uint8_t, 3> channel_mask{};
 
     MythenFrame() = delete;

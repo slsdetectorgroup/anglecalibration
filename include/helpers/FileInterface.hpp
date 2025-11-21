@@ -44,6 +44,8 @@ class SimpleFileInterface {
 
     virtual ~SimpleFileInterface() { m_file.close(); }
 
+    virtual void close() { m_file.close(); }
+
   protected:
     std::string m_filename{};
     std::ifstream m_file{};

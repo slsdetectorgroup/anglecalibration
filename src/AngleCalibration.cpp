@@ -87,6 +87,11 @@ bool AngleCalibration::module_is_disconnected(const size_t module_index) const {
                        [](const auto &elem) { return elem; });
 }
 
+void AngleCalibration::set_incident_intensity_of_first_acquisition(
+    const double incident_intensity) {
+    I0_of_first_acquisition = incident_intensity;
+}
+
 void AngleCalibration::read_initial_calibration_from_file(
     const std::string &filename) {
 
@@ -312,66 +317,142 @@ bool AngleCalibration::base_peak_is_in_module(
             left_module_boundary_angle < base_peak_angle - *bounds_in_angles);
 }
 
-double
-AngleCalibration::rate_correction_factor(const double photon_count,
-                                         const double exposure_time) const {
-    const double dead_time = 2.915829802160547e-7; // measured dead-time
+std::pair<double, double>
+AngleCalibration::rate_correction(const double photon_count,
+                                  const double photon_count_error) const {
+    constexpr double dead_time = 2.915829802160547e-7; // measured dead-time
 
     const double maximum_count_rate =
         std::exp(-1); // theoretical maximum count rate for
                       // dead_time*measured_photon_counts_per_second
 
-    double photon_counts_per_second = photon_count / exposure_time;
+    double photon_counts_per_second =
+        photon_count / mythen_detector->exposure_time();
 
-    photon_counts_per_second =
-        std::min(maximum_count_rate, photon_counts_per_second *
-                                         dead_time); // multiply width dead time
+    photon_counts_per_second = std::min(
+        maximum_count_rate,
+        photon_counts_per_second *
+            dead_time); // multiply with dead time - for numerical algorithm
+
+    double error_photon_counts_per_second =
+        photon_count_error *
+        std::pow(dead_time / mythen_detector->exposure_time(), 2);
 
     // -actual_count_rate*dead_time = W -> -dead_time*measured_count_rate =
     // We^{W} -> W: Lambert W function
 
     // numerical calculation of inverse of Lambart W - function
-    double W_prev_iter = -photon_counts_per_second; // initial guess
+    // actually calculate dead_time*count_rate =
+    // dead_time*actual_count_rate*exp(-dead_time*actual_count_rate)
+    double W_prev_iter = photon_counts_per_second; // initial guess
     double W_next_iter{};
+    double propagated_error = error_photon_counts_per_second;
     bool method_converged = false;
     while (!method_converged) {
         W_next_iter = photon_counts_per_second * std::exp(W_prev_iter);
         method_converged = std::abs(W_next_iter - W_prev_iter) <
                            10 * std::numeric_limits<double>::epsilon();
         W_prev_iter = W_next_iter;
+        propagated_error =
+            error_photon_counts_per_second * std::exp(2 * W_prev_iter) +
+            propagated_error *
+                std::pow(photon_counts_per_second * std::exp(W_prev_iter), 2);
     }
 
-    double actual_count_rate = -W_prev_iter;
+    double actual_count_rate = W_prev_iter; // actual count rate * dead_time
 
-    return actual_count_rate /
-           photon_counts_per_second; // TODO: its a statistic variable not a
-                                     // constant do I take it into account?
+    double rate_correction_factor =
+        actual_count_rate / photon_counts_per_second;
+
+    double error_rate_correction_factor =
+        propagated_error / std::pow(photon_counts_per_second, 2) +
+        error_photon_counts_per_second *
+            std::pow(actual_count_rate /
+                         (photon_counts_per_second * photon_counts_per_second),
+                     2);
+
+    double rate_corrected_photon_counts = photon_count *
+                                          rate_correction_factor /
+                                          mythen_detector->exposure_time();
+
+    double rate_corrected_photon_counts_error =
+        photon_count_error * std::pow(rate_correction_factor, 2) +
+        error_rate_correction_factor * std::pow(photon_count, 2) /
+            std::pow(mythen_detector->exposure_time(), 2);
+
+    return std::pair<double, double>{rate_corrected_photon_counts,
+                                     rate_corrected_photon_counts_error};
 }
 
-std::pair<double, double> AngleCalibration::calculate_corrected_photon_counts(
-    const double photon_counts, const size_t global_strip_index) const {
+std::pair<double, double> AngleCalibration::incident_intensity_correction(
+    const double photon_counts, const double photon_count_error,
+    const uint64_t incident_intensity) const {
 
-    // flatfield normalization and Mighells statistics
+    double I0_correction_factor =
+        I0_of_first_acquisition.has_value()
+            ? I0_of_first_acquisition.value() /
+                  (incident_intensity * mythen_detector->exposure_time())
+            : 1.0 / mythen_detector->exposure_time();
+
+    double I0_corrected_photon_counts = photon_counts * I0_correction_factor;
+    double I0_corrected_photon_counts_error =
+        photon_count_error * std::pow(I0_correction_factor, 2);
+
+    return std::pair<double, double>{I0_corrected_photon_counts,
+                                     I0_corrected_photon_counts_error};
+}
+
+std::pair<double, double>
+AngleCalibration::flatfield_correction(const double photon_counts,
+                                       const double photon_counts_error,
+                                       const size_t global_strip_index) const {
+
+    // flatfield normalization
     double flatfield_normalized_photon_counts =
-        (photon_counts + 1) *
+        photon_counts *
         flat_field->get_inverse_normalized_flatfield()(global_strip_index, 0);
 
-    double some_flatfield_error =
-        1.0; // TODO: some dummy value - implement read from file
+    double normalized_flatfield_variance =
+        flat_field->get_inverse_normalized_flatfield()(global_strip_index, 1);
 
-    // I guess it measures the
-    // expcected noise - where is the formula - used as the variance
-    double inverse_photon_counts_variance =
-        1. / (std::pow(flatfield_normalized_photon_counts, 2) *
-              (1. / (photon_counts + 1) +
-               std::pow(some_flatfield_error *
-                            flat_field->get_inverse_normalized_flatfield()(
-                                global_strip_index, 0),
-                        2))); // this is probably the inverse - for easier
-                              // multiplication - division by variance
+    double flatfield_normalized_photon_counts_error =
+        photon_counts_error *
+            std::pow(flat_field->get_inverse_normalized_flatfield()(
+                         global_strip_index, 0),
+                     2) +
+        normalized_flatfield_variance *
+            std::pow(photon_counts, 2); // error propagation (error squared !!)
 
     return std::pair(flatfield_normalized_photon_counts,
-                     inverse_photon_counts_variance);
+                     flatfield_normalized_photon_counts_error);
+}
+
+std::pair<double, double>
+AngleCalibration::photon_count_correction(double photon_counts,
+                                          const size_t global_strip_index,
+                                          const uint64_t I0) const {
+
+    // TODO no idea what to do with variance
+
+    auto [rate_corrected_photon_counts, rate_corrected_photon_counts_error] =
+        rate_correction(photon_counts,
+                        photon_counts); // same variance as poisson distributed
+                                        // - maybe sqaured?
+
+    // mighells statistics
+    rate_corrected_photon_counts += 1;
+
+    // error does not change
+
+    auto [flatfield_normalized_photon_counts,
+          flatfield_normalized_photon_counts_variance] =
+        flatfield_correction(rate_corrected_photon_counts,
+                             rate_corrected_photon_counts_error,
+                             global_strip_index);
+
+    return incident_intensity_correction(
+        flatfield_normalized_photon_counts,
+        flatfield_normalized_photon_counts_variance, I0);
 }
 
 double

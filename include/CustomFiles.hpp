@@ -11,6 +11,7 @@
 
 namespace angcal {
 
+/*
 class CustomMythenFile : public SimpleFileInterface {
   public:
     CustomMythenFile() = default;
@@ -31,29 +32,30 @@ class CustomMythenFile : public SimpleFileInterface {
         }
     }
 };
+*/
 
 class CustomFlatFieldFile : public SimpleFileInterface {
   public:
     CustomFlatFieldFile() = default;
 
-    ~CustomFlatFieldFile() { m_file.close(); }
+    ~CustomFlatFieldFile() override { m_file.close(); }
 
     void read_into(std::byte *image_buf,
                    const ssize_t data_types_bytes = 8) override {
         uint32_t strip_index;
         double flatfield_value, flatfield_error, val_1, val_2;
         std::string line;
-
         try {
             std::getline(m_file, line); // skip header
             while (m_file >> strip_index >> flatfield_value >>
                    flatfield_error >> val_1 >> val_2) {
                 std::memcpy(image_buf, &flatfield_value,
                             sizeof(flatfield_value));
+                image_buf += data_types_bytes;
                 std::memcpy(image_buf, &flatfield_error,
-                            sizeof(flatfield_error));            
+                            sizeof(flatfield_error));
 
-                image_buf += 2*data_types_bytes;
+                image_buf += data_types_bytes;
             }
         } catch (const std::exception &e) {
             LOG(TLogLevel::logERROR) << e.what();
