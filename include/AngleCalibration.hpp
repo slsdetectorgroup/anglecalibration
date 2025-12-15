@@ -80,13 +80,13 @@ class AngleCalibration {
      * base_peak_ROI, base_peak + base_peak_ROI] given in angles defaults to
      * '0.05°'
      * */
-    void set_base_peak_ROI(const double base_peak_roi_ = 0.05);
+    void set_base_peak_ROI_width(const double base_peak_roi_ = 0.05);
 
-    /** @brief base peak region of interest
+    /** @brief half odf the width of base peak region of interest
      * @return width of base peak ROI [degrees] e.g. [base_peak - base_peak_ROI,
      * base_peak + base_peak_ROI] given in angles [degrees]
      * */
-    double get_base_peak_ROI() const;
+    double get_base_peak_ROI_width() const;
 
     std::shared_ptr<MythenDetectorSpecifications>
     get_detector_specifications() const;
@@ -427,7 +427,7 @@ class AngleCalibration {
      * [base_peak_angle - base_peak_roi, base_peak_angle +
      * base_peak_roi] [degrees]
      */
-    double base_peak_roi = 0.05;
+    double base_peak_roi_width = 0.05;
 
     // TODO maybe deprecated - only compute in member function
     ssize_t num_bins{};
@@ -485,10 +485,10 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     if constexpr (base_peak_ROI_only) {
         number_of_bins = get_base_peak_ROI_num_bins(); // fixed angle width bins
                                                        // in base peak ROI
-        left_boundary_roi_base_peak = (base_peak_angle - base_peak_roi +
+        left_boundary_roi_base_peak = (base_peak_angle - base_peak_roi_width +
                                        0.5 * histogram_bin_width); // in degrees
         right_boundary_roi_base_peak =
-            (base_peak_angle + base_peak_roi -
+            (base_peak_angle + base_peak_roi_width -
              0.5 * histogram_bin_width); // in degrees
     } else {
         number_of_bins = new_number_of_bins();
@@ -597,7 +597,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                 proper_bin_index =
                     bin_index -
                     (static_cast<ssize_t>(
-                        (base_peak_angle - base_peak_roi) /
+                        (base_peak_angle - base_peak_roi_width) /
                         histogram_bin_width)); // bin index starts at zero
             } else {
                 proper_bin_index =

@@ -47,14 +47,18 @@ double AngleCalibration::get_histogram_bin_width() const {
 }
 
 ssize_t AngleCalibration::get_base_peak_ROI_num_bins() const {
-    return 2 * static_cast<ssize_t>(base_peak_roi / histogram_bin_width) + 1;
+    return 2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) +
+           1;
 }
 
-void AngleCalibration::set_base_peak_ROI(const double base_peak_roi_) {
-    base_peak_roi = base_peak_roi_;
+void AngleCalibration::set_base_peak_ROI_width(
+    const double base_peak_roi_width_) {
+    base_peak_roi_width = base_peak_roi_width_;
 }
 
-double AngleCalibration::get_base_peak_ROI() const { return base_peak_roi; }
+double AngleCalibration::get_base_peak_ROI_width() const {
+    return base_peak_roi_width;
+}
 
 std::shared_ptr<MythenDetectorSpecifications>
 AngleCalibration::get_detector_specifications() const {
@@ -299,7 +303,8 @@ bool AngleCalibration::base_peak_is_in_module(
     std::optional<double> bounds_in_angles) const {
 
     if (!bounds_in_angles.has_value()) {
-        bounds_in_angles = base_peak_roi; // take ROI of base peak in angles
+        bounds_in_angles =
+            base_peak_roi_width; // take ROI of base peak in angles
     }
 
     double left_module_boundary_angle =
@@ -461,7 +466,7 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
                                                 PlotHandle plot) const {
 
     ssize_t num_bins_in_ROI =
-        2 * static_cast<ssize_t>(base_peak_roi / histogram_bin_width) + 1;
+        2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;
     // used to calculate similarity criterion between peaks of different
     // acquisition S_index = sum_i^num_runs
     // photon_count^index*photon_variance
@@ -514,7 +519,8 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
                 auto bin_to_diffraction_angle_base_peak_ROI_only =
                     [this](const size_t bin_index) {
                         return bin_index * this->histogram_bin_width -
-                               this->base_peak_roi + this->base_peak_angle;
+                               this->base_peak_roi_width +
+                               this->base_peak_angle;
                     };
 
                 std::string filename =
@@ -523,7 +529,7 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
 
                 plot->append_to_plot(
                     fixed_angle_width_bins_photon_counts.view(),
-                    {0, 2 * static_cast<ssize_t>(base_peak_roi /
+                    {0, 2 * static_cast<ssize_t>(base_peak_roi_width /
                                                  histogram_bin_width) +
                             1},
                     bin_to_diffraction_angle_base_peak_ROI_only, dataset_name);
@@ -558,7 +564,7 @@ void AngleCalibration::plot_last_calibration_step(const size_t module_index,
                                                   PlotHandle plot) const {
 
     ssize_t num_bins_in_ROI =
-        2 * static_cast<ssize_t>(base_peak_roi / histogram_bin_width) + 1;
+        2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;
 
 #ifdef ANGCAL_PLOT
     auto data_file_path =
@@ -601,7 +607,8 @@ void AngleCalibration::plot_last_calibration_step(const size_t module_index,
                 auto bin_to_diffraction_angle_base_peak_ROI_only =
                     [this](const size_t bin_index) {
                         return bin_index * this->histogram_bin_width -
-                               this->base_peak_roi + this->base_peak_angle;
+                               this->base_peak_roi_width +
+                               this->base_peak_angle;
                     };
 
                 std::string filename =
@@ -610,7 +617,7 @@ void AngleCalibration::plot_last_calibration_step(const size_t module_index,
 
                 plot->append_to_plot(
                     fixed_angle_width_bins_photon_counts.view(),
-                    {0, 2 * static_cast<ssize_t>(base_peak_roi /
+                    {0, 2 * static_cast<ssize_t>(base_peak_roi_width /
                                                  histogram_bin_width) +
                             1},
                     bin_to_diffraction_angle_base_peak_ROI_only, dataset_name);

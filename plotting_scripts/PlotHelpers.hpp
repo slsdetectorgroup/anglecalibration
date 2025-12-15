@@ -18,7 +18,7 @@ class PlotHelper {
             [this](const ssize_t bin_index) {
                 return (bin_index *
                             m_anglecalibration->get_histogram_bin_width() -
-                        m_anglecalibration->get_base_peak_ROI() +
+                        m_anglecalibration->get_base_peak_ROI_width() +
                         m_anglecalibration->get_base_peak_angle());
             };
     }

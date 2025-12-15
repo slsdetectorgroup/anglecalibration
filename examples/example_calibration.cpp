@@ -291,7 +291,7 @@ int main() {
 
     anglecalibration.set_base_peak_angle(base_peak_angle);
 
-    anglecalibration.set_base_peak_ROI(0.18);
+    anglecalibration.set_base_peak_ROI_width(0.18);
 
     // anglecalibration.set_histogram_bin_width(0.01);
 
@@ -370,7 +370,7 @@ int main() {
 #endif
 
     // anglecalibration.calibrate(filelist, base_peak_angle, module_index);
-    anglecalibration.calibrate(filelist, base_peak_angle, output_filename);
+    anglecalibration.calibrate(filelist, base_peak_angle); //, output_filename);
 
-    anglecalibration.write_to_file(output_filename);
+    // anglecalibration.write_to_file(output_filename);
 }
