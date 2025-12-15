@@ -69,6 +69,7 @@ void get_angle_range_of_module(
 
     double min_left_module_angle = max_left_module_angle;
     double min_right_module_angle = max_right_module_angle;
+
     for (auto &frame : file_list) {
         detector_angle = mythen_file_reader->read_frame(frame).detector_angle;
         double left_module_angle =
@@ -91,10 +92,22 @@ void get_angle_range_of_module(
     }
 
     LOG(TLogLevel::logINFO) << fmt::format(
-        "minimum module angle: {},{}, maximum module angle: {},{} for module "
+        "minimum module ROI [degrees]: {},{}, maximum module ROI [degrees]: "
+        "{},{} for module "
         "{}",
         min_left_module_angle, min_right_module_angle, max_left_module_angle,
         max_right_module_angle, module_index);
+}
+
+void get_module_angle_ranges(
+    std::shared_ptr<MythenFileReader> mythen_file_reader,
+    const std::vector<std::string> &file_list,
+    AngleCalibration &anglecalibration, const ssize_t num_modules) {
+
+    for (ssize_t module_idx = 0; module_idx < num_modules; ++module_idx) {
+        get_angle_range_of_module(mythen_file_reader, file_list,
+                                  anglecalibration, module_idx);
+    }
 }
 
 #ifdef ANGCAL_PLOT
@@ -105,26 +118,42 @@ void get_angle_range_of_module(
  */
 void select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
                       std::shared_ptr<MythenFileReader> mythen_file_reader,
-                      const std::vector<std::string> &filelist) {
+                      const std::vector<std::string> &filelist,
+                      const size_t module_index = 0) {
     PlotHelper plotter(anglecalibration);
 
     std::shared_ptr<Gnuplot> gp = std::make_shared<Gnuplot>();
 
+    auto detector_angle_range = std::make_pair(6.0, 33.0);
+    double strip_angle = anglecalibration->diffraction_angle_from_DG_parameters(
+        module_index, 0.0, 0, -0.5);
+    detector_angle_range.first -= strip_angle - 5.0;
+    detector_angle_range.second -= strip_angle + 5.0;
+
+    LOG(TLogLevel::logINFO) << fmt::format(
+        "adjusted detector angle range for module {}: {} to {}", module_index,
+        detector_angle_range.first, detector_angle_range.second);
+
     for (const auto &file : filelist) {
 
-        LOG(TLogLevel::logINFO) << fmt::format("reading file {}", file);
+        LOG(TLogLevel::logDEBUG) << fmt::format("reading file {}", file);
         auto frame = mythen_file_reader->read_frame(file);
 
-        if (frame.detector_angle > 6.0 || frame.detector_angle > 33.0) {
+        if (frame.detector_angle > detector_angle_range.first &&
+            frame.detector_angle < detector_angle_range.second) {
+
+            LOG(TLogLevel::logINFO)
+                << fmt::format("plotting file {} with detector angle {}", file,
+                               frame.detector_angle);
 
             // plot module
             auto module_redistributed_to_fixed_angle_bins =
                 anglecalibration
                     ->redistribute_photon_counts_to_fixed_angle_width_bins(
-                        frame, 0);
+                        frame, module_index);
 
             plotter.plot_module_redistributed_to_fixed_angle_width_bins(
-                0, module_redistributed_to_fixed_angle_bins.view(),
+                module_index, module_redistributed_to_fixed_angle_bins.view(),
                 frame.detector_angle, gp);
 
             plotter.pause();
@@ -151,6 +180,8 @@ int main() {
 
     std::string acquisition_fileprefix = "ang1up_22keV_MIX_0p5mm_48M_a_";
 
+    const size_t num_files = 1501;
+
     auto output_filename =
         file_path / "angcal_Jul2025_P12_0p0105_calibrated.off";
 
@@ -165,9 +196,13 @@ int main() {
 
     auto initial_angles_filename = file_path / "angcal_Mar2021_P10.off";
 
-    std::string acquisition_fileprefix = "ang1dnSi0p3mm_";
+    std::string acquisition_fileprefix = "ang1upSi0p3mm_";
+
+    const size_t num_files = 1001;
 
     auto output_filename = file_path / "angcal_Mar2021_P10_calibrated.off";
+
+    // base peaks: 31.588, 23.5126, 28.771
     */
 
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
@@ -220,7 +255,7 @@ int main() {
 
     LOG(TLogLevel::logINFO) << "read initial parameters from file";
 
-    std::vector<std::string> filelist(1501); // 1501
+    std::vector<std::string> filelist(num_files); // 1501
 
     size_t i = 0;
     std::generate(filelist.begin(), filelist.end(),
@@ -232,12 +267,21 @@ int main() {
     auto [left_angle, right_angle] =
         get_detector_range(mythen_file_reader, filelist);
 
-    LOG(TLogLevel::logINFO)
-        << fmt::format("detector range: [{},{}]", left_angle, right_angle);
+    LOG(TLogLevel::logINFO) << fmt::format("detector range [degrees]: [{},{}]",
+                                           left_angle, right_angle);
+
+    LOG(TLogLevel::logINFO) << fmt::format(
+        "range of detector [degrees]: {}",
+        anglecalibration.diffraction_angle_from_DG_parameters(0, 0.0, 0, -0.5) -
+            anglecalibration.diffraction_angle_from_DG_parameters(23, 0.0, 1279,
+                                                                  +0.5));
+
+    // get_module_angle_ranges(mythen_file_reader, filelist, anglecalibration,
+    // mythen_detector_ptr->max_modules());
 
 #ifdef ANGCAL_PLOT
     // select_base_peak(std::make_shared<AngleCalibration>(anglecalibration),
-    // mythen_file_reader, filelist);
+    // mythen_file_reader, filelist, 18);
 #endif
 
     // take a tabulated peak as base peak
@@ -253,15 +297,9 @@ int main() {
 
     // plot some stuff
     MythenFrame frame = mythen_file_reader->read_frame(
-        file_path / acquisition_fileprefix.append("0165.h5")); // 0170.h5
+        file_path / acquisition_fileprefix.append("1014.h5")); // 0165.h5
 
-    LOG(TLogLevel::logINFO) << fmt::format(
-        "angle range of detector: {}",
-        anglecalibration.diffraction_angle_from_DG_parameters(0, 0.0, 0, -0.5) -
-            anglecalibration.diffraction_angle_from_DG_parameters(23, 0.0, 1279,
-                                                                  +0.5));
-
-    size_t module_index = 0;
+    size_t module_index = 18; // 0
 
 #ifdef ANGCAL_PLOT
 
@@ -332,7 +370,7 @@ int main() {
 #endif
 
     // anglecalibration.calibrate(filelist, base_peak_angle, module_index);
-    // anglecalibration.calibrate(filelist, base_peak_angle, output_filename);
+    anglecalibration.calibrate(filelist, base_peak_angle, output_filename);
 
-    // anglecalibration.write_to_file(output_filename);
+    anglecalibration.write_to_file(output_filename);
 }

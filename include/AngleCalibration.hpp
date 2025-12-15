@@ -402,6 +402,9 @@ class AngleCalibration {
                         const double center, const double conversion,
                         const double offset) const;
 
+    void plot_last_calibration_step(const size_t module_index,
+                                    PlotHandle gp) const;
+
   private:
     DGParameters DGparameters{};
 
@@ -472,29 +475,34 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     NDView<double, 1> inverse_fixed_angle_width_bins_photon_counts_variance,
     std::optional<NDView<double, 1>> S0, std::optional<NDView<double, 1>> S1,
     std::optional<NDView<double, 1>> S2) const {
-    double left_boundary_roi_base_peak =
-        mythen_detector->min_angle(); // dummy values
-    double right_boundary_roi_base_peak =
-        mythen_detector->max_angle(); // dummy values
 
-    ssize_t number_of_bins = new_number_of_bins();
+    ssize_t number_of_bins{}; // number of bins using fixed angle width bins
+    double left_boundary_roi_base_peak{};  // left boundary of base peak ROI
+                                           // [degrees]
+    double right_boundary_roi_base_peak{}; // right boundary of base peak ROI
+                                           // [degrees]
+
     if constexpr (base_peak_ROI_only) {
-        number_of_bins = get_base_peak_ROI_num_bins();
+        number_of_bins = get_base_peak_ROI_num_bins(); // fixed angle width bins
+                                                       // in base peak ROI
+        left_boundary_roi_base_peak = (base_peak_angle - base_peak_roi +
+                                       0.5 * histogram_bin_width); // in degrees
+        right_boundary_roi_base_peak =
+            (base_peak_angle + base_peak_roi -
+             0.5 * histogram_bin_width); // in degrees
+    } else {
+        number_of_bins = new_number_of_bins();
+        left_boundary_roi_base_peak =
+            mythen_detector->min_angle(); // dummy values
+        right_boundary_roi_base_peak =
+            mythen_detector->max_angle(); // dummy values
     }
 
     NDArray<double, 1> sum_statistical_weights(
         std::array<ssize_t, 1>{number_of_bins},
         0.0); // used to normalize statistical weights
 
-    if constexpr (base_peak_ROI_only) {
-
-        left_boundary_roi_base_peak = (base_peak_angle - base_peak_roi +
-                                       0.5 * histogram_bin_width); // in degrees
-        right_boundary_roi_base_peak =
-            (base_peak_angle + base_peak_roi -
-             0.5 * histogram_bin_width); // in degrees
-    }
-
+    // iterate over all strips of module
     for (size_t strip_index = 0;
          strip_index < mythen_detector->strips_per_module(); ++strip_index) {
 
@@ -507,19 +515,23 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         }
 
         double left_strip_boundary_angle = diffraction_angle_from_BC_parameters(
-            module_index, frame.detector_angle, strip_index, -0.5); // -0.5
+            module_index, frame.detector_angle, strip_index,
+            -0.5); // left strip boundary in angles [degrees]
 
         double right_strip_boundary_angle =
             diffraction_angle_from_BC_parameters(
-                module_index, frame.detector_angle, strip_index, +0.5);
+                module_index, frame.detector_angle, strip_index,
+                +0.5); // right strip boundary in angles [degrees]
 
+        // skip strip if not in ROI
         if constexpr (base_peak_ROI_only) {
             if (left_strip_boundary_angle > right_boundary_roi_base_peak ||
                 right_strip_boundary_angle < left_boundary_roi_base_peak) {
-                continue; // skip strip if not in ROI
+                continue;
             }
         }
 
+        // get corrected photon counts and propagate error
         auto [corrected_photon_counts, corrected_photon_counts_variance] =
             photon_count_correction(frame.photon_counts(global_strip_index) + 1,
                                     global_strip_index,
@@ -529,9 +541,11 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             1.0 / corrected_photon_counts_variance;
 
         double strip_width_angle =
-            std::abs(right_strip_boundary_angle - left_strip_boundary_angle);
+            std::abs(right_strip_boundary_angle -
+                     left_strip_boundary_angle); // strip width in angles
         // angular_strip_width_from_BC_parameters(module_index, strip_index);
 
+        // redistribute to fixed angle width bins
         double photon_counts_per_bin =
             corrected_photon_counts * histogram_bin_width / strip_width_angle;
 
@@ -562,7 +576,8 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         }
 
         size_t proper_bin_index =
-            0; // the computed bin indices dont start at zero
+            0; // the computed bin indices dont start at zero but are relative
+               // to detector angle and strip index
 
         for (ssize_t bin_index = left_bin_index_covered_by_strip;
              bin_index < right_bin_index_covered_by_strip; ++bin_index) {

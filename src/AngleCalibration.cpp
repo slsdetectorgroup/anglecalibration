@@ -1,4 +1,5 @@
 #include "AngleCalibration.hpp"
+#include "helpers/utils.hpp"
 
 #include "logger.hpp"
 
@@ -473,11 +474,103 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
         std::filesystem::current_path().parent_path() / "build" / "data";
     if (!std::filesystem::exists(data_file_path))
         std::filesystem::create_directories(data_file_path);
-    plot->clear();
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    if (plot) {
+        plot->clear();
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
 #endif
 
     size_t num_runs = 0;
+    for (const auto &file : file_list) {
+
+        LOG(TLogLevel::logDEBUG1) << "file: " << file;
+
+        MythenFrame frame = mythen_file_reader->read_frame(file);
+
+        // base peak angle is in module
+        if (base_peak_is_in_module(module_index, frame.detector_angle)) {
+
+            LOG(TLogLevel::logDEBUG1) << "file name: " << file;
+            LOG(TLogLevel::logDEBUG1)
+                << fmt::format("detector angle: {}", frame.detector_angle);
+
+            NDArray<double, 1> fixed_angle_width_bins_photon_counts(
+                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+            NDArray<double, 1>
+                inverse_fixed_angle_width_bins_photon_counts_variance(
+                    std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+            // calculates flatfield normalized photon counts and
+            // photon_count_variance for ROI around base_peak and
+            // redistributes to fixed angle width bins
+
+            redistribute_photon_counts_to_fixed_angle_width_bins<true>(
+                module_index, frame,
+                fixed_angle_width_bins_photon_counts.view(),
+                inverse_fixed_angle_width_bins_photon_counts_variance.view(),
+                S0.view(), S1.view(), S2.view());
+
+#ifdef ANGCAL_PLOT
+            if (plot) {
+                auto bin_to_diffraction_angle_base_peak_ROI_only =
+                    [this](const size_t bin_index) {
+                        return bin_index * this->histogram_bin_width -
+                               this->base_peak_roi + this->base_peak_angle;
+                    };
+
+                std::string filename =
+                    std::filesystem::path(file).stem().string() + ".dat";
+                auto dataset_name = data_file_path / filename;
+
+                plot->append_to_plot(
+                    fixed_angle_width_bins_photon_counts.view(),
+                    {0, 2 * static_cast<ssize_t>(base_peak_roi /
+                                                 histogram_bin_width) +
+                            1},
+                    bin_to_diffraction_angle_base_peak_ROI_only, dataset_name);
+                // plot->pause();
+            }
+#endif
+            ++num_runs;
+        }
+    }
+
+    if (num_runs == 0) {
+        throw NoBasePeakOverLapError();
+    }
+
+#ifdef ANGCAL_PLOT
+    if (plot) {
+        plot->flush(); // make plot appear
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(1000)); // let gnuplot update
+    }
+#endif
+
+    double similarity_of_peaks =
+        num_runs == 0
+            ? std::numeric_limits<double>::infinity()
+            : similarity_criterion(S0.view(), S1.view(), S2.view(), num_runs);
+    LOG(TLogLevel::logDEBUG1) << "similarity_of_peaks: " << similarity_of_peaks;
+    return similarity_of_peaks;
+}
+
+void AngleCalibration::plot_last_calibration_step(const size_t module_index,
+                                                  PlotHandle plot) const {
+
+    ssize_t num_bins_in_ROI =
+        2 * static_cast<ssize_t>(base_peak_roi / histogram_bin_width) + 1;
+
+#ifdef ANGCAL_PLOT
+    auto data_file_path =
+        std::filesystem::current_path().parent_path() / "build" / "data";
+    if (!std::filesystem::exists(data_file_path))
+        std::filesystem::create_directories(data_file_path);
+    if (plot) {
+        plot->clear();
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+#endif
+
     for (const auto &file : file_list) {
 
         LOG(TLogLevel::logDEBUG1) << "file: " << file;
@@ -501,52 +594,40 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
             redistribute_photon_counts_to_fixed_angle_width_bins<true>(
                 module_index, frame,
                 fixed_angle_width_bins_photon_counts.view(),
-                inverse_fixed_angle_width_bins_photon_counts_variance.view(),
-                S0.view(), S1.view(), S2.view());
+                inverse_fixed_angle_width_bins_photon_counts_variance.view());
 
 #ifdef ANGCAL_PLOT
-            auto bin_to_diffraction_angle_base_peak_ROI_only =
-                [this](const size_t bin_index) {
-                    return bin_index * this->histogram_bin_width -
-                           this->base_peak_roi + this->base_peak_angle;
-                };
+            if (plot) {
+                auto bin_to_diffraction_angle_base_peak_ROI_only =
+                    [this](const size_t bin_index) {
+                        return bin_index * this->histogram_bin_width -
+                               this->base_peak_roi + this->base_peak_angle;
+                    };
 
-            std::string filename =
-                std::filesystem::path(file).stem().string() + ".dat";
-            auto dataset_name = data_file_path / filename;
+                std::string filename =
+                    std::filesystem::path(file).stem().string() + ".dat";
+                auto dataset_name = data_file_path / filename;
 
-            plot->append_to_plot(
-                fixed_angle_width_bins_photon_counts.view(),
-                {0,
-                 2 * static_cast<ssize_t>(base_peak_roi / histogram_bin_width) +
-                     1},
-                bin_to_diffraction_angle_base_peak_ROI_only, dataset_name);
-            // plot->pause();
+                plot->append_to_plot(
+                    fixed_angle_width_bins_photon_counts.view(),
+                    {0, 2 * static_cast<ssize_t>(base_peak_roi /
+                                                 histogram_bin_width) +
+                            1},
+                    bin_to_diffraction_angle_base_peak_ROI_only, dataset_name);
+                // plot->pause();
+            }
+
 #endif
-            ++num_runs;
         }
     }
 
-    // handle those cases
-    if (num_runs == 0) {
-        LOG(TLogLevel::logDEBUG) << "there was no frame where base peak ROI "
-                                    "overlapped with module region";
-    }
-
 #ifdef ANGCAL_PLOT
-    plot->flush(); // make plot appear
-    std::this_thread::sleep_for(
-        std::chrono::milliseconds(1000)); // let gnuplot update
+    if (plot) {
+        plot->flush(); // make plot appear
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(100)); // let gnuplot update
+    }
 #endif
-
-    // TODO: give a warning if there was no acquisition for a module
-
-    double similarity_of_peaks =
-        num_runs == 0
-            ? std::numeric_limits<double>::infinity()
-            : similarity_criterion(S0.view(), S1.view(), S2.view(), num_runs);
-    LOG(TLogLevel::logDEBUG1) << "similarity_of_peaks: " << similarity_of_peaks;
-    return similarity_of_peaks;
 }
 
 // TODO: maybe have a function where we calculate the average photon counts
@@ -582,12 +663,29 @@ void AngleCalibration::calibrate(
 #ifdef ANGCAL_PLOT
             std::string plot_title =
                 fmt::format("Base Peaks for module {} ", module_index);
-            optimization_algorithm(
-                module_index,
-                std::make_shared<PlotCalibrationProcess>(plot_title));
+            auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
+
+            try {
+                optimization_algorithm(module_index, nullptr);
+            } catch (const NoBasePeakOverLapError &e) {
+                LOG(angcal::TLogLevel::logINFO)
+                    << e.what()
+                    << fmt::format(" Skipping module {}.", module_index);
+                continue;
+            }
+
+            plot_last_calibration_step(module_index, plot);
 #else
-            optimization_algorithm(module_index);
+            try {
+                optimization_algorithm(module_index);
+            } catch (const NoBasePeakOverLapError &e) {
+                LOG(angcal::TLogLevel::logINFO)
+                    << e.what()
+                    << fmt::format(" Skipping module {}.", module_index);
+                continue;
+            }
 #endif
+
         } else {
             LOG(TLogLevel::logINFO)
                 << fmt::format("module {} is disconnected", module_index);
@@ -620,10 +718,13 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
 #ifdef ANGCAL_PLOT
         std::string plot_title =
             fmt::format("Base Peaks for module {} ", module_index);
+
         optimization_algorithm(
             module_index, std::make_shared<PlotCalibrationProcess>(plot_title));
 #else
+
         optimization_algorithm(module_index);
+
 #endif
     }
 }
@@ -748,7 +849,7 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
         for (size_t parameter_index = 0;
              parameter_index < shift_parameters.size(); ++parameter_index) {
 
-            LOG(TLogLevel::logINFO)
+            LOG(TLogLevel::logDEBUG)
                 << fmt::format("Iteration {} with peak similarity of {}",
                                iteration_index, previous_similarity_of_peaks);
 
@@ -785,9 +886,6 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
         LOG(TLogLevel::logINFO)
             << "peak similarity: " << previous_similarity_of_peaks;
 
-#ifdef ANGCAL_PLOT
-        PlotHelper::pause(); // dont know if handled properly more for debugging
-#endif
         // deviates from Antonios code
         // calculate Hessian matrix
 
@@ -848,7 +946,7 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
             ((Dxx + regularization_term) * Dy - Dyx * Dx) *
                 inverse_determinant);
 
-        LOG(TLogLevel::logINFO) << fmt::format(
+        LOG(TLogLevel::logDEBUG) << fmt::format(
             " fine tune parameters in direction of steepest descent: [{},{}]",
             steepest_descent.first, steepest_descent.second);
 
@@ -895,7 +993,7 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
             BCparameters.module_center_sample_distances(module_index) +=
                 steepest_descent.second;
 
-            LOG(TLogLevel::logINFO)
+            LOG(TLogLevel::logDEBUG)
                 << fmt::format("Iteration {} with peak similarity of {}",
                                iteration_index, previous_similarity_of_peaks);
 
