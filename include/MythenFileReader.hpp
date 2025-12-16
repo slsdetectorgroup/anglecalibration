@@ -36,15 +36,24 @@ counter_mask_to_channel_indices(uint8_t counter_mask) {
 }
 
 struct MythenFrame : public aare::Frame {
+    /// @brief detector angle in degrees
     double detector_angle{};
     uint64_t incident_intensity{}; // I_0
-    double exposure_time{};        // in seconds
+    /// @brief exposure time in seconds
+    double exposure_time{}; // in seconds
+
+    /// @brief counter mask given as binary representation (counter 0 is most
+    /// significant bit)
     std::array<uint8_t, 3> channel_mask{};
 
     MythenFrame() = delete;
     MythenFrame(aare::Frame &&frame) : aare::Frame(std::move(frame)){};
     MythenFrame(MythenFrame &&) = default; // important for move
 
+    /**
+     * @brief photon counts for each channel
+     * stored as 1d array
+     */
     NDView<uint32_t, 1> photon_counts() {
         std::array<ssize_t, 1> shape = {static_cast<ssize_t>(this->rows()) *
                                         static_cast<ssize_t>(this->cols())};
@@ -52,16 +61,23 @@ struct MythenFrame : public aare::Frame {
         return NDView<uint32_t, 1>(data, shape);
     }
 
+    /**
+     * @brief photon counts at specfic channel
+     * @param col channel index
+     */
     uint32_t photon_counts(size_t col, size_t row = 0) const {
         return *reinterpret_cast<uint32_t *>(this->pixel_ptr(row, col));
     }
 
+    /**
+     * @brief size of frame (given in pixels)
+     */
     ssize_t size() const { return static_cast<ssize_t>(Frame::size()); }
 };
 
-/*
-abstract base class for MythenFileReader
-*/
+/**
+ * @brief abstract base class for MythenFileReader
+ */
 class MythenFileReader {
   public:
     MythenFileReader() = default;
@@ -72,16 +88,13 @@ class MythenFileReader {
 };
 
 /**
- * @brief MythenFileReader to read raw files in the sls detector format
- * @param detector_angles path to file storing detector angles of the
- * acquisitions (need to be stored as binary file of doubles)
- * @param incident_intensities path to file storing incident intensities of the
- * acquisitions (need to be stored as binary file of uint64_t)
+ * @brief MythenFileReader to read raw files following format from
+ * slsDetectorPackage
  */
 class RawMythenFileReader : public MythenFileReader {
 
   public:
-    RawMythenFileReader() = default;
+    // RawMythenFileReader() = default;
 
     /**
      * @brief Constructor for MythenFileReader class
@@ -99,14 +112,20 @@ class RawMythenFileReader : public MythenFileReader {
         try {
             detector_angles_file.open(detector_angles_filename,
                                       std::ios_base::in);
+            if (!detector_angles_file.is_open())
+                throw std::runtime_error(fmt::format("Could not open file {}\n",
+                                                     detector_angles_filename));
         } catch (const std::exception &error) {
-            LOG(TLogLevel::logERROR) << "Could not open file\n";
+            LOG(TLogLevel::logERROR) << error.what();
         }
         try {
             incident_intensities_file.open(incident_intensities_filename,
                                            std::ios_base::in);
+            if (!incident_intensities_file.is_open())
+                throw std::runtime_error(fmt::format(
+                    "Could not open file {}\n", incident_intensities_filename));
         } catch (const std::exception &error) {
-            LOG(TLogLevel::logERROR) << "Could not open file\n";
+            LOG(TLogLevel::logERROR) << error.what();
         }
     };
 
@@ -117,8 +136,6 @@ class RawMythenFileReader : public MythenFileReader {
 
     /**
      * @brief read Mythenframe
-     * @warning the filename needs to include the acquisition index starting at
-     * zero
      */
     MythenFrame read_frame(const std::filesystem::path &file_name) override {
 
@@ -167,6 +184,9 @@ class RawMythenFileReader : public MythenFileReader {
             reinterpret_cast<char *>(&incident_intensity), sizeof(uint64_t));
     }
 
+    /**
+     * @brief gets the acquisition index from the filename
+     */
     size_t get_acquisition_index(const std::filesystem::path &filename) {
         std::string base_name = filename.stem();
         try {
@@ -186,11 +206,45 @@ class RawMythenFileReader : public MythenFileReader {
     std::ifstream incident_intensities_file{};
 };
 
-/** minimal version for custom mythen file reader */
-class CustomMythenFileReader : public HDF5FileReader, public MythenFileReader {
+/**
+ * @brief class to read MythenFiles following Epics file format
+ */
+class EpicsMythenFileReader : public HDF5FileReader, public MythenFileReader {
 
   public:
-    CustomMythenFileReader() = default;
+    /**
+     * @brief Default Constructor
+     * @note incident intensities not initialized will take the ones written by
+     * epics in the hdf5 file. For newer versions this will be garbage.
+     */
+    EpicsMythenFileReader() = default;
+
+    /**
+     * @brief Constructor
+     * @param incident_intensities path to file storing incident intensities of
+     * the acquisitions (need to be stored as binary file of uint64_t)
+     */
+    EpicsMythenFileReader(
+        const std::filesystem::path &incident_intensity_filename_)
+        : incident_intensities_filename(incident_intensity_filename_) {
+        // TODO maybe directly read into NDArray faster than always reading from
+        // filesystem
+        try {
+            incident_intensities_file.open(incident_intensities_filename,
+                                           std::ios_base::in);
+            if (!incident_intensities_file.is_open()) {
+                throw std::runtime_error(fmt::format(
+                    "Could not open file {}\n", incident_intensities_filename));
+            }
+        } catch (const std::exception &error) {
+            LOG(TLogLevel::logERROR) << error.what();
+        }
+    }
+
+    ~EpicsMythenFileReader() {
+        if (incident_intensities_file.is_open())
+            incident_intensities_file.close();
+    }
 
     /**
      * @brief read acquisition file from hdf5
@@ -212,14 +266,13 @@ class CustomMythenFileReader : public HDF5FileReader, public MythenFileReader {
         dataset_detector_angle.read_into_buffer(
             reinterpret_cast<std::byte *>(&frame.detector_angle));
 
-        /*
-        size_t acquisition_index = get_acquisition_index(file_name);
-
-        MythenFileReader::read_incident_intensity(acquisition_index,
-                                                  frame.incident_intensity);
-        */
-
-        read_incident_intensity(frame.incident_intensity);
+        if (incident_intensities_file.is_open()) {
+            const size_t acquisition_index = get_acquisition_index(file_name);
+            read_incident_intensity(acquisition_index,
+                                    frame.incident_intensity);
+        } else {
+            read_incident_intensity_from_hdf5(frame.incident_intensity);
+        }
 
         auto dataset_channel_number =
             get_dataset("/entry/instrument/NDAttributes/CounterMask");
@@ -236,13 +289,48 @@ class CustomMythenFileReader : public HDF5FileReader, public MythenFileReader {
         return frame;
     }
 
-    void read_incident_intensity(uint64_t incident_intensity) {
+    /**
+     * @brief reads the incident intensity from seperate file
+     */
+    void read_incident_intensity(const size_t acquisition_index,
+                                 uint64_t &incident_intensity) {
+        // TODO: add a contract check that it is a binary file of uint64_t
+        incident_intensities_file.seekg(
+            acquisition_index *
+            sizeof(uint64_t)); // what if its not stored as a double
+        incident_intensities_file.read(
+            reinterpret_cast<char *>(&incident_intensity), sizeof(uint64_t));
+    }
+
+    /**
+     * @brief reads the incident intensity from epics hdf5 files
+     */
+    void read_incident_intensity_from_hdf5(uint64_t incident_intensity) {
         auto dataset_incident_intensity =
             get_dataset("/entry/instrument/NDAttributes/Izero");
 
         dataset_incident_intensity.read_into_buffer(
             reinterpret_cast<std::byte *>(&incident_intensity));
     }
+
+  private:
+    /**
+     * @brief get the acquisition index from the filename
+     */
+    size_t get_acquisition_index(const std::filesystem::path &file_name) {
+        std::string base_name = file_name.stem();
+        try {
+            auto pos = base_name.rfind('_');
+            return static_cast<size_t>(std::stoi(base_name.substr(pos + 1)));
+        } catch (const std::invalid_argument &e) {
+            throw std::runtime_error(LOCATION +
+                                     "Could not parse acquisition index");
+        }
+    }
+
+  private:
+    std::string incident_intensities_filename{};
+    std::ifstream incident_intensities_file{};
 };
 
 /**

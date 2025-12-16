@@ -43,7 +43,7 @@ class AngleCalibration {
      * @param flat_field_ ptr to FlatField class storing inverse normalized flat
      field
      * @param mythen_file_reader optional, pass if you use custom acquisition
-     files - default: reads hdf5 files
+     files - default: reads hdf5 files following epics format
      * @param custom_file_ptr optional, pass if you use custom files to store
      initial angle parameters - default: initial angle parameters supports
      * following format module [module_index] center [center] +- [error]

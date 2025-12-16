@@ -11,29 +11,6 @@
 
 namespace angcal {
 
-/*
-class CustomMythenFile : public SimpleFileInterface {
-  public:
-    CustomMythenFile() = default;
-
-    ~CustomMythenFile() { m_file.close(); }
-
-    void read_into(std::byte *image_buf,
-                   const ssize_t data_types_bytes = 4) override {
-        uint32_t strip_index, photon_count;
-        try {
-            while (m_file >> strip_index >> photon_count) {
-                std::memcpy(image_buf, &photon_count, sizeof(photon_count));
-
-                image_buf += data_types_bytes;
-            }
-        } catch (const std::exception &e) {
-            LOG(TLogLevel::logERROR) << e.what();
-        }
-    }
-};
-*/
-
 class CustomFlatFieldFile : public SimpleFileInterface {
   public:
     CustomFlatFieldFile() = default;

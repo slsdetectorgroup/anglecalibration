@@ -104,7 +104,7 @@ int main() {
 
     flat_field_ptr->calculate_inverse_normalized_flatfield<true>();
 
-    auto mythen_file_reader = std::make_shared<CustomMythenFileReader>();
+    auto mythen_file_reader = std::make_shared<EpicsMythenFileReader>();
 
     AngleCalibration anglecalibration(mythen_detector_ptr, flat_field_ptr,
                                       mythen_file_reader);
