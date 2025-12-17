@@ -39,11 +39,6 @@ void define_MythenFrame_bindings(py::module &m) {
 }
 
 void define_MythenFileReader_bindings(py::module &m) {
-    /*
-    py::class_<MythenFileReader, std::shared_ptr<MythenFileReader>>(
-        m, "MythenFileReader")
-        .def(py::init<>());
-    */
 
     py::class_<RawMythenFileReader, std::shared_ptr<RawMythenFileReader>>(
         m, "RawMythenFileReader")

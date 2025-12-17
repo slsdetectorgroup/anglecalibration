@@ -167,14 +167,13 @@ set(PUBLICHEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CustomFiles.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Flatfield.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/helpers/FileInterface.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/helpers/utils.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/Hdf5FileReader.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/helpers/custom_errors.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/helpers/Hdf5FileReader.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/logger.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenFileReader.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenDetectorSpecifications.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Parameters.hpp
 ) 
-
 
 set(SourceFiles 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AngleCalibration.cpp

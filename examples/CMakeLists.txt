@@ -1,4 +1,5 @@
 add_executable(example)
+
 target_link_libraries(example PRIVATE angle_calibration compiler_flags)
 set_target_properties(example PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}

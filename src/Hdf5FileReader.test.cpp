@@ -9,8 +9,8 @@
 
 #include <H5Cpp.h>
 
-#include "Hdf5FileReader.hpp"
 #include "aare/NDArray.hpp"
+#include "helpers/Hdf5FileReader.hpp"
 
 #include <catch2/catch_all.hpp>
 #include <catch2/catch_test_macros.hpp>

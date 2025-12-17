@@ -149,7 +149,7 @@ class FlatField {
     }
 
     /**
-     * read flatfield from file
+     * read normalized flatfield from file
      * @warning only works if member m_custom_detectot_file_ptr supports reading
      * the format
      */
