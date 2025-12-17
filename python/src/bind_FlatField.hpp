@@ -16,9 +16,12 @@ void define_FlatField_binding(py::module &m) {
              py::arg("file_interface") = std::nullopt)
 
         .def("create_flatfield_from_filelist",
-             [](FlatField &self, const std::filesystem::path &file_list, const std::string& incident_intensities) {
-                 self.create_flatfield_from_filelist(file_list, incident_intensities);
-             }) 
+             [](FlatField &self,
+                std::shared_ptr<MythenFileReader> mythen_file_reader,
+                const std::filesystem::path &file_list) {
+                 self.create_flatfield_from_filelist(mythen_file_reader,
+                                                     file_list);
+             })
 
         .def("read_flatfield_from_file",
              [](FlatField &self, const std::string &filename) {

@@ -461,9 +461,8 @@ AngleCalibration::photon_count_correction(double photon_counts,
         flatfield_normalized_photon_counts_variance, I0);
 }
 
-double
-AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
-                                                PlotHandle plot) const {
+double AngleCalibration::calculate_similarity_of_peaks(
+    const size_t module_index, [[maybe_unused]] PlotHandle plot) const {
 
     ssize_t num_bins_in_ROI =
         2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;
@@ -560,8 +559,8 @@ AngleCalibration::calculate_similarity_of_peaks(const size_t module_index,
     return similarity_of_peaks;
 }
 
-void AngleCalibration::plot_last_calibration_step(const size_t module_index,
-                                                  PlotHandle plot) const {
+void AngleCalibration::plot_last_calibration_step(
+    const size_t module_index, [[maybe_unused]] PlotHandle plot) const {
 
     ssize_t num_bins_in_ROI =
         2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;

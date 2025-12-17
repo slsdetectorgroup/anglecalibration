@@ -26,7 +26,7 @@ number_of_bins : int
 )")
         .def(py::init<std::shared_ptr<MythenDetectorSpecifications>,
                       std::shared_ptr<FlatField>,
-                      std::optional<std::shared_ptr<MythenFileReader>>,
+                      std::shared_ptr<MythenFileReader>,
                       std::optional<std::shared_ptr<SimpleFileInterface>>>(),
              py::arg("MythenDetectorSpecifications"), py::arg("FlatField"),
              py::arg("MythenFileReader") = std::nullopt,
