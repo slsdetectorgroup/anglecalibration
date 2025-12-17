@@ -48,23 +48,14 @@ class FlatField {
      * ssize_t cols, std::string reading_mode) rows, and cols define the
      * intended image size to read
      */
-    FlatField(std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
-              std::optional<std::shared_ptr<SimpleFileInterface>>
-                  custom_file_ptr = std::nullopt)
-        : mythen_detector(mythen_detector_) {
-
-        if (custom_file_ptr.has_value()) {
-            m_custom_file_ptr = custom_file_ptr.value();
-        }
-    }
+    FlatField(std::shared_ptr<MythenDetectorSpecifications> mythen_detector_)
+        : mythen_detector(mythen_detector_) {}
 
     /**
      * @brief sums up the photon counts for multiple acquisitions
      * @param filelist: path to file that stores the file paths to the aquired
      * data the list should contain multiple acquisitions for different detector
      * angles
-     * @warning only works if member m_custom_detectot_file_ptr supports reading
-     * the format
      */
     void create_flatfield_from_filelist(
         std::shared_ptr<MythenFileReader> file_reader,
@@ -133,33 +124,40 @@ class FlatField {
     // caveat user has to pass by value or move otherwise copied twice from
     // filesystem and then into member variable !!!!
     /**
-     * read flatfield from file
-     * @warning only works if member m_custom_detectot_file_ptr supports reading
-     * the format
+     * @brief read flatfield from file
+     * @param filename name of file
+     * @param file_reader custom file_reader to read flatfield file default:
+     * ascii file with //TODO finish documentation
      */
-    void read_flatfield_from_file(const std::string &filename) {
+    void read_flatfield_from_file(
+        const std::string &filename,
+        const std::shared_ptr<SimpleFileInterface> file_reader =
+            std::make_shared<CustomFlatFieldFile>()) {
         flat_field = NDArray<double, 2>(
             std::array<ssize_t, 2>{mythen_detector->num_strips(), 2});
-        m_custom_file_ptr->open(filename);
-        m_custom_file_ptr->read_into(
-            reinterpret_cast<std::byte *>(flat_field.data()),
-            8); // TODO: should be int though !!!
+        file_reader->open(filename);
+        file_reader->read_into(reinterpret_cast<std::byte *>(flat_field.data()),
+                               8); // TODO: should be int though !!!
 
-        m_custom_file_ptr->close();
+        file_reader->close();
     }
 
     /**
-     * read normalized flatfield from file
-     * @warning only works if member m_custom_detectot_file_ptr supports reading
-     * the format
+     * @brief read normalized flatfield from file
+     * @param filename name of file
+     * @param file_reader custom file_reader to read flatfield file default:
+     * ascii file with //TODO finish documentation
      */
-    void read_normalized_flatfield_from_file(const std::string &filename) {
+    void read_normalized_flatfield_from_file(
+        const std::string &filename,
+        const std::shared_ptr<SimpleFileInterface> file_reader =
+            std::make_shared<CustomFlatFieldFile>()) {
         normalized_flat_field = NDArray<double, 2>(
             std::array<ssize_t, 2>{mythen_detector->num_strips(), 2});
-        m_custom_file_ptr->open(filename);
-        m_custom_file_ptr->read_into(
+        file_reader->open(filename);
+        file_reader->read_into(
             reinterpret_cast<std::byte *>(normalized_flat_field.data()), 8);
-        m_custom_file_ptr->close();
+        file_reader->close();
     }
 
     /**
@@ -282,7 +280,5 @@ class FlatField {
     NDArray<double, 2> normalized_flat_field;
     NDArray<double, 2> inverse_normalized_flat_field;
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector;
-    std::shared_ptr<SimpleFileInterface> m_custom_file_ptr =
-        std::make_shared<CustomFlatFieldFile>();
 };
 } // namespace angcal

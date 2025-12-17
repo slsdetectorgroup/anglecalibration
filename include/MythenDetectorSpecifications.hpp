@@ -29,48 +29,28 @@ class MythenDetectorSpecifications {
     /**
      * @brief constructor for MythenDetectorSpecifications
      * @param custom_file_ptr (optional) pass Filereader to read bad channels
-     * file default If none is provided bad channel file is expected to be a
-     * text file where each line stores the channel index of a bad channel.
-     * Consecutive bad channels can be stored in one line by seperating the
-     * first and last channel index of the bad channel block e.g.
-     * bad_channel_index0-bad_channel_index1.)
+     * file default
      */
-    MythenDetectorSpecifications(
-        std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr =
-            std::nullopt) {
-
-        if (custom_file_ptr.has_value()) {
-            m_custom_file_ptr = custom_file_ptr.value();
-        }
+    MythenDetectorSpecifications() {
 
         bad_channels =
             NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips()}, false);
     }
 
+    // TODO: is this constructor still relevant? or does one read from the file?
     /**
      * @brief constructor for MythenDetectorSpecifications
      * @param max_modules Number of modules in detector (default 48).
      * @param exposure_time Exposure time [s].
      * @param num_counters Number of counters active.
      * @param bloffset
-     * @param custom_file_ptr (optional) pass Filereader to read bad channels
-     * file default If none is provided bad channel file is expected to be a
-     * text file where each line stores the channel index of a bad channel.
-     * Consecutive bad channels can be stored in one line by seperating the
-     * first and last channel index of the bad channel block e.g.
-     * bad_channel_index0-bad_channel_index1.)
      */
-    MythenDetectorSpecifications(
-        const size_t max_modules, const double exposure_time,
-        const double num_counters = 1, double bloffset = 1.532,
-        std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr =
-            std::nullopt)
+    MythenDetectorSpecifications(const size_t max_modules,
+                                 const double exposure_time,
+                                 const double num_counters = 1,
+                                 double bloffset = 1.532)
         : max_modules_(max_modules), num_counters_(num_counters),
           exposure_time_(exposure_time), bloffset_(bloffset) {
-
-        if (custom_file_ptr.has_value()) {
-            m_custom_file_ptr = custom_file_ptr.value();
-        }
 
         bad_channels =
             NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips()}, false);
@@ -78,12 +58,21 @@ class MythenDetectorSpecifications {
 
     /**
      * @brief read bad channels from file
-     * @warning only works if member custom_file_ptr supports reading the format
+     * @param filename bad channels filename
+     * @param file_reader file_reader to read bad channels file (default:
+     * CustomBadChannelsFile bad channel file is expected to be a text file
+     * where each line stores the channel index of a bad channel. Consecutive
+     * bad channels can be stored in one line by seperating the first and last
+     * channel index of the bad channel block e.g.
+     * bad_channel_index0-bad_channel_index1.))
      */
-    void read_bad_channels_from_file(const std::string &filename) {
+    void read_bad_channels_from_file(
+        const std::string &filename,
+        std::shared_ptr<SimpleFileInterface> file_reader =
+            std::make_shared<CustomBadChannelsFile>()) {
 
-        m_custom_file_ptr->open(filename);
-        m_custom_file_ptr->read_into(
+        file_reader->open(filename);
+        file_reader->read_into(
             reinterpret_cast<std::byte *>(bad_channels.data()));
     }
 
@@ -195,12 +184,6 @@ class MythenDetectorSpecifications {
      */
     NDArray<bool, 1> bad_channels{};
     NDArray<ssize_t, 1> m_unconnected_modules{}; // list of unconnected modules
-
-    /**
-     * file interface to read bad channels file
-     */
-    std::shared_ptr<SimpleFileInterface> m_custom_file_ptr =
-        std::make_shared<CustomBadChannelsFile>();
 };
 
 } // namespace angcal

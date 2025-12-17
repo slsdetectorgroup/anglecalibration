@@ -8,9 +8,8 @@ using namespace angcal;
 
 void define_MythenDetectorSpecifications_binding(py::module &m) {
 
-    py::class_<MythenDetectorSpecifications,
-               std::shared_ptr<MythenDetectorSpecifications>>(
-        m, "MythenDetectorSpecifications", R"(Attributes
+    py::class_<MythenDetectorSpecifications>(m, "MythenDetectorSpecifications",
+                                             R"(Attributes
 ----------
 min_angle : double 
     Read-only static. Minimum potential detector angle
@@ -40,20 +39,11 @@ bloffset: double
 dtt0: double 
 )")
 
-        .def(py::init<std::optional<std::shared_ptr<SimpleFileInterface>>>(),
-             py::arg("file_interface") = std::nullopt,
-             R"(
-             Parameters
-             ----------
-             file_interface : Optional[SimpleFileInterface], default None
-                 A file interface to read bad channels file. 
-                 If none is provided bad channel file is expected to be a text file where each line stores the channel index of a bad channel. Consecutive bad channels can be stored in one line by seperating the first and last channel index of the bad channel block e.g. bad_channel_index0-bad_channel_index1.)")
+        .def(py::init<>())
 
-        .def(py::init<const size_t, const double, const double, const double,
-                      std::optional<std::shared_ptr<SimpleFileInterface>>>(),
+        .def(py::init<const size_t, const double, const double, const double>(),
              py::arg("max_modules"), py::arg("exposure_time"),
              py::arg("num_counters") = 1, py::arg("bloffset") = 1.532,
-             py::arg("file_interface") = std::nullopt,
              R"(
              Parameters
              ----------
@@ -63,9 +53,9 @@ dtt0: double
                 Exposure time in seconds. 
              num_counters: int
                 Number of counters active. 
-             file_interface : Optional[SimpleFileInterface], default None
-                 A file interface to read bad channels file. If none is provided bad channel file is expected to be a text file where each line stores the channel index of a bad channel. Consecutive bad channels can be stored in one line by seperating the first and last channel index of the bad channel block e.g. bad_channel_index0-bad_channel_index1.)")
+            )")
 
+        /*
         .def(
             "read_bad_channels_from_file",
             [](MythenDetectorSpecifications &self,
@@ -73,7 +63,7 @@ dtt0: double
                 self.read_bad_channels_from_file(filename);
             },
             py::arg("filename"), R"(reads bad channels from file)")
-
+        */
         .def_property(
             "unconnected_modules",
             [](MythenDetectorSpecifications &self) {

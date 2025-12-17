@@ -42,20 +42,12 @@ class AngleCalibration {
      mythen specific parameters
      * @param flat_field_ ptr to FlatField class storing inverse normalized flat
      field
-     * @param mythen_file_reader optional, pass if you use custom acquisition
-     files - default: reads hdf5 files following epics format
-     * @param custom_file_ptr optional, pass if you use custom files to store
-     initial angle parameters - default: initial angle parameters supports
-     * following format module [module_index] center [center] +- [error]
-     conversion [conversion] +- [error] offset [offset] +- [error]
+     * @param mythen_file_reader file reader to read mythen acquisition files
      */
-    // TODO: actially MythenFileReader not generalizable
     AngleCalibration(
         std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
         std::shared_ptr<FlatField> flat_field_,
-        std::shared_ptr<MythenFileReader> mythen_file_reader_,
-        std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr_ =
-            std::nullopt);
+        std::shared_ptr<MythenFileReader> mythen_file_reader_);
 
     /** @brief set the histogram bin width [degrees]
      * default '0.0036°'
@@ -91,12 +83,18 @@ class AngleCalibration {
     std::shared_ptr<MythenDetectorSpecifications>
     get_detector_specifications() const;
 
-    /** reads the historical Detector Group (DG) parameters from file and
+    /** @brief reads the historical Detector Group (DG) parameters from file and
      * transforms them to Best Computing parameters
-     * @warning only works if member m_custom_detectot_file_ptr supports reading
-     * the format
+     * @param filename name of file
+     * @param file_reader filereader to read file (default
+     InitialAngCalParametersFile:
+     * following format module [module_index] center [center] +- [error]
+     conversion [conversion] +- [error] offset [offset] +- [error])
      */
-    void read_initial_calibration_from_file(const std::string &filename);
+    void read_initial_calibration_from_file(
+        const std::string &filename,
+        const std::shared_ptr<SimpleFileInterface> file_reader =
+            std::make_shared<InitialAngCalParametersFile>());
 
     /**
      * get the histoic DG parameters
@@ -112,8 +110,6 @@ class AngleCalibration {
      * @param output_file optional, if provided the optimized BC parameters are
      * converted back to DG parameters and are appended to the file (given as
      * full file path)
-     * @warning method only works if mythen_file_reader supports reading the
-     * file format
      */
     void
     calibrate(const std::vector<std::string> &file_list,
@@ -125,8 +121,6 @@ class AngleCalibration {
      * @param file_list vector of file_names of acquisition files
      * @param base_peak_angle angle of the selcted base peak given in degrees
      * @param module_index index of module to be calibrated
-     * @warning method only works if mythen_file_reader supports reading the
-     * file format
      */
     void calibrate(const std::vector<std::string> &file_list_,
                    const double base_peak_angle_, const size_t module_index);
@@ -448,24 +442,11 @@ class AngleCalibration {
      */
     std::vector<std::string> file_list{};
 
-    // TODO: not really generalizable mabye point to HDF5File but what if one
-    // passes a raw file
     /**
-     * file reader to read acquisition files
-     * default: expects hdf5 file with fields 'data', 'DetectorAngle' and
-     * 'CounterMask'
+     * file reader to read mythen acquisition files
      */
     std::shared_ptr<MythenFileReader>
         mythen_file_reader{}; // TODO replace by FileInterface ptr
-
-    /**
-     * file reader to read initial DG parameters
-     * deafult: expect text file with format
-     * [module [module_index] center [center] +-  [error] conversion
-     * [conversion] +- [error] offset [offset] +- [error]
-     */
-    std::shared_ptr<SimpleFileInterface> custom_file_ptr =
-        std::make_shared<InitialAngCalParametersFile>();
 };
 
 template <bool base_peak_ROI_only>

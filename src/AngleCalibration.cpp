@@ -25,14 +25,9 @@ struct SignalHandler {
 AngleCalibration::AngleCalibration(
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
     std::shared_ptr<FlatField> flat_field_,
-    std::shared_ptr<MythenFileReader> mythen_file_reader_,
-    std::optional<std::shared_ptr<SimpleFileInterface>> custom_file_ptr_)
+    std::shared_ptr<MythenFileReader> mythen_file_reader_)
     : mythen_detector(mythen_detector_), flat_field(flat_field_),
       mythen_file_reader(mythen_file_reader_) {
-
-    if (custom_file_ptr_.has_value()) {
-        custom_file_ptr = custom_file_ptr_.value();
-    }
 
     DGparameters = DGParameters(mythen_detector->max_modules());
     BCparameters = BCParameters(mythen_detector->max_modules());
@@ -98,10 +93,13 @@ void AngleCalibration::set_incident_intensity_of_first_acquisition(
 }
 
 void AngleCalibration::read_initial_calibration_from_file(
-    const std::string &filename) {
+    const std::string &filename,
+    const std::shared_ptr<SimpleFileInterface> file_reader) {
 
-    custom_file_ptr->open(filename);
-    custom_file_ptr->read_into(DGparameters.parameters.buffer(), 8);
+    file_reader->open(filename);
+    file_reader->read_into(DGparameters.parameters.buffer(), 8);
+
+    file_reader->close();
 
     DGparameters.convert_to_BCParameters(
         BCparameters); // initialize BC parameters

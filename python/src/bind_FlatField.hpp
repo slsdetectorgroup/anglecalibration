@@ -10,10 +10,8 @@ using namespace angcal;
 void define_FlatField_binding(py::module &m) {
 
     py::class_<FlatField, std::shared_ptr<FlatField>>(m, "FlatField")
-        .def(py::init<std::shared_ptr<MythenDetectorSpecifications>,
-                      std::optional<std::shared_ptr<SimpleFileInterface>>>(),
-             py::arg("MythenDetectorSpecifications"),
-             py::arg("file_interface") = std::nullopt)
+        .def(py::init<std::shared_ptr<MythenDetectorSpecifications>>(),
+             py::arg("MythenDetectorSpecifications"))
 
         .def("create_flatfield_from_filelist",
              [](FlatField &self,
@@ -23,10 +21,12 @@ void define_FlatField_binding(py::module &m) {
                                                      file_list);
              })
 
+        /*
         .def("read_flatfield_from_file",
              [](FlatField &self, const std::string &filename) {
                  self.read_flatfield_from_file(filename);
              })
+        */
 
         .def_property(
             "flatfield",

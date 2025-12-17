@@ -54,8 +54,7 @@ TEST_CASE("read initial angle calibration file",
 TEST_CASE("read bad channels",
           "[anglecalibration][mythenspecifications][.files]") {
 
-    MythenDetectorSpecifications mythen_detector(
-        std::make_shared<CustomBadChannelsFile>());
+    MythenDetectorSpecifications mythen_detector;
 
     std::string bad_channels_filename = test_data_path() /
                                         "AngleCalibration_Test_Data" /

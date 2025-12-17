@@ -26,24 +26,17 @@ number_of_bins : int
 )")
         .def(py::init<std::shared_ptr<MythenDetectorSpecifications>,
                       std::shared_ptr<FlatField>,
-                      std::shared_ptr<MythenFileReader>,
-                      std::optional<std::shared_ptr<SimpleFileInterface>>>(),
+                      std::shared_ptr<MythenFileReader>>(),
              py::arg("MythenDetectorSpecifications"), py::arg("FlatField"),
-             py::arg("MythenFileReader") = std::nullopt,
-             py::arg("file_interface") = std::nullopt, R"(
+             py::arg("MythenFileReader"), R"(
              Parameters
              ----------
              MythenDetectorSpecifications: MythenDetectorSpecifications 
                 storing all mythen specific parameters
              FlatField: FlatField 
                 class storing inverse normalized flatfield
-             MythenFileReader: optional[MythenFileReader], default None
-                pass if you use custom acquisition files - default: reads hdf5 files
-             file_interafce: optional[SimpleFileInterface], default None 
-                custom_file_ptr optional, pass if you use custom files to store
-                initial angle parameters - default: initial angle parameters supports
-                following format module [module_index] center [center] +- [error]
-                conversion [conversion] +- [error] offset [offset] +- [error])")
+             MythenFileReader: File Reader to read Mythen acquisition files
+             )")
 
         .def_property("histogram_bin_width",
                       &AngleCalibration::get_histogram_bin_width,
@@ -51,6 +44,7 @@ number_of_bins : int
 
         .def_property_readonly("number_of_bins",
                                &AngleCalibration::new_number_of_bins)
+        /*
         .def(
             "read_initial_calibration_from_file",
             [](AngleCalibration &self, const std::string &filename) {
@@ -58,6 +52,7 @@ number_of_bins : int
             },
             R"(reads the historical Detector Group (DG) parameters from file and
      transforms them to Best Computing parameters)")
+        */
 
         .def_property("base_peak_angle", &AngleCalibration::get_base_peak_angle,
                       &AngleCalibration::set_base_peak_angle)
