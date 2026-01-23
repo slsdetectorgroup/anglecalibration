@@ -10,14 +10,6 @@
  * ANGCAL_TEST_PATH=Path_to_git_repository
  *
  */
-inline auto data_path() {
-    if (const char *env_p = std::getenv("ANGCAL_TEST_DATA")) {
-        return std::filesystem::path(env_p);
-    } else {
-        throw std::runtime_error(
-            "Path to test data: $ANGCAL_TEST_DATA not set");
-    }
-}
 
 using namespace angcal;
 

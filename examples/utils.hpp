@@ -8,6 +8,15 @@
 
 using namespace angcal;
 
+inline auto data_path() {
+    if (const char *env_p = std::getenv("ANGCAL_TEST_DATA")) {
+        return std::filesystem::path(env_p);
+    } else {
+        throw std::runtime_error(
+            "Path to test data: $ANGCAL_TEST_DATA not set");
+    }
+}
+
 std::pair<double, double>
 get_detector_range(std::shared_ptr<MythenFileReader> mythen_file_reader,
                    const std::vector<std::string> &file_list) {
