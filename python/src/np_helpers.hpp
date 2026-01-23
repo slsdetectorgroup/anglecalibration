@@ -31,3 +31,15 @@ py::array return_image_data(aare::NDArray<T, Ndim> *image) {
 template <class T, int Flags> auto make_view_1d(py::array_t<T, Flags> &arr) {
     return aare::NDView<T, 1>(arr.mutable_data(), aare::Shape<1>(arr.shape(0)));
 }
+
+template <typename T, ssize_t Ndim>
+py::array return_view_data(aare::NDView<T, Ndim> view) {
+
+    auto byte_strides = view.strides();
+    std::for_each(byte_strides.begin(), byte_strides.end(),
+                  [](auto &stride) { stride *= sizeof(T); });
+
+    return py::array_t<T>(view.shape(), // shape
+                          byte_strides, // C-style contiguous strides for double
+                          view.data()); // the data pointer
+}

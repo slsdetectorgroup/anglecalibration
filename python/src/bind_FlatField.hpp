@@ -73,6 +73,9 @@ void define_FlatField_binding(py::module &m) {
         .def("calculate_normalized_flatfield",
              &FlatField::calculate_normalized_flatfield)
 
+        .def("calculate_inverse_normalized_flatfield_from_normalized_flatfield",
+             &FlatField::calculate_inverse_normalized_flatfield<true>)
+
         .def("calculate_inverse_normalized_flatfield",
              &FlatField::calculate_inverse_normalized_flatfield)
 

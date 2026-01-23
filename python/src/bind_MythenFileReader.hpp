@@ -11,37 +11,39 @@ using namespace angcal;
 
 void define_MythenFrame_bindings(py::module &m) {
     py::class_<MythenFrame>(m, "MythenFrame")
-        /*
-        .def_property_readonly(
-            "photon_counts",
-            [](MythenFrame &self) {
-                auto photon_counts = new NDArray<double, 2>(
-                    self.photon_counts()); // TODO: maybe dont want a copy
-                                         // actually
-                return return_image_data(photon_counts);
-            })
-        */ //TODO: handle view
 
-        .def_property_readonly(
-            "photon_counts",
-            [](MythenFrame &self, size_t row, size_t col=0) {
+        .def_property_readonly("photon_counts",
+                               [](MythenFrame &self) {
+                                   return return_view_data(
+                                       self.photon_counts());
+                               })
+        // TODO: handle view
+
+        .def(
+            "photon_count",
+            [](MythenFrame &self, size_t row, size_t col = 0) {
                 return self.photon_counts(row, col);
-            })
+            },
+            py::arg("row"), py::arg("col") = 0)
 
         .def_property_readonly(
             "detector_angle",
             [](MythenFrame &self) { return self.detector_angle; })
-        .def_property_readonly("channel_mask", [](MythenFrame &self) {
-            return self.channel_mask;
-        })
+        .def_property_readonly(
+            "channel_mask", [](MythenFrame &self) { return self.channel_mask; })
 
-        .def_property_readonly("incident_intensity", [](MythenFrame &self) { return self.incident_intensity; });
+        .def_property_readonly("incident_intensity", [](MythenFrame &self) {
+            return self.incident_intensity;
+        });
 }
 
 void define_MythenFileReader_bindings(py::module &m) {
 
-    py::class_<RawMythenFileReader, std::shared_ptr<RawMythenFileReader>>(
-        m, "RawMythenFileReader")
+    py::class_<MythenFileReader, std::shared_ptr<MythenFileReader>>(
+        m, "MythenFileReader");
+
+    py::class_<RawMythenFileReader, MythenFileReader,
+               std::shared_ptr<RawMythenFileReader>>(m, "RawMythenFileReader")
         .def(py::init<const std::filesystem::path &,
                       const std::filesystem::path &>(),
              py::arg("detector_positions_filename"),
@@ -53,8 +55,9 @@ void define_MythenFileReader_bindings(py::module &m) {
                  return self.read_frame(file_name);
              });
 
-    py::class_<EpicsMythenFileReader, std::shared_ptr<EpicsMythenFileReader>>(
-        m, "EpicsMythenFileReader")
+    py::class_<EpicsMythenFileReader, MythenFileReader,
+               std::shared_ptr<EpicsMythenFileReader>>(m,
+                                                       "EpicsMythenFileReader")
         .def(py::init<>())
         .def(py::init<const std::filesystem::path &>(),
              py::arg("incident_intensities_filename"), R"(

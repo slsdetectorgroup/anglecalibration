@@ -83,15 +83,14 @@ class FlatField {
                                     mythen_detector->num_strips(),
                                     frame.rows() * frame.cols()));
                 }
-                average_incident_intensity += frame.incident_intensity + 1;
+                average_incident_intensity +=
+                    frame.incident_intensity + 1; // Mighells correction
                 ++count;
                 for (ssize_t row = 0; row < frame.rows(); ++row)
                     for (ssize_t col = 0; col < frame.cols(); ++col) {
                         flat_field(row * frame.cols() + col, 0) +=
                             (frame.photon_counts(row, col) + 1) /
                             (frame.incident_intensity + 1);
-                        // TODO inefficient as one has to
-                        // copy twice into frame and into
                         // flat_field
                         // flatfield variance
                         flat_field(row * frame.cols() + col, 1) +=

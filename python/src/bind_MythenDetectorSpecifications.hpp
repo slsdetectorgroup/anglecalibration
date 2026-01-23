@@ -8,8 +8,10 @@ using namespace angcal;
 
 void define_MythenDetectorSpecifications_binding(py::module &m) {
 
-    py::class_<MythenDetectorSpecifications>(m, "MythenDetectorSpecifications",
-                                             R"(Attributes
+    py::class_<MythenDetectorSpecifications,
+               std::shared_ptr<MythenDetectorSpecifications>>(
+        m, "MythenDetectorSpecifications",
+        R"(Attributes
 ----------
 min_angle : double 
     Read-only static. Minimum potential detector angle
@@ -55,7 +57,6 @@ dtt0: double
                 Number of counters active. 
             )")
 
-        /*
         .def(
             "read_bad_channels_from_file",
             [](MythenDetectorSpecifications &self,
@@ -63,7 +64,7 @@ dtt0: double
                 self.read_bad_channels_from_file(filename);
             },
             py::arg("filename"), R"(reads bad channels from file)")
-        */
+
         .def_property(
             "unconnected_modules",
             [](MythenDetectorSpecifications &self) {
@@ -132,11 +133,17 @@ dtt0: double
 
         .def_property_readonly("dtt0", &MythenDetectorSpecifications::dtt0)
 
-        .def_property_readonly_static("min_angle",
-                                      &MythenDetectorSpecifications::min_angle)
+        .def_property_readonly_static(
+            "min_angle",
+            [](py::object /* self */) {
+                return MythenDetectorSpecifications::min_angle();
+            })
 
-        .def_property_readonly_static("max_angle",
-                                      &MythenDetectorSpecifications::max_angle)
+        .def_property_readonly_static(
+            "max_angle",
+            [](py::object /* self */) {
+                return MythenDetectorSpecifications::max_angle();
+            })
 
         .def_property_readonly("num_strips",
                                &MythenDetectorSpecifications::num_strips);

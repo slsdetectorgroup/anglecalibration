@@ -44,7 +44,7 @@ number_of_bins : int
 
         .def_property_readonly("number_of_bins",
                                &AngleCalibration::new_number_of_bins)
-        /*
+
         .def(
             "read_initial_calibration_from_file",
             [](AngleCalibration &self, const std::string &filename) {
@@ -52,7 +52,6 @@ number_of_bins : int
             },
             R"(reads the historical Detector Group (DG) parameters from file and
      transforms them to Best Computing parameters)")
-        */
 
         .def_property("base_peak_angle", &AngleCalibration::get_base_peak_angle,
                       &AngleCalibration::set_base_peak_angle)
