@@ -113,7 +113,7 @@ class MythenDetectorSpecifications {
 
     static constexpr double pitch() { return pitch_; }
 
-    static constexpr double pixel_height() { return pixel_height_; }
+    static constexpr double transverse_width() { return transverse_width_; }
 
     static constexpr size_t strips_per_module() { return strips_per_module_; }
 
@@ -148,7 +148,7 @@ class MythenDetectorSpecifications {
     static constexpr double pitch_ = 0.05;
 
     /// @brief Strip/channel height of Mythen detector [mm]
-    static constexpr double pixel_height_ = 8.0;
+    static constexpr double transverse_width_ = 8.0;
 
     /// @brief Minimum potential detector angle
     /// (measured as displacement of first strip) [degrees]
