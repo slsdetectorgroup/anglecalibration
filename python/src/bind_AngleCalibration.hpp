@@ -42,8 +42,8 @@ number_of_bins : int
                       &AngleCalibration::get_histogram_bin_width,
                       &AngleCalibration::set_histogram_bin_width)
 
-        .def_property_readonly("number_of_bins",
-                               &AngleCalibration::new_number_of_bins)
+        .def_property_readonly("num_fixed_angle_width_bins",
+                               &AngleCalibration::num_fixed_angle_width_bins)
 
         .def(
             "read_initial_calibration_from_file",
@@ -171,22 +171,26 @@ number_of_bins : int
 
             Returns
             -------
-            numpy.ndarray (,new_number_of_bins)
+            numpy.ndarray (,num_fixed_angle_width_bins)
                 to fixed angle width redistributed, flatfield corrected and variance scaled photon counts of respective module)")
 
         .def(
-            "redistribute_photon_counts_to_fixed_angle_width_bins",
-            [](AngleCalibration &self, const MythenFrame &frame) {
-                auto result = new NDArray<double, 1>(
-                    self.redistribute_photon_counts_to_fixed_angle_width_bins(
-                        frame));
+            "convert",
+            [](AngleCalibration &self,
+               const std::vector<std::string> &file_list) {
+                auto result = new NDArray<double, 1>(self.convert(file_list));
                 return return_image_data(result);
             },
             R"(
-            redistribute photon counts of given frame to fixed angle width bins 
+            performs angular conversion e.g. calculates diffraction pattern from raw photon counts
+
+            Params: 
+            ----------
+            file_list: list 
+                list of paths to acquisition files
 
             Returns
             -------
-            numpy.ndarray (,new_number_of_bins)
+            numpy.ndarray (,num_fixed_angle_width_bins)
                 to fixed angle width redistributed, flatfield corrected and variance scaled photon counts)");
 }

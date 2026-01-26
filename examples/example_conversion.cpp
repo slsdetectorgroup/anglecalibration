@@ -64,20 +64,26 @@ int main() {
     anglecalibration.read_initial_calibration_from_file(
         initial_angles_filename);
 
-    MythenFrame frame =
-        mythen_file_reader->read_frame(file_path / "Fructose_0p2_60_0060.h5");
+    std::vector<std::string> file_list(4);
+    std::generate(file_list.begin(), file_list.end(),
+                  [n = 60, &file_path]() mutable {
+                      std::string filename =
+                          fmt::format("Fructose_0p2_60_{:04d}.h5", n++);
+                      return (file_path / filename).string();
+                  });
 
-    auto redistributed_photon_counts =
-        anglecalibration.redistribute_photon_counts_to_fixed_angle_width_bins(
-            frame); // redistributes and applies pixel wise correction
-
+    auto redistributed_photon_counts = anglecalibration.convert(
+        file_list); // redistributes and applies pixel wise correction
     LOG(TLogLevel::logDEBUG) << "redistributed photon counts shape: "
                              << redistributed_photon_counts.shape()[0];
 
-    LOG(TLogLevel::logDEBUG)
-        << "num fixed angle bins: " << anglecalibration.new_number_of_bins();
+    LOG(TLogLevel::logDEBUG) << "num fixed angle bins: "
+                             << anglecalibration.num_fixed_angle_width_bins();
 
 #ifdef ANGCAL_PLOT
+    MythenFrame frame =
+        mythen_file_reader->read_frame(file_path / "Fructose_0p2_60_0060.h5");
+
     auto photon_counts = frame.photon_counts();
 
     plot_photon_counts(frame.photon_counts(),

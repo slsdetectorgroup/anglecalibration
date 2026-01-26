@@ -88,7 +88,7 @@ class PlotHelper {
 
         plot_photon_counts_for_fixed_angle_width_bins(
             *gp, redistributed_photon_counts,
-            {0, m_anglecalibration->new_number_of_bins()}, plot_title,
+            {0, m_anglecalibration->num_fixed_angle_width_bins()}, plot_title,
             bin_to_diffraction_angle);
     }
 

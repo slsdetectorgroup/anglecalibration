@@ -48,7 +48,7 @@ class MythenDetectorSpecifications {
     MythenDetectorSpecifications(const size_t max_modules,
                                  const double exposure_time,
                                  const double num_counters = 1,
-                                 double bloffset = 1.532)
+                                 double bloffset = 1.4715)
         : max_modules_(max_modules), num_counters_(num_counters),
           exposure_time_(exposure_time), bloffset_(bloffset) {
 
@@ -177,7 +177,8 @@ class MythenDetectorSpecifications {
      */
     double exposure_time_ = 5.0; // TODO: could read from acquired file but
                                  // maybe should be configurable
-    double bloffset_ = 1.532; // what is this? detector offset relative to what?
+    double bloffset_ =
+        1.4715; // what is this? detector offset relative to what?
 
     /** Array of size strips/channels in detector, stores 'TRUE' if strip is a
      * bad channel otherwise 'FALSE'

@@ -60,7 +60,7 @@ class AngleCalibration {
     double get_histogram_bin_width() const;
 
     /** @brief number of bins of fixed angle width bin histogram */
-    ssize_t new_number_of_bins() const;
+    ssize_t num_fixed_angle_width_bins() const;
 
     /** @brief number of bins covered by base peak region of interest
      * default '101' bins
@@ -163,18 +163,20 @@ class AngleCalibration {
         const double incident_intensity);
 
     /**
-     * @brief redistribute photon counts to fixed angle width bins for given
-     * frame
+     * @brief Performs angular conversion e.g. calculates from raw photon counts
+     * the resulting diffraction pattern
+     * @param file_list vector of file_names of acquisition files
      * @return flatfield corrected and variance scaled photon counts
      * redistributed to fixed angle width bins given in the range [min_angle,
      * max_angle]
      */
-    NDArray<double, 1> redistribute_photon_counts_to_fixed_angle_width_bins(
-        const MythenFrame &frame) const;
+    NDArray<double, 1> convert(const std::vector<std::string> &file_list) const;
 
+    // TODO more useful for debugging
     /**
      * @brief redistribute photon counts to fixed angle width bins for the
      * specified module region
+     * @param frame: raw photons from acquisition
      * @param module_index: index of module region to redistribute
      * @return flatfield corrected and variance scaled photon counts in the
      * module region redistributed to fixed angle width bins array covers the
@@ -183,6 +185,7 @@ class AngleCalibration {
     NDArray<double, 1> redistribute_photon_counts_to_fixed_angle_width_bins(
         const MythenFrame &frame, const size_t module_index) const;
 
+    // TODO more useful for debugging
     /**
      * @brief redistribute photon counts to fixed angle width bins which are
      * within base peak region
@@ -283,16 +286,14 @@ class AngleCalibration {
      * corrected
      * @param inverse_fixed_angle_width_bins_photon_counts_variance stores
      * inverse variance
-     * @param S0, S1, S2 used to calculate similarity criterion between peaks
+     * @param sum_statistical_weights sum of statistical weights to normalize
      */
     template <bool base_peak_ROI_only = false>
     void redistribute_photon_counts_to_fixed_angle_width_bins(
         const size_t module_index, const MythenFrame &frame,
         NDView<double, 1> fixed_angle_width_bins_photon_counts,
         NDView<double, 1> inverse_fixed_angle_width_bins_photon_counts_variance,
-        std::optional<NDView<double, 1>> S0 = std::nullopt,
-        std::optional<NDView<double, 1>> S1 = std::nullopt,
-        std::optional<NDView<double, 1>> S2 = std::nullopt) const;
+        NDView<double, 1> sum_statistical_weights) const;
 
     /**
      * @brief redistributes photon counts to fixed angle width bins around base
@@ -454,8 +455,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     const size_t module_index, const MythenFrame &frame,
     NDView<double, 1> fixed_angle_width_bins_photon_counts,
     NDView<double, 1> inverse_fixed_angle_width_bins_photon_counts_variance,
-    std::optional<NDView<double, 1>> S0, std::optional<NDView<double, 1>> S1,
-    std::optional<NDView<double, 1>> S2) const {
+    NDView<double, 1> sum_statistical_weights) const {
 
     ssize_t number_of_bins{}; // number of bins using fixed angle width bins
     double left_boundary_roi_base_peak{};  // left boundary of base peak ROI
@@ -472,16 +472,12 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             (base_peak_angle + base_peak_roi_width -
              0.5 * histogram_bin_width); // in degrees
     } else {
-        number_of_bins = new_number_of_bins();
+        number_of_bins = num_fixed_angle_width_bins();
         left_boundary_roi_base_peak =
             mythen_detector->min_angle(); // dummy values
         right_boundary_roi_base_peak =
             mythen_detector->max_angle(); // dummy values
     }
-
-    NDArray<double, 1> sum_statistical_weights(
-        std::array<ssize_t, 1>{number_of_bins},
-        0.0); // used to normalize statistical weights
 
     // iterate over all strips of module
     for (size_t strip_index = 0;
@@ -604,40 +600,6 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                                      // corrected_photon_counts_variance
 
             sum_statistical_weights(proper_bin_index) += statistical_weight;
-        }
-    }
-
-    // S_index = sum_i^num_runs
-    // photon_count^index*photon_variance
-    // normalize statistical weights
-    for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.size(); ++i) {
-        fixed_angle_width_bins_photon_counts(i) =
-            sum_statistical_weights(i) < std::numeric_limits<double>::epsilon()
-                ? 0.0
-                : fixed_angle_width_bins_photon_counts(i) /
-                      sum_statistical_weights(i); // y_k
-
-        inverse_fixed_angle_width_bins_photon_counts_variance(i) =
-            inverse_fixed_angle_width_bins_photon_counts_variance(i) <
-                    std::numeric_limits<double>::epsilon()
-                ? 0.0
-                : std::pow(sum_statistical_weights(i), 2) /
-                      inverse_fixed_angle_width_bins_photon_counts_variance(i);
-
-        if (S0.has_value()) {
-            S0.value()(i) +=
-                inverse_fixed_angle_width_bins_photon_counts_variance(i);
-        }
-        if (S1.has_value()) {
-            S1.value()(i) +=
-                fixed_angle_width_bins_photon_counts(i) *
-                inverse_fixed_angle_width_bins_photon_counts_variance(i);
-        }
-        if (S2.has_value()) {
-            S2.value()(i) +=
-                fixed_angle_width_bins_photon_counts(i) *
-                fixed_angle_width_bins_photon_counts(i) *
-                inverse_fixed_angle_width_bins_photon_counts_variance(i);
         }
     }
 }
