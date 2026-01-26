@@ -142,8 +142,8 @@ double AngleCalibration::diffraction_angle_from_DG_parameters(
                (center * std::abs(conversion) -
                 std::atan((center - (strip_index + distance_to_strip)) *
                           std::abs(conversion))) +
-           detector_angle + mythen_detector->dtt0() +
-           mythen_detector->bloffset();
+           detector_angle + mythen_detector->offset() +
+           mythen_detector->sample_detector_offset();
 }
 
 double AngleCalibration::diffraction_angle_from_BC_parameters(
@@ -172,8 +172,8 @@ double AngleCalibration::diffraction_angle_from_BC_parameters(
                         MythenDetectorSpecifications::pitch()) /
                    (std::abs(distance_center_sample) *
                     std::cos(M_PI / 180.0 * angle_module_center_normal))) +
-           detector_angle + mythen_detector->dtt0() +
-           mythen_detector->bloffset();
+           detector_angle + mythen_detector->offset() +
+           mythen_detector->sample_detector_offset();
 }
 
 double AngleCalibration::diffraction_angle_from_EE_parameters(
@@ -192,8 +192,8 @@ double AngleCalibration::diffraction_angle_from_EE_parameters(
                           MythenDetectorSpecifications::pitch() *
                               (strip_index + distance_to_strip)) /
                          std::abs(normal_distance)) +
-           detector_angle + mythen_detector->dtt0() +
-           mythen_detector->bloffset();
+           detector_angle + mythen_detector->offset() +
+           mythen_detector->sample_detector_offset();
 }
 
 // TODO maybe template these on parameter type
@@ -323,15 +323,15 @@ bool AngleCalibration::base_peak_is_in_module(
 
 std::pair<double, double>
 AngleCalibration::rate_correction(const double photon_count,
-                                  const double photon_count_error) const {
+                                  const double photon_count_error,
+                                  const double exposure_time) const {
     constexpr double dead_time = 2.915829802160547e-7; // measured dead-time
 
     const double maximum_count_rate =
         std::exp(-1); // theoretical maximum count rate for
                       // dead_time*measured_photon_counts_per_second
 
-    double photon_counts_per_second =
-        photon_count / mythen_detector->exposure_time();
+    double photon_counts_per_second = photon_count / exposure_time;
 
     photon_counts_per_second = std::min(
         maximum_count_rate,
@@ -339,8 +339,7 @@ AngleCalibration::rate_correction(const double photon_count,
             dead_time); // multiply with dead time - for numerical algorithm
 
     double error_photon_counts_per_second =
-        photon_count_error *
-        std::pow(dead_time / mythen_detector->exposure_time(), 2);
+        photon_count_error * std::pow(dead_time / exposure_time, 2);
 
     // -actual_count_rate*dead_time = W -> -dead_time*measured_count_rate =
     // We^{W} -> W: Lambert W function
@@ -375,14 +374,13 @@ AngleCalibration::rate_correction(const double photon_count,
                          (photon_counts_per_second * photon_counts_per_second),
                      2);
 
-    double rate_corrected_photon_counts = photon_count *
-                                          rate_correction_factor /
-                                          mythen_detector->exposure_time();
+    double rate_corrected_photon_counts =
+        photon_count * rate_correction_factor / exposure_time;
 
     double rate_corrected_photon_counts_error =
         photon_count_error * std::pow(rate_correction_factor, 2) +
         error_rate_correction_factor * std::pow(photon_count, 2) /
-            std::pow(mythen_detector->exposure_time(), 2);
+            std::pow(exposure_time, 2);
 
     return std::pair<double, double>{rate_corrected_photon_counts,
                                      rate_corrected_photon_counts_error};
@@ -390,13 +388,12 @@ AngleCalibration::rate_correction(const double photon_count,
 
 std::pair<double, double> AngleCalibration::incident_intensity_correction(
     const double photon_counts, const double photon_count_error,
-    const uint64_t incident_intensity) const {
+    const uint64_t incident_intensity, const double exposure_time) const {
 
-    double I0_correction_factor =
-        I0_of_first_acquisition.has_value()
-            ? I0_of_first_acquisition.value() /
-                  (incident_intensity * mythen_detector->exposure_time())
-            : 1.0 / mythen_detector->exposure_time();
+    double I0_correction_factor = I0_of_first_acquisition.has_value()
+                                      ? I0_of_first_acquisition.value() /
+                                            (incident_intensity * exposure_time)
+                                      : 1.0 / exposure_time;
 
     double I0_corrected_photon_counts = photon_counts * I0_correction_factor;
     double I0_corrected_photon_counts_error =
@@ -431,16 +428,15 @@ AngleCalibration::flatfield_correction(const double photon_counts,
                      flatfield_normalized_photon_counts_error);
 }
 
-std::pair<double, double>
-AngleCalibration::photon_count_correction(double photon_counts,
-                                          const size_t global_strip_index,
-                                          const uint64_t I0) const {
+std::pair<double, double> AngleCalibration::photon_count_correction(
+    double photon_counts, const size_t global_strip_index, const uint64_t I0,
+    const double exposure_time) const {
 
     // TODO no idea what to do with variance
 
     auto [rate_corrected_photon_counts, rate_corrected_photon_counts_error] =
-        rate_correction(photon_counts,
-                        photon_counts); // same variance as poisson distributed
+        rate_correction(photon_counts, photon_counts,
+                        exposure_time); // same variance as poisson distributed
                                         // - maybe sqaured?
 
     // mighells statistics
@@ -456,7 +452,7 @@ AngleCalibration::photon_count_correction(double photon_counts,
 
     return incident_intensity_correction(
         flatfield_normalized_photon_counts,
-        flatfield_normalized_photon_counts_variance, I0);
+        flatfield_normalized_photon_counts_variance, I0, exposure_time);
 }
 
 double AngleCalibration::calculate_similarity_of_peaks(

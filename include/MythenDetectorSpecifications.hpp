@@ -37,20 +37,17 @@ class MythenDetectorSpecifications {
             NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips()}, false);
     }
 
-    // TODO: is this constructor still relevant? or does one read from the file?
     /**
      * @brief constructor for MythenDetectorSpecifications
+     * @param offset Additional offset to sample detector offset.
+     * @param num_counters Number of counters active (default 1)
      * @param max_modules Number of modules in detector (default 48).
-     * @param exposure_time Exposure time [s].
-     * @param num_counters Number of counters active.
-     * @param bloffset
      */
-    MythenDetectorSpecifications(const size_t max_modules,
-                                 const double exposure_time,
-                                 const double num_counters = 1,
-                                 double bloffset = 1.4715)
-        : max_modules_(max_modules), num_counters_(num_counters),
-          exposure_time_(exposure_time), bloffset_(bloffset) {
+    MythenDetectorSpecifications(const double offset,
+                                 const size_t num_counters = 1,
+                                 const size_t max_modules = 48)
+        : offset_(offset), num_counters_(num_counters),
+          max_modules_(max_modules) {
 
         bad_channels =
             NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips()}, false);
@@ -116,6 +113,8 @@ class MythenDetectorSpecifications {
 
     static constexpr double pitch() { return pitch_; }
 
+    static constexpr double pixel_height() { return pixel_height_; }
+
     static constexpr size_t strips_per_module() { return strips_per_module_; }
 
     /**
@@ -126,11 +125,11 @@ class MythenDetectorSpecifications {
 
     size_t num_counters() const { return num_counters_; }
 
-    double exposure_time() const { return exposure_time_; }
+    static constexpr double sample_detector_offset() {
+        return sample_detector_offset_;
+    }
 
-    double bloffset() const { return bloffset_; }
-
-    double dtt0() const { return dtt0_; }
+    double offset() const { return offset_; }
 
     static constexpr double min_angle() { return min_angle_; }
 
@@ -142,47 +141,39 @@ class MythenDetectorSpecifications {
     ssize_t num_strips() const { return max_modules_ * strips_per_module_; }
 
   private:
-    /**
-     * number of strips/channels per module
-     */
+    /// @brief number of strips/channels per module
     static constexpr size_t strips_per_module_ = 1280;
-    /**
-     * Strip/channel width of Mythen detector [mm]
-     */
+
+    /// @brief Strip/channel width of Mythen detector [mm]
     static constexpr double pitch_ = 0.05;
-    /** Minimum potential detector angle
-     *(measured as displacement of first strip) [degree]
-     */
+
+    /// @brief Strip/channel height of Mythen detector [mm]
+    static constexpr double pixel_height_ = 8.0;
+
+    /// @brief Minimum potential detector angle
+    /// (measured as displacement of first strip) [degrees]
     static constexpr double min_angle_ =
         -180.0; // maybe shoudnt be static but configurable
 
-    /** Maximum potential detector angle
-     *(measured as displacement of first strip) [degree]
-     */
+    /// @brief Maximum potential detector angle
+    /// (measured as displacement of first strip) [degrees]
     static constexpr double max_angle_ = 180.0;
-    static constexpr double dtt0_ = 0.0;
 
-    /**
-     * number of modules in detector
-     */
-    size_t max_modules_ = 48;
+    /// @brief Offset between sample horizontal plane and detector [degrees]
+    static constexpr double sample_detector_offset_ = 1.4715;
 
-    /**
-     * num counters active in detector
-     */
+    /// @brief additional offset to sample detector offset (can change in
+    /// experimental setup) [degrees]
+    double offset_ = 0.0;
+
+    /// @brief num counters active in detector
     size_t num_counters_ = 1;
 
-    /**
-     * exposure time [s]
-     */
-    double exposure_time_ = 5.0; // TODO: could read from acquired file but
-                                 // maybe should be configurable
-    double bloffset_ =
-        1.4715; // what is this? detector offset relative to what?
+    /// @brief number of modules in detector
+    size_t max_modules_ = 48; // TODO: could be static if bloffset is static
 
-    /** Array of size strips/channels in detector, stores 'TRUE' if strip is a
-     * bad channel otherwise 'FALSE'
-     */
+    /// @brief Array of size strips/channels in detector, stores 'TRUE' if strip
+    /// is a bad channel otherwise 'FALSE'
     NDArray<bool, 1> bad_channels{};
     NDArray<ssize_t, 1> m_unconnected_modules{}; // list of unconnected modules
 };

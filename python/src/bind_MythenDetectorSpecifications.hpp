@@ -35,26 +35,24 @@ num_strips: int
 max_modules: int 
     Read-only. Number of modules in detector. 
     Default (48)
-exposure_time: double 
-    Read-only. Exposure time [s]
-bloffset: double 
-dtt0: double 
+sample_detector_offset: double 
+offset: double 
 )")
 
         .def(py::init<>())
 
-        .def(py::init<const size_t, const double, const double, const double>(),
-             py::arg("max_modules"), py::arg("exposure_time"),
-             py::arg("num_counters") = 1, py::arg("bloffset") = 1.532,
+        .def(py::init<const double, const size_t, const size_t>(),
+             py::arg("offset"), py::arg("num_counters") = 1,
+             py::arg("max_modules") = 48,
              R"(
              Parameters
              ----------
-             max_modules: int 
-                Number of modules in detector (default 48).
-             exposure_time: double 
-                Exposure time in seconds. 
+             offset: double 
+                Additional offset to sample detector offset. 
              num_counters: int
                 Number of counters active. 
+             max_modules: int 
+                Number of modules in detector (default 48).
             )")
 
         .def(
@@ -125,13 +123,11 @@ dtt0: double
         .def_property_readonly("num_counters",
                                &MythenDetectorSpecifications::num_counters)
 
-        .def_property_readonly("exposure_time",
-                               &MythenDetectorSpecifications::exposure_time)
+        .def_property_readonly_static(
+            "sample_detector_offset",
+            &MythenDetectorSpecifications::sample_detector_offset)
 
-        .def_property_readonly("bloffset",
-                               &MythenDetectorSpecifications::bloffset)
-
-        .def_property_readonly("dtt0", &MythenDetectorSpecifications::dtt0)
+        .def_property_readonly("offset", &MythenDetectorSpecifications::offset)
 
         .def_property_readonly_static(
             "min_angle",

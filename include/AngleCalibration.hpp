@@ -360,35 +360,37 @@ class AngleCalibration {
      * @param photon_counts photon counts
      * @param photon_count_error error of photon counts (generally variance
      * error is used)
+     * @param exposure_time exposure time of acquisition [s]
      * @return pair {corrected photon counts, propagated_error}
      */
-    std::pair<double, double>
-    rate_correction(const double photon_counts,
-                    const double photon_count_error) const;
+    std::pair<double, double> rate_correction(const double photon_counts,
+                                              const double photon_count_error,
+                                              const double exposure_time) const;
 
     /** @brief calculate the incident intensity corrected photon counts
      * @param photon_counts photon counts
      * @param photon_counts_error error of photon counts (generally variance
      * error is used)
      * @param incident_intensity incident intensity
+     * @param exposure_time exposure time of acquisition [s]
      * @return pair {corrected photon counts, propagated_error}
      */
-    std::pair<double, double>
-    incident_intensity_correction(const double photon_counts,
-                                  const double photon_counts_error,
-                                  const uint64_t incident_intensity) const;
+    std::pair<double, double> incident_intensity_correction(
+        const double photon_counts, const double photon_counts_error,
+        const uint64_t incident_intensity, const double exposure_time) const;
 
     /** @brief calculate the corrected photon counts (flatfield, rate, incident
      * intensity)
      * @param photon_counts photon counts
      * @param global_strip_index strip index of photon counts
      * @param I0 incident intensity
+     * @param exposure_time exposure time of acquisition [s]
      * @return pair {corrected photon counts, propagated_error}
      */
     std::pair<double, double>
     photon_count_correction(double photon_counts,
-                            const size_t global_strip_index,
-                            const uint64_t I0) const;
+                            const size_t global_strip_index, const uint64_t I0,
+                            const double exposure_time) const;
 
     /**
      * @brief appends given parameters to file
@@ -510,9 +512,9 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
 
         // get corrected photon counts and propagate error
         auto [corrected_photon_counts, corrected_photon_counts_variance] =
-            photon_count_correction(frame.photon_counts(global_strip_index) + 1,
-                                    global_strip_index,
-                                    frame.incident_intensity);
+            photon_count_correction(
+                frame.photon_counts(global_strip_index) + 1, global_strip_index,
+                frame.incident_intensity, frame.exposure_time);
 
         double inverse_corrected_photon_counts_variance =
             1.0 / corrected_photon_counts_variance;
