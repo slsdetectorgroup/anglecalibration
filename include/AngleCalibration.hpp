@@ -156,11 +156,15 @@ class AngleCalibration {
     bool module_is_disconnected(const size_t module_index) const;
 
     /**
-     * @brief set the incident intensity of the first acquisition used for
-     * incident intensity correction
+     * @brief set the scale factor to scale everything to a reasonable scale
+     * e.g. can be incident_intensity of first acquisition
      */
-    void set_incident_intensity_of_first_acquisition(
-        const double incident_intensity);
+    void set_scale_factor(const double scale_factor_);
+
+    /**
+     * @brief get the currently configured scale factor (if any)
+     */
+    double get_scale_factor() const;
 
     /**
      * @brief Performs angular conversion e.g. calculates from raw photon counts
@@ -372,12 +376,12 @@ class AngleCalibration {
      * @param photon_counts_error error of photon counts (generally variance
      * error is used)
      * @param incident_intensity incident intensity
-     * @param exposure_time exposure time of acquisition [s]
      * @return pair {corrected photon counts, propagated_error}
      */
-    std::pair<double, double> incident_intensity_correction(
-        const double photon_counts, const double photon_counts_error,
-        const uint64_t incident_intensity, const double exposure_time) const;
+    std::pair<double, double>
+    incident_intensity_correction(const double photon_counts,
+                                  const double photon_counts_error,
+                                  const uint64_t incident_intensity) const;
 
     std::pair<double, double> transverse_width_correction(
         const double photon_counts, const double photon_counts_error,
@@ -439,10 +443,11 @@ class AngleCalibration {
     double base_peak_angle{};
 
     /**
-     * incident intensity of first acquisition used for incident intensity
-     * correction
+     * @brief scale factor to scale everything to a reasonable scale
+     * e.g. can be incident_intensity of first acquisition
+     * @default 1.0
      */
-    std::optional<uint64_t> I0_of_first_acquisition{};
+    double m_scale_factor{1.0};
 
     /**
      * list of acquisition files used for calibration

@@ -87,10 +87,11 @@ bool AngleCalibration::module_is_disconnected(const size_t module_index) const {
                        [](const auto &elem) { return elem; });
 }
 
-void AngleCalibration::set_incident_intensity_of_first_acquisition(
-    const double incident_intensity) {
-    I0_of_first_acquisition = incident_intensity;
+void AngleCalibration::set_scale_factor(const double scale_factor_) {
+    m_scale_factor = scale_factor_;
 }
+
+double AngleCalibration::get_scale_factor() const { return m_scale_factor; }
 
 void AngleCalibration::read_initial_calibration_from_file(
     const std::string &filename,
@@ -366,18 +367,20 @@ AngleCalibration::rate_correction(const double photon_count,
 
 std::pair<double, double> AngleCalibration::incident_intensity_correction(
     const double photon_counts, const double photon_count_error,
-    const uint64_t incident_intensity, const double exposure_time) const {
+    const uint64_t incident_intensity) const {
 
-    if (exposure_time == 0) {
-        throw std::runtime_error(
-            LOCATION + "Exposure time is zero - cannot perform incident "
-                       "intensity correction!");
+    if (incident_intensity == 0) {
+        throw std::runtime_error(LOCATION +
+                                 "Incident intensity is zero - cannot perform "
+                                 "incident intensity correction");
+    }
+    if (m_scale_factor == 1.0) {
+        LOG(TLogLevel::logWARNING)
+            << "Scale factor for incident intensity correction not set, "
+               "assuming scale factor of 1.0";
     }
 
-    double I0_correction_factor = I0_of_first_acquisition.has_value()
-                                      ? I0_of_first_acquisition.value() /
-                                            (incident_intensity * exposure_time)
-                                      : 1.0 / exposure_time;
+    double I0_correction_factor = get_scale_factor() / (incident_intensity);
 
     double I0_corrected_photon_counts = photon_counts * I0_correction_factor;
     double I0_corrected_photon_counts_error =
@@ -445,27 +448,25 @@ std::pair<double, double> AngleCalibration::photon_count_correction(
     double photon_counts, const size_t global_strip_index, const uint64_t I0,
     const double exposure_time) const {
 
+    /*
     auto [rate_corrected_photon_counts, rate_corrected_photon_counts_error] =
         rate_correction(photon_counts, photon_counts,
                         exposure_time); // same variance as poisson distributed
                                         // - maybe sqaured?
+    */
 
     // mighells statistics
-    rate_corrected_photon_counts += 1;
-
-    // error does not change
+    photon_counts += 1;
 
     auto [flatfield_normalized_photon_counts,
           flatfield_normalized_photon_counts_variance] =
-        flatfield_correction(rate_corrected_photon_counts,
-                             rate_corrected_photon_counts_error,
-                             global_strip_index);
+        flatfield_correction(photon_counts, photon_counts, global_strip_index);
 
     auto [incident_intensity_corrected_photon_counts,
           incident_intensity_corrected_photon_counts_variance] =
         incident_intensity_correction(
             flatfield_normalized_photon_counts,
-            flatfield_normalized_photon_counts_variance, I0, exposure_time);
+            flatfield_normalized_photon_counts_variance, I0);
 
     /*
     const size_t module_index =
@@ -826,6 +827,7 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) const {
 
     for (const auto &file : file_list_) {
         MythenFrame frame = mythen_file_reader->read_frame(file);
+
         // TODO : actually they should not be added up each set of modules is
         // independant - at beamline the module positions overlap (e.g.
         // counterclockwise)

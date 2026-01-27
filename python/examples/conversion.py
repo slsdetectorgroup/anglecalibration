@@ -60,6 +60,12 @@ anglecalibration = AngleCalibration(mythendetectorspecifications, flatfield, myt
 
 anglecalibration.read_initial_calibration_from_file(str(data_path() / "Angcal_2E_Feb2023_P29.off"))
 
+#set scale factor to get reasonable scales 
+frame = mythenfilereader.read_frame(str(data_path() / "Fructose_0p2_60_0060.h5"))
+anglecalibration.scale_factor = frame.incident_intensity/10
+
+print("scale Factor: " ,anglecalibration.scale_factor)
+
 file_list = [f"Fructose_0p2_60_006{i}.h5" for i in range(0,4)] 
 
 redistributed_photon_counts = anglecalibration.convert([str(data_path() / file_name) for file_name in file_list])

@@ -45,6 +45,11 @@ number_of_bins : int
         .def_property_readonly("num_fixed_angle_width_bins",
                                &AngleCalibration::num_fixed_angle_width_bins)
 
+        .def_property("scale_factor", &AngleCalibration::get_scale_factor,
+                      &AngleCalibration::set_scale_factor,
+                      R"(scale factor to scale correction to reasonable values
+                      )")
+
         .def(
             "read_initial_calibration_from_file",
             [](AngleCalibration &self, const std::string &filename) {
