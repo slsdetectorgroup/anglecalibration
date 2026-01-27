@@ -8,10 +8,11 @@ import matplotlib.pyplot as plt
 
 def data_path():
     return Path("/home/mazzol_a/Documents/VariaMay2025/Antonio20250512/AngularConversionTestData/")
+
 def env_data_path():
     env_value = os.environ.get("ANGCAL_TEST_DATA")
     if not env_value:
-        raise RuntimeError("Environment variable AARE_TEST_DATA is not set or is empty")
+        raise RuntimeError("Environment variable ANGCAL_TEST_DATA is not set or is empty")
 
     return Path(env_value)
 
@@ -59,9 +60,13 @@ anglecalibration = AngleCalibration(mythendetectorspecifications, flatfield, myt
 
 anglecalibration.read_initial_calibration_from_file(str(data_path() / "Angcal_2E_Feb2023_P29.off"))
 
-file_list = [f"Fructose_0p2_60_006{i}.h5" for i in range(0,4)]
+file_list = [f"Fructose_0p2_60_006{i}.h5" for i in range(0,4)] 
+
+print("so far so good")
 
 redistributed_photon_counts = anglecalibration.convert([str(data_path() / file_name) for file_name in file_list])
+
+print("did it hang here?")
 
 # plot converted data
 bin_indices = np.arange(0, redistributed_photon_counts.size,1)

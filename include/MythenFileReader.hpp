@@ -149,6 +149,16 @@ class RawMythenFileReader : public MythenFileReader {
             frame.channel_mask =
                 counter_mask_to_channel_indices(counter_mask.value());
 
+        auto exposure_time = file.master().exptime();
+        if (exposure_time.has_value()) {
+            frame.exposure_time =
+                std::chrono::duration<double>(exposure_time.value()).count();
+        } else {
+            LOG(TLogLevel::logWARNING)
+                << "Exposure time not found in master file, setting to 0.";
+            frame.exposure_time = 0.0;
+        }
+
         // extract acquisition_index
         size_t acquisition_index = get_acquisition_index(file_name);
 
@@ -284,6 +294,12 @@ class EpicsMythenFileReader : public HDF5FileReader, public MythenFileReader {
 
         frame.channel_mask = counter_mask_to_channel_indices(channel_number);
 
+        auto dataset_exposure_time =
+            get_dataset("/entry/instrument/NDAttributes/AcquireTime");
+
+        dataset_exposure_time.read_into_buffer(
+            reinterpret_cast<std::byte *>(&frame.exposure_time));
+
         close_file();
 
         return frame;
@@ -305,12 +321,14 @@ class EpicsMythenFileReader : public HDF5FileReader, public MythenFileReader {
     /**
      * @brief reads the incident intensity from epics hdf5 files
      */
-    void read_incident_intensity_from_hdf5(uint64_t incident_intensity) {
+    void read_incident_intensity_from_hdf5(uint64_t &incident_intensity) {
         auto dataset_incident_intensity =
             get_dataset("/entry/instrument/NDAttributes/Izero");
 
+        double temp_value = 0.0;
         dataset_incident_intensity.read_into_buffer(
-            reinterpret_cast<std::byte *>(&incident_intensity));
+            reinterpret_cast<std::byte *>(&temp_value));
+        incident_intensity = static_cast<uint64_t>(std::lround(temp_value));
     }
 
   private:

@@ -43,6 +43,7 @@ TEST_CASE("MythenFileReader using raw file", "[mythenfilereader][.files]") {
         REQUIRE(frame.incident_intensity == 1002);
         REQUIRE(frame.size() == 1280 * 2);
         REQUIRE(frame.channel_mask == std::array<uint8_t, 3>{0, 0, 1});
+        REQUIRE(frame.exposure_time == 5.0);
     }
 }
 
@@ -66,7 +67,9 @@ TEST_CASE("test Epics mythenfilereader", "[mythenfilereader][.files]") {
 
         CHECK(frame.photon_counts().size() == 61440);
 
-        CHECK(frame.incident_intensity == 0.0);
+        CHECK(frame.incident_intensity == 5163472);
+
+        CHECK(frame.exposure_time == 5.0);
     }
     SECTION("read I0 values from seperate file") {
         EpicsMythenFileReader file_reader(fpath / "I0.txt");
@@ -83,5 +86,6 @@ TEST_CASE("test Epics mythenfilereader", "[mythenfilereader][.files]") {
         CHECK(frame.photon_counts().size() == 61440);
 
         CHECK(frame.incident_intensity == 0.0);
+        CHECK(frame.exposure_time == 5.0);
     }
 }
