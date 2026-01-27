@@ -233,35 +233,6 @@ void AngleCalibration::set_base_peak_angle(const double base_peak_angle_) {
 
 double AngleCalibration::get_base_peak_angle() const { return base_peak_angle; }
 
-/*
-void AngleCalibration::calculate_average_photon_counts() {
-    NDArray<size_t, 1> num_frames_with_base_peak_in_module(
-        std::array<ssize_t, 1>{mythen_detector->max_modules()});
-    NDArray<double, 1> average_photon_counts(
-        std::array<ssize_t, 1>{mythen_detector->max_modules()});
-
-    for (const auto &file : file_list) {
-        MythenFrame frame = mythen_file_reader->read_frame(file);
-
-        for (size_t module_index; module_index < mythen_detector->max_modules();
-             ++module_index) {
-            if (base_peak_is_in_module(module_index, frame.detector_angle)) {
-                num_frames_with_base_peak_in_module(module_index) += 1;
-                average_photon_counts(module_index) = std::accumulate(
-                    frame.photon_counts.begin() +
-                        module_index * mythen_detector->strips_per_module(),
-                    frame.photon_counts.end() +
-                        (module_index + 1) *
-                            mythen_detector->strips_per_module(),
-                    1.0); // mmh why 1.0 though?
-            }
-        }
-    }
-
-    // scale with average over all runs
-}
-*/
-
 double AngleCalibration::similarity_criterion(const NDView<double, 1> S0,
                                               const NDView<double, 1> S1,
                                               const NDView<double, 1> S2,
@@ -325,6 +296,13 @@ std::pair<double, double>
 AngleCalibration::rate_correction(const double photon_count,
                                   const double photon_count_error,
                                   const double exposure_time) const {
+
+    if (exposure_time == 0) {
+        throw std::runtime_error(LOCATION +
+                                 "Exposure time is zero - cannot perform rate "
+                                 "correction!");
+    }
+
     constexpr double dead_time = 2.915829802160547e-7; // measured dead-time
 
     const double maximum_count_rate =
@@ -390,6 +368,12 @@ std::pair<double, double> AngleCalibration::incident_intensity_correction(
     const double photon_counts, const double photon_count_error,
     const uint64_t incident_intensity, const double exposure_time) const {
 
+    if (exposure_time == 0) {
+        throw std::runtime_error(
+            LOCATION + "Exposure time is zero - cannot perform incident "
+                       "intensity correction!");
+    }
+
     double I0_correction_factor = I0_of_first_acquisition.has_value()
                                       ? I0_of_first_acquisition.value() /
                                             (incident_intensity * exposure_time)
@@ -411,7 +395,9 @@ AngleCalibration::flatfield_correction(const double photon_counts,
     // flatfield normalization
     double flatfield_normalized_photon_counts =
         photon_counts *
-        flat_field->get_inverse_normalized_flatfield()(global_strip_index, 0);
+        flat_field->get_inverse_normalized_flatfield()(
+            global_strip_index,
+            0); // TODO: maybe just divide by normalized flatfield
 
     double normalized_flatfield_variance =
         flat_field->get_inverse_normalized_flatfield()(global_strip_index, 1);
@@ -428,11 +414,36 @@ AngleCalibration::flatfield_correction(const double photon_counts,
                      flatfield_normalized_photon_counts_error);
 }
 
+std::pair<double, double> AngleCalibration::transverse_width_correction(
+    const double photon_counts, const double photon_counts_error,
+    const size_t module_index, const size_t strip_index) const {
+
+    // convert to EE parameters
+    const auto [normal_distance, module_center_distance, angle] =
+        BCparameters.convert_to_EEParameters(module_index);
+
+    const double distance_sample_pixel =
+        std::sqrt(std::pow(normal_distance, 2) +
+                  std::pow(module_center_distance -
+                               mythen_detector->pitch() * strip_index,
+                           2));
+
+    const double transverse_width_correction_factor =
+        1. / (2 * std::atan(mythen_detector->transverse_width() /
+                            (2 * distance_sample_pixel)));
+    double transverse_width_normalized_photon_counts =
+        photon_counts * transverse_width_correction_factor;
+    double transverse_width_normalized_photon_counts_error =
+        photon_counts_error * std::pow(transverse_width_correction_factor,
+                                       2); // TODO: is it squared the error?
+
+    return std::pair(transverse_width_normalized_photon_counts,
+                     transverse_width_normalized_photon_counts_error);
+}
+
 std::pair<double, double> AngleCalibration::photon_count_correction(
     double photon_counts, const size_t global_strip_index, const uint64_t I0,
     const double exposure_time) const {
-
-    // TODO no idea what to do with variance
 
     auto [rate_corrected_photon_counts, rate_corrected_photon_counts_error] =
         rate_correction(photon_counts, photon_counts,
@@ -450,9 +461,28 @@ std::pair<double, double> AngleCalibration::photon_count_correction(
                              rate_corrected_photon_counts_error,
                              global_strip_index);
 
-    return incident_intensity_correction(
-        flatfield_normalized_photon_counts,
-        flatfield_normalized_photon_counts_variance, I0, exposure_time);
+    auto [incident_intensity_corrected_photon_counts,
+          incident_intensity_corrected_photon_counts_variance] =
+        incident_intensity_correction(
+            flatfield_normalized_photon_counts,
+            flatfield_normalized_photon_counts_variance, I0, exposure_time);
+
+    /*
+    const size_t module_index =
+        global_strip_index / MythenDetectorSpecifications::strips_per_module();
+    const size_t strip_index =
+        global_strip_index % MythenDetectorSpecifications::strips_per_module();
+
+
+    transverse_width_correction(
+        incident_intensity_corrected_photon_counts,
+        incident_intensity_corrected_photon_counts_variance, module_index,
+        strip_index);
+    */
+
+    return std::pair<double, double>{
+        incident_intensity_corrected_photon_counts,
+        incident_intensity_corrected_photon_counts_variance};
 }
 
 double AngleCalibration::calculate_similarity_of_peaks(

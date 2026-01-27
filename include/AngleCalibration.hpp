@@ -379,8 +379,12 @@ class AngleCalibration {
         const double photon_counts, const double photon_counts_error,
         const uint64_t incident_intensity, const double exposure_time) const;
 
-    /** @brief calculate the corrected photon counts (flatfield, rate, incident
-     * intensity)
+    std::pair<double, double> transverse_width_correction(
+        const double photon_counts, const double photon_counts_error,
+        const size_t module_index, const size_t strip_index) const;
+
+    /** @brief calculate the corrected photon counts (flatfield, rate,
+     * incident intensity)
      * @param photon_counts photon counts
      * @param global_strip_index strip index of photon counts
      * @param I0 incident intensity
@@ -486,8 +490,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
          strip_index < mythen_detector->strips_per_module(); ++strip_index) {
 
         size_t global_strip_index =
-            module_index * mythen_detector->strips_per_module() +
-            strip_index; // TODO: is this really correct - check sign
+            module_index * mythen_detector->strips_per_module() + strip_index;
 
         if (mythen_detector->get_bad_channels()(global_strip_index)) {
             continue; // skip bad channels
@@ -513,7 +516,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         // get corrected photon counts and propagate error
         auto [corrected_photon_counts, corrected_photon_counts_variance] =
             photon_count_correction(
-                frame.photon_counts(global_strip_index) + 1, global_strip_index,
+                frame.photon_counts(global_strip_index), global_strip_index,
                 frame.incident_intensity, frame.exposure_time);
 
         double inverse_corrected_photon_counts_variance =
@@ -588,9 +591,6 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
 
             double statistical_weight =
                 bin_coverage_factor * inverse_photon_counts_variance_per_bin;
-
-            // std::cout << "statistical weight: " << statistical_weight <<
-            // "\n";
 
             fixed_angle_width_bins_photon_counts(proper_bin_index) +=
                 statistical_weight * photon_counts_per_bin;

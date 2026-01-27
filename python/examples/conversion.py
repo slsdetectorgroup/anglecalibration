@@ -41,7 +41,7 @@ mythendetectorspecifications.read_bad_channels_from_file(str(data_path() / "bc20
 
 bad_channels = mythendetectorspecifications.bad_channels
 
-plot(bad_channels)
+#plot(bad_channels)
 
 # setup flatfield 
 flatfield = FlatField(mythendetectorspecifications)
@@ -50,7 +50,7 @@ normalized_flatfield = np.loadtxt(data_path() / "Flatfield_E17p5keV_T12500eV_up_
 
 flatfield.inverse_normalized_flatfield = 1./normalized_flatfield
 
-plot(flatfield.inverse_normalized_flatfield[:,0])
+#plot(flatfield.inverse_normalized_flatfield[:,0])
 
 # setup mythen data file reader to read EPICS mythen hdf5 files
 mythenfilereader = EpicsMythenFileReader()
@@ -62,11 +62,7 @@ anglecalibration.read_initial_calibration_from_file(str(data_path() / "Angcal_2E
 
 file_list = [f"Fructose_0p2_60_006{i}.h5" for i in range(0,4)] 
 
-print("so far so good")
-
 redistributed_photon_counts = anglecalibration.convert([str(data_path() / file_name) for file_name in file_list])
-
-print("did it hang here?")
 
 # plot converted data
 bin_indices = np.arange(0, redistributed_photon_counts.size,1)
