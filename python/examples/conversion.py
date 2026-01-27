@@ -46,9 +46,7 @@ bad_channels = mythendetectorspecifications.bad_channels
 # setup flatfield 
 flatfield = FlatField(mythendetectorspecifications)
 
-normalized_flatfield = np.loadtxt(data_path() / "Flatfield_E17p5keV_T12500eV_up_AUGCAL2_Sep2023_open_WS_C_X_X.raw", dtype=np.double, usecols=[1,2])
-
-flatfield.inverse_normalized_flatfield = 1./normalized_flatfield
+flatfield.normalized_flatfield = np.loadtxt(data_path() / "Flatfield_E17p5keV_T12500eV_up_AUGCAL2_Sep2023_open_WS_C_X_X.raw", dtype=np.double, usecols=[1,2])
 
 #plot(flatfield.inverse_normalized_flatfield[:,0])
 

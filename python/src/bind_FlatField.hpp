@@ -70,6 +70,27 @@ void define_FlatField_binding(py::module &m) {
                     temp_array); // second copy TODO im copying twice
             })
 
+        .def_property(
+            "normalized_flatfield",
+            [](FlatField &self) {
+                auto result =
+                    new NDArray<double, 2>(self.get_normalized_flatfield());
+                return return_image_data(result); // maybe return memory view
+            },
+            [](FlatField &self,
+               py::array_t<double, py::array::c_style | py::array::forcecast>
+                   &normalized_flatfield) {
+                py::buffer_info info = normalized_flatfield.request();
+                NDView<double, 2> temp_array_view(
+                    reinterpret_cast<double *>(info.ptr),
+                    std::array<ssize_t, 2>{info.shape[0], info.shape[1]});
+                NDArray<double, 2> temp_array(
+                    temp_array_view); // first copy //maybe modify buffer //or
+                                      // iterate
+                self.set_normalized_flatfield(
+                    temp_array); // second copy TODO im copying twice
+            })
+
         .def("calculate_normalized_flatfield",
              &FlatField::calculate_normalized_flatfield)
 
@@ -77,11 +98,5 @@ void define_FlatField_binding(py::module &m) {
              &FlatField::calculate_inverse_normalized_flatfield<true>)
 
         .def("calculate_inverse_normalized_flatfield",
-             &FlatField::calculate_inverse_normalized_flatfield)
-
-        .def_property_readonly("get_normalized_flatfield", [](FlatField &self) {
-            auto result =
-                new NDArray<double, 2>(self.get_normalized_flatfield());
-            return return_image_data(result);
-        });
+             &FlatField::calculate_inverse_normalized_flatfield);
 }

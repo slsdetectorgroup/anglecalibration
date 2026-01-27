@@ -397,19 +397,16 @@ AngleCalibration::flatfield_correction(const double photon_counts,
 
     // flatfield normalization
     double flatfield_normalized_photon_counts =
-        photon_counts *
-        flat_field->get_inverse_normalized_flatfield()(
-            global_strip_index,
-            0); // TODO: maybe just divide by normalized flatfield
+        photon_counts /
+        flat_field->get_normalized_flatfield()(global_strip_index, 0);
 
     double normalized_flatfield_variance =
-        flat_field->get_inverse_normalized_flatfield()(global_strip_index, 1);
+        flat_field->get_normalized_flatfield()(global_strip_index, 1);
 
     double flatfield_normalized_photon_counts_error =
-        photon_counts_error *
-            std::pow(flat_field->get_inverse_normalized_flatfield()(
-                         global_strip_index, 0),
-                     2) +
+        photon_counts_error * std::pow(flat_field->get_normalized_flatfield()(
+                                           global_strip_index, 0),
+                                       2) +
         normalized_flatfield_variance *
             std::pow(photon_counts, 2); // error propagation (error squared !!)
 
