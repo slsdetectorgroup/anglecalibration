@@ -97,6 +97,31 @@ class AngleCalibration {
             std::make_shared<InitialAngCalParametersFile>());
 
     /**
+     * @brief read bad channels from file
+     * @param filename bad channels filename
+     * @param file_reader file_reader to read bad channels file (default:
+     * CustomBadChannelsFile bad channel file is expected to be a text file
+     * where each line stores the channel index of a bad channel. Consecutive
+     * bad channels can be stored in one line by seperating the first and last
+     * channel index of the bad channel block e.g.
+     * bad_channel_index0-bad_channel_index1.))
+     */
+    void read_bad_channels_from_file(
+        const std::string &filename,
+        std::shared_ptr<SimpleFileInterface> file_reader =
+            std::make_shared<CustomBadChannelsFile>());
+
+    NDView<bool, 1> get_bad_channels() const;
+
+    /**
+     * @brief set bad channels
+     * @param bad_channels_ boolean NDArray of size of total number of
+     * strips/channels in detector, stores 'TRUE' if strip is a bad channel
+     * otherwise 'FALSE'
+     */
+    void set_bad_channels(const NDArray<bool, 1> &bad_channels_);
+
+    /**
      * get the histoic DG parameters
      */
     const DGParameters &get_DGparameters() const; // TODO do I need that?
@@ -414,6 +439,10 @@ class AngleCalibration {
     DGParameters DGparameters{};
 
     BCParameters BCparameters{};
+
+    /// @brief Array of size strips/channels in detector, stores 'TRUE' if strip
+    /// is a bad channel otherwise 'FALSE'
+    NDArray<bool, 1> bad_channels{};
 
     /**
      * detector specifications

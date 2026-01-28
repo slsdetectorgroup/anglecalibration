@@ -33,16 +33,6 @@ int main() {
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
         std::make_shared<MythenDetectorSpecifications>();
 
-    mythen_detector_ptr->read_bad_channels_from_file(bad_channels_filename);
-
-    LOG(TLogLevel::logINFO) << "read bad channels";
-
-#ifdef ANGCAL_PLOT
-    plot_photon_counts(mythen_detector_ptr->get_bad_channels(),
-                       {0, mythen_detector_ptr->num_strips()}, "Bad channels",
-                       std::nullopt);
-#endif
-
     // FileaReader to read Mythen Files
     auto mythen_file_reader = std::make_shared<EpicsMythenFileReader>();
 
@@ -63,6 +53,16 @@ int main() {
     // read initial parameters from file
     anglecalibration.read_initial_calibration_from_file(
         initial_angles_filename);
+
+    anglecalibration.read_bad_channels_from_file(bad_channels_filename);
+
+    LOG(TLogLevel::logINFO) << "read bad channels";
+
+#ifdef ANGCAL_PLOT
+    plot_photon_counts(anglecalibration.get_bad_channels(),
+                       {0, mythen_detector_ptr->num_strips()}, "Bad channels",
+                       std::nullopt);
+#endif
 
     std::vector<std::string> file_list(4);
     std::generate(file_list.begin(), file_list.end(),

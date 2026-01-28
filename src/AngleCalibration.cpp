@@ -31,6 +31,9 @@ AngleCalibration::AngleCalibration(
 
     DGparameters = DGParameters(mythen_detector->max_modules());
     BCparameters = BCParameters(mythen_detector->max_modules());
+
+    bad_channels = NDArray<bool, 1>(
+        std::array<ssize_t, 1>{mythen_detector->num_strips()}, false);
 }
 
 void AngleCalibration::set_histogram_bin_width(double bin_width) {
@@ -104,6 +107,22 @@ void AngleCalibration::read_initial_calibration_from_file(
 
     DGparameters.convert_to_BCParameters(
         BCparameters); // initialize BC parameters
+}
+
+void AngleCalibration::read_bad_channels_from_file(
+    const std::string &filename,
+    std::shared_ptr<SimpleFileInterface> file_reader) {
+
+    file_reader->open(filename);
+    file_reader->read_into(reinterpret_cast<std::byte *>(bad_channels.data()));
+}
+
+NDView<bool, 1> AngleCalibration::get_bad_channels() const {
+    return bad_channels.view();
+}
+
+void AngleCalibration::set_bad_channels(const NDArray<bool, 1> &bad_channels_) {
+    bad_channels = bad_channels_;
 }
 
 size_t AngleCalibration::global_to_local_strip_index_conversion(

@@ -54,7 +54,9 @@ TEST_CASE("read initial angle calibration file",
 TEST_CASE("read bad channels",
           "[anglecalibration][mythenspecifications][.files]") {
 
-    MythenDetectorSpecifications mythen_detector;
+    AngleCalibration anglecalibration(
+        std::make_shared<MythenDetectorSpecifications>(),
+        std::shared_ptr<FlatField>(), std::shared_ptr<MythenFileReader>());
 
     std::string bad_channels_filename = test_data_path() /
                                         "AngleCalibration_Test_Data" /
@@ -62,13 +64,13 @@ TEST_CASE("read bad channels",
 
     REQUIRE(std::filesystem::exists(bad_channels_filename));
 
-    mythen_detector.read_bad_channels_from_file(bad_channels_filename);
+    anglecalibration.read_bad_channels_from_file(bad_channels_filename);
 
-    CHECK(mythen_detector.get_bad_channels().size() == 61440);
+    CHECK(anglecalibration.get_bad_channels().size() == 61440);
 
-    CHECK(mythen_detector.get_bad_channels()[61437] == true);
-    CHECK(std::all_of(mythen_detector.get_bad_channels().begin() + 30720,
-                      mythen_detector.get_bad_channels().begin() + 61439,
+    CHECK(anglecalibration.get_bad_channels()[61437] == true);
+    CHECK(std::all_of(anglecalibration.get_bad_channels().begin() + 30720,
+                      anglecalibration.get_bad_channels().begin() + 61439,
                       [](const bool element) { return element; }));
 }
 

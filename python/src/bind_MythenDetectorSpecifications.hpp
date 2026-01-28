@@ -55,14 +55,6 @@ offset: double
                 Number of modules in detector (default 48).
             )")
 
-        .def(
-            "read_bad_channels_from_file",
-            [](MythenDetectorSpecifications &self,
-               const std::string &filename) {
-                self.read_bad_channels_from_file(filename);
-            },
-            py::arg("filename"), R"(reads bad channels from file)")
-
         .def_property(
             "unconnected_modules",
             [](MythenDetectorSpecifications &self) {
@@ -88,34 +80,15 @@ offset: double
                 self.set_unconnected_modules(temp_vec);
             })
 
-        .def_property(
-            "bad_channels",
-            [](MythenDetectorSpecifications &self) {
-                auto bad_channels =
-                    new NDArray<ssize_t, 1>(self.get_bad_channels());
-                return return_image_data(bad_channels);
-            },
-            [](MythenDetectorSpecifications &self,
-               py::array_t<bool, py::array::forcecast> bad_channels) {
-                py::buffer_info info = bad_channels.request();
-                if (info.ndim != 1 ||
-                    info.format != py::format_descriptor<bool>::format()) {
-                    throw std::runtime_error("Expected 1D buffer of type bool");
-                }
-                NDView<bool, 1> temp_array_view(
-                    reinterpret_cast<bool *>(info.ptr),
-                    std::array<ssize_t, 1>{info.shape[0]});
-                NDArray temp_array(temp_array_view); // first copy
-                self.set_bad_channels(
-                    temp_array); // second copy TODO im copying twice
-            })
-
         .def_property_readonly_static(
-            "pitch", &MythenDetectorSpecifications::pitch, R"()")
+            "pitch",
+            [](py::object) { return MythenDetectorSpecifications::pitch(); })
 
         .def_property_readonly_static(
             "strips_per_module",
-            &MythenDetectorSpecifications::strips_per_module)
+            [](py::object) {
+                return MythenDetectorSpecifications::strips_per_module();
+            })
 
         .def_property_readonly("max_modules",
                                &MythenDetectorSpecifications::max_modules)
@@ -125,19 +98,21 @@ offset: double
 
         .def_property_readonly_static(
             "sample_detector_offset",
-            &MythenDetectorSpecifications::sample_detector_offset)
+            [](py::object) {
+                return MythenDetectorSpecifications::sample_detector_offset();
+            })
 
         .def_property_readonly("offset", &MythenDetectorSpecifications::offset)
 
         .def_property_readonly_static(
             "min_angle",
-            [](py::object /* self */) {
+            [](py::object) {
                 return MythenDetectorSpecifications::min_angle();
             })
 
         .def_property_readonly_static(
             "max_angle",
-            [](py::object /* self */) {
+            [](py::object) {
                 return MythenDetectorSpecifications::max_angle();
             })
 

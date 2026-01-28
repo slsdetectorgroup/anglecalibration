@@ -2,7 +2,7 @@
 AngleCalibration
 ==================
 
-Class to calibrate the mythen detector parameters. For the calibration the "Best computing" BC parameters are used. However, as initial parameters it expects the "historic detector group" DG parameters. 
+Class to perform angular conversion and to calibrate the mythen detector parameters used for conversion. For the calibration the "Best computing" BC parameters are used. However, as initial parameters or for conversion it expects the "historic detector group" DG parameters. 
 See :ref:`parametersets` for a more detailed description of the different detector parameters. 
 
 .. note:: 
@@ -11,8 +11,8 @@ See :ref:`parametersets` for a more detailed description of the different detect
 ..
     TODO: maybe move detailed description to another page. 
 
-Example Usage: 
-_______________
+Example Usage for Calibration: 
+_______________________________
 
 .. code-block:: cpp
 
@@ -41,6 +41,8 @@ _______________
     //calibrate parameters for module 10
     anglecalibration.calibrate(filelist, base_peak_angle, 10); 
 
+API:
+____
 
 .. note:: 
     The method ``read_initial_calibration_from_file`` expects a text file in the format below. Each line denotes the DG parameters for each module. 
@@ -51,8 +53,21 @@ _______________
         module 1 center  633.044070300816 +- 0.0000 conversion 0.657618957538105E-04 +- 0.0000 offset  5.00486981153634     +- 0.0000
 
 
-    If youre file format deviates from the above format implement your custom file reader inheriting from the class ``SimpleFileInterface`` (:ref:`simplefileinterface`) and pass it to the constructor. 
-    Similarly for the acquisition files, ``AngleCalibration`` uses per default the class ``MythenFileReader`` (:ref:`mythenfilereader`) expecting hdf5 files with entries 'data', 'DetectorAngle' and 'CounterMask'. 
+    If youre file format deviates from the above format implement your custom file reader inheriting from the class ``SimpleFileInterface`` (:ref:`simplefileinterface`) and pass it to the function.
+
+
+.. note:: 
+    The method ``read_bad_channels_from_file`` expects a text file using the format below. Each line denotes the index of a bad channel. Consecutive bad channels can be stored on one line e.g. channels with 20-42 are bad channels.
+
+    .. code-block:: text
+
+        1
+        2
+        20-42
+        100
+        1002-1004
+
+    If youre file format deviates from the above format implement your custom file reader inheriting from the class ``SimpleFileInterface`` (:ref:`simplefileinterface`) and pass it to the function.
 
 
 .. doxygenclass:: angcal::AngleCalibration

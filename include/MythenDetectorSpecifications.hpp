@@ -47,31 +47,7 @@ class MythenDetectorSpecifications {
                                  const size_t num_counters = 1,
                                  const size_t max_modules = 48)
         : offset_(offset), num_counters_(num_counters),
-          max_modules_(max_modules) {
-
-        bad_channels =
-            NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips()}, false);
-    }
-
-    /**
-     * @brief read bad channels from file
-     * @param filename bad channels filename
-     * @param file_reader file_reader to read bad channels file (default:
-     * CustomBadChannelsFile bad channel file is expected to be a text file
-     * where each line stores the channel index of a bad channel. Consecutive
-     * bad channels can be stored in one line by seperating the first and last
-     * channel index of the bad channel block e.g.
-     * bad_channel_index0-bad_channel_index1.))
-     */
-    void read_bad_channels_from_file(
-        const std::string &filename,
-        std::shared_ptr<SimpleFileInterface> file_reader =
-            std::make_shared<CustomBadChannelsFile>()) {
-
-        file_reader->open(filename);
-        file_reader->read_into(
-            reinterpret_cast<std::byte *>(bad_channels.data()));
-    }
+          max_modules_(max_modules) {}
 
     void
     set_unconnected_modules(const std::vector<ssize_t> &unconnected_modules) {

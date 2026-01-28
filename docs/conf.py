@@ -32,7 +32,8 @@ version = '@PROJECT_VERSION@'
 extensions = ['breathe',
               'sphinx.ext.autodoc',
               'sphinx.ext.napoleon',
-              'sphinx.ext.autosummary'
+              'sphinx.ext.autosummary',
+              'numpydoc'
               #'sphinx.ext.mathjax'
              ]
 

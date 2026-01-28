@@ -37,12 +37,6 @@ def plot_excluding_channels(array: np.array, channels_to_exclude: np.array, x = 
 # setup mythen detector specifications - stores all relevant parameters of the detector setup
 mythendetectorspecifications = MythenDetectorSpecifications() 
 
-mythendetectorspecifications.read_bad_channels_from_file(str(data_path() / "bc2023_003_RING.chans"))
-
-bad_channels = mythendetectorspecifications.bad_channels
-
-#plot(bad_channels)
-
 # setup flatfield 
 flatfield = FlatField(mythendetectorspecifications)
 
@@ -58,15 +52,21 @@ anglecalibration = AngleCalibration(mythendetectorspecifications, flatfield, myt
 
 anglecalibration.read_initial_calibration_from_file(str(data_path() / "Angcal_2E_Feb2023_P29.off"))
 
+anglecalibration.read_bad_channels_from_file(str(data_path() / "bc2023_003_RING.chans"))
+
+bad_channels = anglecalibration.bad_channels
+
+#plot(bad_channels)
+
 #set scale factor to get reasonable scales 
 frame = mythenfilereader.read_frame(str(data_path() / "Fructose_0p2_60_0060.h5"))
 anglecalibration.scale_factor = frame.incident_intensity/10
 
 print("scale Factor: " ,anglecalibration.scale_factor)
 
-file_list = [f"Fructose_0p2_60_006{i}.h5" for i in range(0,4)] 
+file_list = [str(data_path() / f"Fructose_0p2_60_006{i}.h5") for i in range(0,4)] 
 
-redistributed_photon_counts = anglecalibration.convert([str(data_path() / file_name) for file_name in file_list])
+redistributed_photon_counts = anglecalibration.convert(file_list)
 
 # plot converted data
 bin_indices = np.arange(0, redistributed_photon_counts.size,1)

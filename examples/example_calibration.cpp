@@ -61,10 +61,6 @@ int main() {
 
     assert(std::filesystem::exists(bad_channels_filename));
 
-    mythen_detector_ptr->read_bad_channels_from_file(bad_channels_filename);
-
-    LOG(TLogLevel::logINFO) << "read bad channels";
-
 #ifdef ANGCAL_PLOT
 
     plot_photon_counts(mythen_detector_ptr->get_bad_channels(),
@@ -105,6 +101,10 @@ int main() {
         initial_angles_filename);
 
     LOG(TLogLevel::logINFO) << "read initial parameters from file";
+
+    anglecalibration.read_bad_channels_from_file(bad_channels_filename);
+
+    LOG(TLogLevel::logINFO) << "read bad channels";
 
     std::vector<std::string> filelist(num_files); // 1501
 

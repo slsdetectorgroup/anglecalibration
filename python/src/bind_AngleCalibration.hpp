@@ -14,16 +14,7 @@ using namespace angcal;
 
 void define_AngleCalibration_binding(py::module &m) {
 
-    py::class_<AngleCalibration>(m, "AngleCalibration", R"(Attributes
-----------
-histogram_bin_width : double 
-    bin width of fixed angle width histogram [degree]
-    (default: 0.0036 deg)
-base_peak_angle: double
-    angle of center of base peak [degree]
-number_of_bins : int 
-    Read-only. number of bins for new fixed angle width histogram
-)")
+    py::class_<AngleCalibration>(m, "AngleCalibration")
         .def(py::init<std::shared_ptr<MythenDetectorSpecifications>,
                       std::shared_ptr<FlatField>,
                       std::shared_ptr<MythenFileReader>>(),
@@ -40,10 +31,14 @@ number_of_bins : int
 
         .def_property("histogram_bin_width",
                       &AngleCalibration::get_histogram_bin_width,
-                      &AngleCalibration::set_histogram_bin_width)
+                      &AngleCalibration::set_histogram_bin_width, R"(
+                      bin width of fixed angle width histogram [degrees]
+                      default: '0.0036°')")
 
-        .def_property_readonly("num_fixed_angle_width_bins",
-                               &AngleCalibration::num_fixed_angle_width_bins)
+        .def_property_readonly(
+            "num_fixed_angle_width_bins",
+            &AngleCalibration::num_fixed_angle_width_bins,
+            R"(number of bins in fixed angle width histogram)")
 
         .def_property("scale_factor", &AngleCalibration::get_scale_factor,
                       &AngleCalibration::set_scale_factor,
@@ -58,8 +53,16 @@ number_of_bins : int
             R"(reads the historical Detector Group (DG) parameters from file and
      transforms them to Best Computing parameters)")
 
+        .def(
+            "read_bad_channels_from_file",
+            [](AngleCalibration &self, const std::string &filename) {
+                self.read_bad_channels_from_file(filename);
+            },
+            py::arg("filename"), R"(reads bad channels from file)")
+
         .def_property("base_peak_angle", &AngleCalibration::get_base_peak_angle,
-                      &AngleCalibration::set_base_peak_angle)
+                      &AngleCalibration::set_base_peak_angle,
+                      R"(center of chosen base peak for calibration [degrees])")
 
         .def(
             "base_peak_is_in_module",
@@ -71,9 +74,10 @@ number_of_bins : int
             py::arg("module_index"), py::arg("detector_angle"),
             R"(
             check if base peak ROI is contained within module region
-
+            
             Parameters
             ----------
+
             module_index : int
                 Index of the module.
             detector_angle : double
@@ -82,15 +86,28 @@ number_of_bins : int
 
             Returns
             -------
+
             bool
                 True if the base peak ROI lies inside the module region, False otherwise.)")
 
-        .def("module_is_disconnected",
-             [](AngleCalibration &self, const size_t module_index) {
-                 return self.module_is_disconnected(module_index);
-             })
+        .def(
+            "module_is_disconnected",
+            [](AngleCalibration &self, const size_t module_index) {
+                return self.module_is_disconnected(module_index);
+            },
+            py::arg("module_index"),
+            R"(
+            check if a module only has bad channels or is disconnected 
 
-        // TODO set initial calibration from file
+            Parameters
+            ----------
+            module_index : int
+                Index of the module.
+            Returns
+            -------
+            bool
+                True if module is disconnected, False otherwise.
+            )")
 
         .def_property_readonly(
             "DGparameters",
@@ -99,8 +116,42 @@ number_of_bins : int
                     new NDArray<double, 2>(self.get_DGparameters().parameters);
                 return return_image_data(
                     DGparameters); // maybe return memoryview::from_memory
-            })                     // should I have a python class with method
-                                   // centers, etc? - use py::buffer
+            },
+            R"(
+            historic DG parameters 
+
+            numpy.ndarray (,3)
+                array of shape (n_modules, 3) containing the DG parameters for all modules (first column: center, second column: conversion, third column: offset)
+            )") // should I have a python class with
+                // method centers, etc? - use
+                // py::buffer
+
+        .def_property(
+            "bad_channels",
+            [](AngleCalibration &self) {
+                auto bad_channels =
+                    new NDArray<ssize_t, 1>(self.get_bad_channels());
+                return return_image_data(bad_channels);
+            },
+            [](AngleCalibration &self,
+               py::array_t<bool, py::array::forcecast> bad_channels) {
+                py::buffer_info info = bad_channels.request();
+                if (info.ndim != 1 ||
+                    info.format != py::format_descriptor<bool>::format()) {
+                    throw std::runtime_error("Expected 1D buffer of type bool");
+                }
+                NDView<bool, 1> temp_array_view(
+                    reinterpret_cast<bool *>(info.ptr),
+                    std::array<ssize_t, 1>{info.shape[0]});
+                NDArray temp_array(temp_array_view); // first copy
+                self.set_bad_channels(
+                    temp_array); // second copy TODO im copying twice
+            },
+            R"(
+            bad_channels : numpy.ndarray of bool, shape (n_channels,)
+                Expected size: number of channels/strips in the detector.
+                Each element is ``True`` if the channel is bad, otherwise ``False``.
+            )")
 
         .def(
             "calibrate",
@@ -112,16 +163,15 @@ number_of_bins : int
             py::arg("file_list"), py::arg("base_peak_angle"),
             py::arg("module_index"),
             R"(
-            calibrates BC parameters for respective module 
+            calibrates BC parameters for respective module
 
-            Parameters
-            ----------
             file_list: list 
-                list of paths to acquisition files
-            base_peak_angle: double 
-                angle of base peak center [degree]
+                List of paths to acquisition files.
+            base_peak_angle: float
+                Angle of base peak center [degree].
             module_index: int
-                index of module)")
+                Index of module
+            )")
 
         .def(
             "calibrate",
@@ -133,51 +183,12 @@ number_of_bins : int
             py::arg("file_list"), py::arg("base_peak_angle"),
             R"(
             calibrates BC parameters for all modules
-
-            Parameters
-            ----------
-            file_list: list 
+            
+            file_list : list
                 list of paths to acquisition files
-            base_peak_angle: double
+            base_peak_angle : double
                 angle of base peak center [degree]
             )")
-
-        // TODO: is ite better to pass a string for the filename and expose
-        // mythen_file_reader of AngleCalibration
-        .def(
-            "redistributed_photon_counts_in_base_peak_ROI",
-            [](AngleCalibration &self, const MythenFrame &frame,
-               const size_t module_index) {
-                auto result = new NDArray<double, 1>(
-                    self.redistributed_photon_counts_in_base_peak_ROI(
-                        frame, module_index));
-                return return_image_data(result);
-            },
-            R"(
-            redistribute photon counts to fixed angle width bins which are
-            within base peak region
-
-            Returns
-            -------
-            numpy.ndarray (,number_of_bins_in_base_peak_ROI)
-                to fixed angle width redistributed, flatfield corrected and variance scaled photon counts of respective module within base peak ROI)")
-
-        .def(
-            "redistribute_photon_counts_to_fixed_angle_width_bins",
-            [](AngleCalibration &self, const MythenFrame &frame,
-               const size_t module_index) {
-                auto result = new NDArray<double, 1>(
-                    self.redistribute_photon_counts_to_fixed_angle_width_bins(
-                        frame, module_index));
-                return return_image_data(result);
-            },
-            R"(
-            redistribute photon counts of respective module fixed angle width bins 
-
-            Returns
-            -------
-            numpy.ndarray (,num_fixed_angle_width_bins)
-                to fixed angle width redistributed, flatfield corrected and variance scaled photon counts of respective module)")
 
         .def(
             "convert",
@@ -186,16 +197,18 @@ number_of_bins : int
                 auto result = new NDArray<double, 1>(self.convert(file_list));
                 return return_image_data(result);
             },
+            py::arg("file_list"),
             R"(
             performs angular conversion e.g. calculates diffraction pattern from raw photon counts
 
-            Params: 
+            Parameters
             ----------
+
             file_list: list 
                 list of paths to acquisition files
 
             Returns
             -------
             numpy.ndarray (,num_fixed_angle_width_bins)
-                to fixed angle width redistributed, flatfield corrected and variance scaled photon counts)");
+                photon counts redistributed to fixed angle width bins, flatfield corrected and variance scaled photon counts)");
 }
