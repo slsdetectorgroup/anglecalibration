@@ -191,10 +191,10 @@ The photon counts are now normal distributed. Note, as one almost never has phot
 Further the raw normalized photon counts are corrected as follows: 
 
 **Rate Correction:**
-First the raw photon counts are rate corrected by the exposure time :math:`\tau_e` and the dead time :math:`\tau_d`. The rate corrected photon counts :math:`I_{rc}` are given by: 
+First the raw photon counts are rate corrected by the dead time :math:`\tau_d`. The rate corrected photon counts :math:`I_{rc}` are given by: 
 
 .. math:: 
-    I_{rc} = I \cdot \frac{1}{\tau_e} \cdot \frac{C}{C(\tau_d)}, 
+    I_{rc} = I \cdot \frac{C}{C(\tau_d)}, 
 
 where :math:`C [1/s]` is the actual count rate. :math:`C(\tau_d) [1/s]` is the apparent count rate measured by the detector and dependant on the dead time, which is given by the following formula: 
 

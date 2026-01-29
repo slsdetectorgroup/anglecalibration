@@ -32,8 +32,12 @@ void define_MythenFrame_bindings(py::module &m) {
         .def_property_readonly(
             "channel_mask", [](MythenFrame &self) { return self.channel_mask; })
 
-        .def_property_readonly("incident_intensity", [](MythenFrame &self) {
-            return self.incident_intensity;
+        .def_property_readonly(
+            "incident_intensity",
+            [](MythenFrame &self) { return self.incident_intensity; })
+
+        .def_property_readonly("exposure_time", [](MythenFrame &self) {
+            return self.exposure_time;
         });
 }
 

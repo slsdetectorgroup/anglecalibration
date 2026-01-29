@@ -349,7 +349,9 @@ AngleCalibration::rate_correction(const double photon_count,
                                  "correction!");
     }
 
-    constexpr double dead_time = 2.915829802160547e-7; // measured dead-time
+    constexpr double dead_time =
+        76.08e-9; // 2.915829802160547e-7; // measured dead-time // TODO: in
+                  // Antonios code there are three options
 
     const double maximum_count_rate =
         std::exp(-1); // theoretical maximum count rate for
@@ -377,7 +379,7 @@ AngleCalibration::rate_correction(const double photon_count,
     bool method_converged = false;
     while (!method_converged) {
         W_next_iter = photon_counts_per_second * std::exp(W_prev_iter);
-        method_converged = std::abs(W_next_iter - W_prev_iter) <
+        method_converged = std::abs(1 - W_next_iter / W_prev_iter) <
                            10 * std::numeric_limits<double>::epsilon();
         W_prev_iter = W_next_iter;
         propagated_error =
@@ -398,13 +400,11 @@ AngleCalibration::rate_correction(const double photon_count,
                          (photon_counts_per_second * photon_counts_per_second),
                      2);
 
-    double rate_corrected_photon_counts =
-        photon_count * rate_correction_factor / exposure_time;
+    double rate_corrected_photon_counts = photon_count * rate_correction_factor;
 
     double rate_corrected_photon_counts_error =
         photon_count_error * std::pow(rate_correction_factor, 2) +
-        error_rate_correction_factor * std::pow(photon_count, 2) /
-            std::pow(exposure_time, 2);
+        error_rate_correction_factor * std::pow(photon_count, 2);
 
     return std::pair<double, double>{rate_corrected_photon_counts,
                                      rate_corrected_photon_counts_error};
@@ -494,6 +494,10 @@ std::pair<double, double> AngleCalibration::transverse_width_correction(
 std::pair<double, double> AngleCalibration::photon_count_correction(
     double photon_counts, const size_t global_strip_index, const uint64_t I0,
     const double exposure_time) const {
+
+    if (photon_counts < std::numeric_limits<double>::epsilon()) {
+        return std::pair<double, double>{0.0, 0.0}; // sanity check
+    }
 
     /*
     auto [rate_corrected_photon_counts, rate_corrected_photon_counts_error] =
