@@ -82,9 +82,9 @@ const BCParameters &AngleCalibration::get_BCparameters() const {
 bool AngleCalibration::module_is_disconnected(const size_t module_index) const {
 
     // all channels in the module are bad
-    return std::all_of(mythen_detector->get_bad_channels().begin() +
+    return std::all_of(bad_channels.begin() +
                            module_index * mythen_detector->strips_per_module(),
-                       mythen_detector->get_bad_channels().begin() +
+                       bad_channels.begin() +
                            (module_index + 1) *
                                mythen_detector->strips_per_module(),
                        [](const auto &elem) { return elem; });
@@ -115,6 +115,19 @@ void AngleCalibration::read_bad_channels_from_file(
 
     file_reader->open(filename);
     file_reader->read_into(reinterpret_cast<std::byte *>(bad_channels.data()));
+
+    // update bad_channels
+    std::for_each(
+        mythen_detector->get_unconnected_modules().begin(),
+        mythen_detector->get_unconnected_modules().end(),
+        [this](const auto &module_index) {
+            for (size_t i = module_index *
+                            MythenDetectorSpecifications::strips_per_module();
+                 i < (module_index + 1) *
+                         MythenDetectorSpecifications::strips_per_module();
+                 ++i)
+                bad_channels[i] = true;
+        });
 }
 
 NDView<bool, 1> AngleCalibration::get_bad_channels() const {
@@ -123,6 +136,19 @@ NDView<bool, 1> AngleCalibration::get_bad_channels() const {
 
 void AngleCalibration::set_bad_channels(const NDArray<bool, 1> &bad_channels_) {
     bad_channels = bad_channels_;
+
+    // update bad_channels
+    std::for_each(
+        mythen_detector->get_unconnected_modules().begin(),
+        mythen_detector->get_unconnected_modules().end(),
+        [this](const auto &module_index) {
+            for (size_t i = module_index *
+                            MythenDetectorSpecifications::strips_per_module();
+                 i < (module_index + 1) *
+                         MythenDetectorSpecifications::strips_per_module();
+                 ++i)
+                this->bad_channels[i] = true;
+        });
 }
 
 size_t AngleCalibration::global_to_local_strip_index_conversion(
@@ -413,6 +439,11 @@ std::pair<double, double>
 AngleCalibration::flatfield_correction(const double photon_counts,
                                        const double photon_counts_error,
                                        const size_t global_strip_index) const {
+
+    if (1. / (flat_field->get_normalized_flatfield()(global_strip_index, 0)) <
+        std::numeric_limits<double>::epsilon()) {
+        return std::pair(0.0, 0.0);
+    }
 
     // flatfield normalization
     double flatfield_normalized_photon_counts =

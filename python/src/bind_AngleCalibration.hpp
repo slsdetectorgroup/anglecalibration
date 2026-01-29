@@ -109,6 +109,34 @@ void define_AngleCalibration_binding(py::module &m) {
                 True if module is disconnected, False otherwise.
             )")
 
+        .def(
+            "rate_correction",
+            [](const AngleCalibration &self, const double photon_count,
+               const double photon_count_error, const double exposure_time) {
+                return self.rate_correction(photon_count, photon_count_error,
+                                            exposure_time);
+            },
+            py::arg("photon_count"), py::arg("photon_count_error"),
+            py::arg("exposure_time"),
+            R"(
+            performs rate correction
+
+            Parameters
+            ----------
+            photon_count : float
+                measured photon counts
+            photon_count_error : float
+                propagated error of measured photon counts
+            exposure_time : float
+                exposure time of acquisition [s]
+
+            Returns
+            -------
+            tuple of float
+                pair {rate corrected photon counts, propagated_error}
+            
+            )")
+
         .def_property_readonly(
             "DGparameters",
             [](AngleCalibration &self) {

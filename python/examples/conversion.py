@@ -52,9 +52,11 @@ anglecalibration = AngleCalibration(mythendetectorspecifications, flatfield, myt
 
 anglecalibration.read_initial_calibration_from_file(str(data_path() / "Angcal_2E_Feb2023_P29.off"))
 
+
 anglecalibration.read_bad_channels_from_file(str(data_path() / "bc2023_003_RING.chans"))
 
-bad_channels = anglecalibration.bad_channels
+
+#bad_channels = anglecalibration.bad_channels
 
 #plot(bad_channels)
 

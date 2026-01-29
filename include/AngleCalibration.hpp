@@ -266,6 +266,19 @@ class AngleCalibration {
      */
     void write_to_file(const std::filesystem::path &filename) const;
 
+    /**
+     * @brief calculate the rate corrected photon counts taking into account the
+     * dead time
+     * @param photon_counts photon counts
+     * @param photon_count_error error of photon counts (generally variance
+     * error is used)
+     * @param exposure_time exposure time of acquisition [s]
+     * @return pair {corrected photon counts, propagated_error}
+     */
+    std::pair<double, double> rate_correction(const double photon_counts,
+                                              const double photon_count_error,
+                                              const double exposure_time) const;
+
   private:
     /** @brief calculated the strip width expressed as angle from DG
      * module parameters
@@ -382,19 +395,6 @@ class AngleCalibration {
     flatfield_correction(const double photon_counts,
                          const double photon_counts_error,
                          const size_t global_strip_index) const;
-
-    /**
-     * @brief calculate the rate corrected photon counts taking into account the
-     * dead time
-     * @param photon_counts photon counts
-     * @param photon_count_error error of photon counts (generally variance
-     * error is used)
-     * @param exposure_time exposure time of acquisition [s]
-     * @return pair {corrected photon counts, propagated_error}
-     */
-    std::pair<double, double> rate_correction(const double photon_counts,
-                                              const double photon_count_error,
-                                              const double exposure_time) const;
 
     /** @brief calculate the incident intensity corrected photon counts
      * @param photon_counts photon counts
@@ -526,7 +526,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         size_t global_strip_index =
             module_index * mythen_detector->strips_per_module() + strip_index;
 
-        if (mythen_detector->get_bad_channels()(global_strip_index)) {
+        if (bad_channels(global_strip_index)) {
             continue; // skip bad channels
         }
 

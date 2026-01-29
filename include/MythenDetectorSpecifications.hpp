@@ -7,6 +7,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "CustomFiles.hpp"
 #include "aare/NDArray.hpp"
@@ -31,11 +32,7 @@ class MythenDetectorSpecifications {
      * @param custom_file_ptr (optional) pass Filereader to read bad channels
      * file default
      */
-    MythenDetectorSpecifications() {
-
-        bad_channels =
-            NDArray<bool, 1>(std::array<ssize_t, 1>{num_strips()}, false);
-    }
+    MythenDetectorSpecifications() = default;
 
     /**
      * @brief constructor for MythenDetectorSpecifications
@@ -51,39 +48,10 @@ class MythenDetectorSpecifications {
 
     void
     set_unconnected_modules(const std::vector<ssize_t> &unconnected_modules) {
-        m_unconnected_modules = NDArray<ssize_t, 1>(std::array<ssize_t, 1>{
-            static_cast<ssize_t>(unconnected_modules.size())});
-
-        std::copy(unconnected_modules.begin(), unconnected_modules.end(),
-                  m_unconnected_modules.begin());
-
-        // update bad_channels
-        std::for_each(
-            m_unconnected_modules.begin(), m_unconnected_modules.end(),
-            [this](const auto &module_index) {
-                for (size_t i = module_index * this->strips_per_module_;
-                     i < (module_index + 1) * this->strips_per_module_; ++i)
-                    this->bad_channels[i] = true;
-            });
+        m_unconnected_modules = unconnected_modules;
     }
 
-    /*
-    NDArray<bool, 1> get_bad_channels() const { return bad_channels; }
-    */
-
-    NDView<bool, 1> get_bad_channels() const { return bad_channels.view(); }
-
-    /**
-     * @brief set bad channels
-     * @param bad_channels_ boolean NDArray of size of total number of
-     * strips/channels in detector, stores 'TRUE' if strip is a bad channel
-     * otherwise 'FALSE'
-     */
-    void set_bad_channels(const NDArray<bool, 1> &bad_channels_) {
-        bad_channels = bad_channels_;
-    }
-
-    NDArray<ssize_t, 1> get_unconnected_modules() const {
+    std::vector<ssize_t> &get_unconnected_modules() {
         return m_unconnected_modules;
     }
 
@@ -148,10 +116,7 @@ class MythenDetectorSpecifications {
     /// @brief number of modules in detector
     size_t max_modules_ = 48; // TODO: could be static if bloffset is static
 
-    /// @brief Array of size strips/channels in detector, stores 'TRUE' if strip
-    /// is a bad channel otherwise 'FALSE'
-    NDArray<bool, 1> bad_channels{};
-    NDArray<ssize_t, 1> m_unconnected_modules{}; // list of unconnected modules
+    std::vector<ssize_t> m_unconnected_modules{}; // list of unconnected modules
 };
 
 } // namespace angcal

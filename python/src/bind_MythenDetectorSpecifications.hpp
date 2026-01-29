@@ -58,26 +58,11 @@ offset: double
         .def_property(
             "unconnected_modules",
             [](MythenDetectorSpecifications &self) {
-                auto unconnected_modules =
-                    new NDArray<ssize_t, 1>(self.get_unconnected_modules());
-                return return_image_data(unconnected_modules);
+                return self.get_unconnected_modules();
             },
             [](MythenDetectorSpecifications &self,
-               py::buffer unconnected_modules) {
-                py::buffer_info info = unconnected_modules.request();
-                if (info.ndim != 1 ||
-                    info.format !=
-                        py::format_descriptor<std::size_t>::format()) {
-                    throw std::runtime_error(
-                        "Expected 1D buffer of type unsigned int");
-                }
-                std::vector<ssize_t> temp_vec(info.shape[0]);
-                std::memcpy(temp_vec.data(), info.ptr,
-                            info.shape[0] *
-                                sizeof(ssize_t)); // TODO: std::size_t
-                                                  // exists in python?
-
-                self.set_unconnected_modules(temp_vec);
+               std::vector<ssize_t> &unconnected_modules) {
+                self.set_unconnected_modules(unconnected_modules);
             })
 
         .def_property_readonly_static(

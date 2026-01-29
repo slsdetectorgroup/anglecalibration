@@ -239,10 +239,6 @@ class FlatField {
                          : mean / flat_field(i, 0));
                 // TODO: error propagation
             }
-
-            if (inverse_normalized_flat_field(i, 0) <
-                std::numeric_limits<double>::epsilon())
-                mythen_detector->get_bad_channels()[i] = true;
         }
     }
 
@@ -253,10 +249,6 @@ class FlatField {
 
         for (ssize_t i = 0; i < flat_field.size(); ++i) {
             normalized_flat_field(i, 0) = flat_field(i, 0) / mean;
-            // TODO: error propagation
-            if (normalized_flat_field(i, 0) <
-                std::numeric_limits<double>::epsilon())
-                mythen_detector->get_bad_channels()(i) = true;
         }
     }
 
@@ -280,4 +272,5 @@ class FlatField {
     NDArray<double, 2> inverse_normalized_flat_field;
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector;
 };
+
 } // namespace angcal
