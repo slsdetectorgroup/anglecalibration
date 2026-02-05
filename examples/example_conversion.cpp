@@ -42,8 +42,6 @@ int main() {
 
     flat_field_ptr->read_normalized_flatfield_from_file(flatfield_filename);
 
-    flat_field_ptr->calculate_inverse_normalized_flatfield<true>();
-
     LOG(TLogLevel::logINFO) << "normalized flatfield calculated";
 
     // create AngleCalibration class
@@ -72,8 +70,11 @@ int main() {
                       return (file_path / filename).string();
                   });
 
+    anglecalibration.set_scale_factor(5050880.0);
+
     auto redistributed_photon_counts = anglecalibration.convert(
         file_list); // redistributes and applies pixel wise correction
+
     LOG(TLogLevel::logDEBUG) << "redistributed photon counts shape: "
                              << redistributed_photon_counts.shape()[0];
 

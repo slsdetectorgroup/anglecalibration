@@ -169,6 +169,8 @@ set(PUBLICHEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/helpers/FileInterface.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/helpers/custom_errors.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/helpers/Hdf5FileReader.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/helpers/LogFile.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/helpers/ErrorPropagation.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/logger.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenFileReader.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenDetectorSpecifications.hpp

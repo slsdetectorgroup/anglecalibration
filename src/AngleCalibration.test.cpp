@@ -6,6 +6,7 @@
 #include "AngleCalibration.hpp"
 #include "CustomFiles.hpp"
 #include "FlatField.hpp"
+#include "helpers/ErrorPropagation.hpp"
 #include "logger.hpp"
 
 #include <filesystem>
@@ -307,5 +308,34 @@ TEST_CASE("check parameter conversion", "[anglecalibration]") {
         CHECK(eeparameters_from_DGparameters.normal_distances(module_index) ==
               Catch::Approx(eeparameters_from_BCparameters.normal_distances(
                   module_index)));
+    }
+}
+
+TEST_CASE("check flatfield correction and error propagation",
+          "[anglecalibration][flatfield]") {
+
+    SECTION("flatfield correction error propagation") {
+        double photon_counts = 1000;      // dummy photon counts
+        double photon_count_error = 1000; // Poisson Variance
+
+        double normalized_flatfield = 10;
+        double normalized_flatfield_std =
+            20; // dummy variance of normalized flatfield
+
+        const double flatfield_normalized_photon_counts_error =
+            error_propagation(
+                1. / normalized_flatfield,
+                -1.0 * photon_counts / std::pow(normalized_flatfield, 2),
+                photon_count_error, std::pow(normalized_flatfield_std, 2));
+
+        const double expected_flatfield_normalized_photon_counts_error =
+            std::pow(photon_counts / normalized_flatfield, 2) *
+            (1.0 / photon_counts +
+             std::pow(normalized_flatfield_std / normalized_flatfield, 2));
+
+        // anglecalibration.flatfield_correction
+
+        CHECK(flatfield_normalized_photon_counts_error ==
+              Catch::Approx(expected_flatfield_normalized_photon_counts_error));
     }
 }

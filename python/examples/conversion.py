@@ -42,8 +42,6 @@ flatfield = FlatField(mythendetectorspecifications)
 
 flatfield.normalized_flatfield = np.loadtxt(data_path() / "Flatfield_E17p5keV_T12500eV_up_AUGCAL2_Sep2023_open_WS_C_X_X.raw", dtype=np.double, usecols=[1,2])
 
-#plot(flatfield.inverse_normalized_flatfield[:,0])
-
 # setup mythen data file reader to read EPICS mythen hdf5 files
 mythenfilereader = EpicsMythenFileReader()
 
@@ -52,9 +50,7 @@ anglecalibration = AngleCalibration(mythendetectorspecifications, flatfield, myt
 
 anglecalibration.read_initial_calibration_from_file(str(data_path() / "Angcal_2E_Feb2023_P29.off"))
 
-
 anglecalibration.read_bad_channels_from_file(str(data_path() / "bc2023_003_RING.chans"))
-
 
 #bad_channels = anglecalibration.bad_channels
 
@@ -62,11 +58,20 @@ anglecalibration.read_bad_channels_from_file(str(data_path() / "bc2023_003_RING.
 
 #set scale factor to get reasonable scales 
 frame = mythenfilereader.read_frame(str(data_path() / "Fructose_0p2_60_0060.h5"))
-anglecalibration.scale_factor = frame.incident_intensity/10
+
+incident_intensity_per_second = frame.incident_intensity / frame.exposure_time
+
+scale_factor = 1280.0*round(incident_intensity_per_second/1280.0) # whatever is the same chosen in Antonios code 
+
+anglecalibration.scale_factor = scale_factor
 
 print("scale Factor: " ,anglecalibration.scale_factor)
 
 file_list = [str(data_path() / f"Fructose_0p2_60_006{i}.h5") for i in range(0,4)] 
+
+print("file_list: ", file_list)
+
+anglecalibration.histogram_bin_width = 0.0036  # in degrees (dfeault value) 
 
 redistributed_photon_counts = anglecalibration.convert(file_list)
 

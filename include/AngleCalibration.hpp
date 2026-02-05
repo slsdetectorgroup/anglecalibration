@@ -20,6 +20,7 @@
 #include "Parameters.hpp"
 #include "aare/NDArray.hpp"
 #include "helpers/FileInterface.hpp"
+#include "helpers/LogFiles.hpp"
 
 #ifdef ANGCAL_PLOT
 #include "plot_histogram.hpp"
@@ -494,7 +495,7 @@ template <bool base_peak_ROI_only>
 void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     const size_t module_index, const MythenFrame &frame,
     NDView<double, 1> fixed_angle_width_bins_photon_counts,
-    NDView<double, 1> inverse_fixed_angle_width_bins_photon_counts_variance,
+    NDView<double, 1> fixed_angle_width_bins_photon_counts_variance,
     NDView<double, 1> sum_statistical_weights) const {
 
     ssize_t number_of_bins{}; // number of bins using fixed angle width bins
@@ -570,6 +571,12 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             std::pow(strip_width_angle / histogram_bin_width,
                      2); // Var(aX) = a^2 Var(X)
 
+        Errors.append(fmt::format("erates {}\n",
+                                  1. / inverse_photon_counts_variance_per_bin));
+
+        CorrectedPhotonCountsLogFile.append(
+            fmt::format("pcorr {}\n", photon_counts_per_bin));
+
         ssize_t left_bin_index_covered_by_strip{};
 
         ssize_t right_bin_index_covered_by_strip{};
@@ -629,11 +636,9 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             fixed_angle_width_bins_photon_counts(proper_bin_index) +=
                 statistical_weight * photon_counts_per_bin;
 
-            inverse_fixed_angle_width_bins_photon_counts_variance(
-                proper_bin_index) +=
+            fixed_angle_width_bins_photon_counts_variance(proper_bin_index) +=
                 inverse_photon_counts_variance_per_bin *
-                bin_coverage_factor; // statistical_weigth² *
-                                     // corrected_photon_counts_variance
+                std::pow(bin_coverage_factor, 2);
 
             sum_statistical_weights(proper_bin_index) += statistical_weight;
         }

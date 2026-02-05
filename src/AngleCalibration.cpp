@@ -1,4 +1,6 @@
 #include "AngleCalibration.hpp"
+#include "helpers/ErrorPropagation.hpp"
+#include "helpers/LogFiles.hpp"
 #include "helpers/custom_errors.hpp"
 
 #include "logger.hpp"
@@ -383,9 +385,9 @@ AngleCalibration::rate_correction(const double photon_count,
                            10 * std::numeric_limits<double>::epsilon();
         W_prev_iter = W_next_iter;
         propagated_error =
-            error_photon_counts_per_second * std::exp(2 * W_prev_iter) +
-            propagated_error *
-                std::pow(photon_counts_per_second * std::exp(W_prev_iter), 2);
+            error_propagation(std::exp(W_prev_iter),
+                              photon_counts_per_second * std::exp(W_prev_iter),
+                              error_photon_counts_per_second, propagated_error);
     }
 
     double actual_count_rate = W_prev_iter; // actual count rate * dead_time
@@ -393,18 +395,20 @@ AngleCalibration::rate_correction(const double photon_count,
     double rate_correction_factor =
         actual_count_rate / photon_counts_per_second;
 
-    double error_rate_correction_factor =
-        propagated_error / std::pow(photon_counts_per_second, 2) +
-        error_photon_counts_per_second *
-            std::pow(actual_count_rate /
-                         (photon_counts_per_second * photon_counts_per_second),
-                     2);
+    double error_rate_correction_factor = error_propagation(
+        1. / photon_counts_per_second,
+        -actual_count_rate / std::pow(photon_counts_per_second, 2),
+        propagated_error, error_photon_counts_per_second);
 
     double rate_corrected_photon_counts = photon_count * rate_correction_factor;
 
+    // double rate_corrected_photon_counts_error =
+    // error_propagation(rate_correction_factor, photon_count,
+    // photon_count_error, error_rate_correction_factor);
+
     double rate_corrected_photon_counts_error =
-        photon_count_error * std::pow(rate_correction_factor, 2) +
-        error_rate_correction_factor * std::pow(photon_count, 2);
+        photon_count_error *
+        std::pow(rate_correction_factor, 2); // TODO: In Antonios code like this
 
     return std::pair<double, double>{rate_corrected_photon_counts,
                                      rate_corrected_photon_counts_error};
@@ -442,23 +446,28 @@ AngleCalibration::flatfield_correction(const double photon_counts,
 
     if (1. / (flat_field->get_normalized_flatfield()(global_strip_index, 0)) <
         std::numeric_limits<double>::epsilon()) {
+
         return std::pair(0.0, 0.0);
     }
 
     // flatfield normalization
-    double flatfield_normalized_photon_counts =
+    const double flatfield_normalized_photon_counts =
         photon_counts /
         flat_field->get_normalized_flatfield()(global_strip_index, 0);
 
-    double normalized_flatfield_variance =
-        flat_field->get_normalized_flatfield()(global_strip_index, 1);
+    const double normalized_flatfield_variance = std::pow(
+        flat_field->get_normalized_flatfield()(global_strip_index, 1), 2);
 
-    double flatfield_normalized_photon_counts_error =
-        photon_counts_error * std::pow(flat_field->get_normalized_flatfield()(
-                                           global_strip_index, 0),
-                                       2) +
-        normalized_flatfield_variance *
-            std::pow(photon_counts, 2); // error propagation (error squared !!)
+    const double flatfield_normalized_photon_counts_error = error_propagation(
+        1. / flat_field->get_normalized_flatfield()(global_strip_index, 0),
+        -1.0 * photon_counts /
+            std::pow(
+                flat_field->get_normalized_flatfield()(global_strip_index, 0),
+                2),
+        photon_counts_error,
+        normalized_flatfield_variance); // Variance // TODO: change should be
+                                        // squared per default always talk about
+                                        // variance error
 
     return std::pair(flatfield_normalized_photon_counts,
                      flatfield_normalized_photon_counts_error);
@@ -478,14 +487,21 @@ std::pair<double, double> AngleCalibration::transverse_width_correction(
                                mythen_detector->pitch() * strip_index,
                            2));
 
+    constexpr double average_distance_sample_pixel =
+        2500.0 / M_PI; // TODO why are there two values
+                       // 4420.97064144153710469121564923651006_DP (R_std_H) in
+                       // Antonios code
+
     const double transverse_width_correction_factor =
-        1. / (2 * std::atan(mythen_detector->transverse_width() /
-                            (2 * distance_sample_pixel)));
+        (2 * std::atan(mythen_detector->transverse_width() /
+                       (2 * average_distance_sample_pixel))) /
+        (2 * std::atan(mythen_detector->transverse_width() /
+                       (2 * distance_sample_pixel)));
+
     double transverse_width_normalized_photon_counts =
         photon_counts * transverse_width_correction_factor;
     double transverse_width_normalized_photon_counts_error =
-        photon_counts_error * std::pow(transverse_width_correction_factor,
-                                       2); // TODO: is it squared the error?
+        photon_counts_error * std::pow(transverse_width_correction_factor, 2);
 
     return std::pair(transverse_width_normalized_photon_counts,
                      transverse_width_normalized_photon_counts_error);
@@ -499,42 +515,40 @@ std::pair<double, double> AngleCalibration::photon_count_correction(
         return std::pair<double, double>{0.0, 0.0}; // sanity check
     }
 
-    /*
+    // mighells statistics
+    photon_counts += 1;
+
     auto [rate_corrected_photon_counts, rate_corrected_photon_counts_error] =
         rate_correction(photon_counts, photon_counts,
                         exposure_time); // same variance as poisson distributed
                                         // - maybe sqaured?
-    */
-
-    // mighells statistics
-    photon_counts += 1;
-
-    auto [flatfield_normalized_photon_counts,
-          flatfield_normalized_photon_counts_variance] =
-        flatfield_correction(photon_counts, photon_counts, global_strip_index);
 
     auto [incident_intensity_corrected_photon_counts,
           incident_intensity_corrected_photon_counts_variance] =
-        incident_intensity_correction(
-            flatfield_normalized_photon_counts,
-            flatfield_normalized_photon_counts_variance, I0);
+        incident_intensity_correction(rate_corrected_photon_counts,
+                                      rate_corrected_photon_counts_error, I0);
 
-    /*
     const size_t module_index =
         global_strip_index / MythenDetectorSpecifications::strips_per_module();
     const size_t strip_index =
         global_strip_index % MythenDetectorSpecifications::strips_per_module();
 
+    auto [transverse_width_corrected_photon_counts,
+          transverse_width_corrected_photon_counts_variance] =
+        transverse_width_correction(
+            incident_intensity_corrected_photon_counts,
+            incident_intensity_corrected_photon_counts_variance, module_index,
+            strip_index);
 
-    transverse_width_correction(
-        incident_intensity_corrected_photon_counts,
-        incident_intensity_corrected_photon_counts_variance, module_index,
-        strip_index);
-    */
+    auto [flatfield_normalized_photon_counts,
+          flatfield_normalized_photon_counts_variance] =
+        flatfield_correction(transverse_width_corrected_photon_counts,
+                             transverse_width_corrected_photon_counts_variance,
+                             global_strip_index);
 
     return std::pair<double, double>{
-        incident_intensity_corrected_photon_counts,
-        incident_intensity_corrected_photon_counts_variance};
+        flatfield_normalized_photon_counts,
+        flatfield_normalized_photon_counts_variance};
 }
 
 double AngleCalibration::calculate_similarity_of_peaks(
@@ -576,9 +590,8 @@ double AngleCalibration::calculate_similarity_of_peaks(
 
             NDArray<double, 1> fixed_angle_width_bins_photon_counts(
                 std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-            NDArray<double, 1>
-                inverse_fixed_angle_width_bins_photon_counts_variance(
-                    std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+            NDArray<double, 1> fixed_angle_width_bins_photon_counts_variance(
+                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
 
             NDArray<double, 1> sum_statistical_weights(
                 std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
@@ -589,7 +602,7 @@ double AngleCalibration::calculate_similarity_of_peaks(
             redistribute_photon_counts_to_fixed_angle_width_bins<true>(
                 module_index, frame,
                 fixed_angle_width_bins_photon_counts.view(),
-                inverse_fixed_angle_width_bins_photon_counts_variance.view(),
+                fixed_angle_width_bins_photon_counts_variance.view(),
                 sum_statistical_weights.view());
 
             // S_index = sum_i^num_runs
@@ -604,25 +617,21 @@ double AngleCalibration::calculate_similarity_of_peaks(
                         : fixed_angle_width_bins_photon_counts(i) /
                               sum_statistical_weights(i); // y_k
 
-                inverse_fixed_angle_width_bins_photon_counts_variance(i) =
-                    inverse_fixed_angle_width_bins_photon_counts_variance(i) <
+                fixed_angle_width_bins_photon_counts_variance(i) =
+                    sum_statistical_weights(i) <
                             std::numeric_limits<double>::epsilon()
                         ? 0.0
-                        : std::pow(sum_statistical_weights(i), 2) /
-                              inverse_fixed_angle_width_bins_photon_counts_variance(
-                                  i);
+                        : fixed_angle_width_bins_photon_counts_variance(i) /
+                              std::pow(sum_statistical_weights(i), 2); // y_k
 
-                S0(i) +=
-                    inverse_fixed_angle_width_bins_photon_counts_variance(i);
+                S0(i) += 1. / fixed_angle_width_bins_photon_counts_variance(i);
 
-                S1(i) +=
-                    fixed_angle_width_bins_photon_counts(i) *
-                    inverse_fixed_angle_width_bins_photon_counts_variance(i);
+                S1(i) += fixed_angle_width_bins_photon_counts(i) * 1. /
+                         fixed_angle_width_bins_photon_counts_variance(i);
 
-                S2(i) +=
-                    fixed_angle_width_bins_photon_counts(i) *
-                    fixed_angle_width_bins_photon_counts(i) *
-                    inverse_fixed_angle_width_bins_photon_counts_variance(i);
+                S2(i) += fixed_angle_width_bins_photon_counts(i) *
+                         fixed_angle_width_bins_photon_counts(i) * 1. /
+                         fixed_angle_width_bins_photon_counts_variance(i);
             }
 
 #ifdef ANGCAL_PLOT
@@ -876,8 +885,15 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) const {
     NDArray<double, 1> sum_statistical_weights =
         NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
 
+    size_t count = 0;
     for (const auto &file : file_list_) {
         MythenFrame frame = mythen_file_reader->read_frame(file);
+
+        if (count == 0) {
+            CorrectedPhotonCountsLogFile.open();
+            Errors.open();
+            FlatFieldErrors.open();
+        }
 
         // TODO : actually they should not be added up each set of modules is
         // independant - at beamline the module positions overlap (e.g.
@@ -900,6 +916,8 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) const {
                 fixed_angle_width_bins_photon_variance.view(),
                 sum_statistical_weights.view());
         }
+
+        count++;
     }
 
     // divide by statistial weight
@@ -909,6 +927,12 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) const {
                 ? 0.0
                 : fixed_angle_width_bins_photon_counts(i) /
                       sum_statistical_weights(i);
+
+        fixed_angle_width_bins_photon_variance(i) =
+            sum_statistical_weights(i) < std::numeric_limits<double>::epsilon()
+                ? 0.0
+                : fixed_angle_width_bins_photon_variance(i) /
+                      std::pow(sum_statistical_weights(i), 2);
     }
 
     return fixed_angle_width_bins_photon_counts;
@@ -941,6 +965,12 @@ AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                 ? 0.0
                 : fixed_angle_width_bins_photon_counts(i) /
                       sum_statistical_weights(i); // y_k
+
+        fixed_angle_width_bins_photon_variance(i) =
+            sum_statistical_weights(i) < std::numeric_limits<double>::epsilon()
+                ? 0.0
+                : fixed_angle_width_bins_photon_variance(i) /
+                      std::pow(sum_statistical_weights(i), 2);
     }
 
     return fixed_angle_width_bins_photon_counts;
@@ -972,6 +1002,12 @@ AngleCalibration::redistributed_photon_counts_in_base_peak_ROI(
                 ? 0.0
                 : fixed_angle_width_bins_photon_counts(i) /
                       sum_statistical_weights(i); // y_k
+
+        fixed_angle_width_bins_photon_variance(i) =
+            sum_statistical_weights(i) < std::numeric_limits<double>::epsilon()
+                ? 0.0
+                : fixed_angle_width_bins_photon_variance(i) /
+                      std::pow(sum_statistical_weights(i), 2);
     }
 
     return fixed_angle_width_bins_photon_counts;
