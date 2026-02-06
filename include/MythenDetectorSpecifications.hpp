@@ -75,10 +75,6 @@ class MythenDetectorSpecifications {
 
     double offset() const { return offset_; }
 
-    static constexpr double min_angle() { return min_angle_; }
-
-    static constexpr double max_angle() { return max_angle_; }
-
     /**
      * @brief total number of strips/channels in detector
      */
@@ -93,15 +89,6 @@ class MythenDetectorSpecifications {
 
     /// @brief Strip/channel height of Mythen detector [mm]
     static constexpr double transverse_width_ = 8.0;
-
-    /// @brief Minimum potential detector angle
-    /// (measured as displacement of first strip) [degrees]
-    static constexpr double min_angle_ =
-        -180.0; // maybe shoudnt be static but configurable
-
-    /// @brief Maximum potential detector angle
-    /// (measured as displacement of first strip) [degrees]
-    static constexpr double max_angle_ = 180.0;
 
     /// @brief Offset between sample horizontal plane and detector [degrees]
     static constexpr double sample_detector_offset_ = 1.4715;

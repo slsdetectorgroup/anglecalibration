@@ -67,8 +67,8 @@ AngleCalibration::get_detector_specifications() const {
 
 ssize_t AngleCalibration::num_fixed_angle_width_bins() const {
     ssize_t num_fixed_angle_width_bins =
-        std::floor(mythen_detector->max_angle() / histogram_bin_width) -
-        std::floor(mythen_detector->min_angle() / histogram_bin_width) + 1;
+        std::floor(m_max_angle / histogram_bin_width) -
+        std::floor(m_min_angle / histogram_bin_width) + 1;
     return num_fixed_angle_width_bins;
 }
 
@@ -97,6 +97,16 @@ void AngleCalibration::set_scale_factor(const double scale_factor_) {
 }
 
 double AngleCalibration::get_scale_factor() const { return m_scale_factor; }
+
+void AngleCalibration::set_angular_range(const double min_angle,
+                                         const double max_angle) {
+    m_min_angle = min_angle;
+    m_max_angle = max_angle;
+}
+
+std::pair<double, double> AngleCalibration::get_angular_range() const {
+    return {m_min_angle, m_max_angle};
+}
 
 void AngleCalibration::read_initial_calibration_from_file(
     const std::string &filename,
@@ -876,6 +886,9 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) const {
 
     ssize_t new_num_bins = num_fixed_angle_width_bins();
 
+    LOG(TLogLevel::logDEBUG)
+        << fmt::format("num_fixed_angle_width_bins: {}", new_num_bins);
+
     NDArray<double, 1> fixed_angle_width_bins_photon_counts =
         NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
 
@@ -885,15 +898,8 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) const {
     NDArray<double, 1> sum_statistical_weights =
         NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
 
-    size_t count = 0;
     for (const auto &file : file_list_) {
         MythenFrame frame = mythen_file_reader->read_frame(file);
-
-        if (count == 0) {
-            CorrectedPhotonCountsLogFile.open();
-            Errors.open();
-            FlatFieldErrors.open();
-        }
 
         // TODO : actually they should not be added up each set of modules is
         // independant - at beamline the module positions overlap (e.g.
@@ -907,17 +913,12 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) const {
                 continue;
             }
 
-            LOG(TLogLevel::logDEBUG1)
-                << fmt::format("module_index {} contributes", module_index);
-
             redistribute_photon_counts_to_fixed_angle_width_bins<false>(
                 module_index, frame,
                 fixed_angle_width_bins_photon_counts.view(),
                 fixed_angle_width_bins_photon_variance.view(),
                 sum_statistical_weights.view());
         }
-
-        count++;
     }
 
     // divide by statistial weight

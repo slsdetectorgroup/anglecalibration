@@ -45,6 +45,19 @@ void define_AngleCalibration_binding(py::module &m) {
                       R"(scale factor to scale correction to reasonable values
                       )")
 
+        .def_property(
+            "angular_range",
+            [](AngleCalibration &self) { return self.get_angular_range(); },
+            [](AngleCalibration &self, std::pair<double, double> angle_range) {
+                self.set_angular_range(angle_range.first, angle_range.second);
+            },
+            R"(angular range for conversion [degrees]
+            Returns
+            -------
+            tuple of float
+                (min_angle, max_angle)
+            )")
+
         .def(
             "read_initial_calibration_from_file",
             [](AngleCalibration &self, const std::string &filename) {

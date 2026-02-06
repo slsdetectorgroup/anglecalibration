@@ -73,18 +73,20 @@ print("file_list: ", file_list)
 
 anglecalibration.histogram_bin_width = 0.0036  # in degrees (dfeault value) 
 
+anglecalibration.angular_range = (0.0, 90.5)  # in degrees
+
+print("Angle Range: ", anglecalibration.angular_range)
+
 redistributed_photon_counts = anglecalibration.convert(file_list)
 
 # plot converted data
 bin_indices = np.arange(0, redistributed_photon_counts.size,1)
-bin_to_diffraction_angle = lambda bin_index : bin_index * anglecalibration.histogram_bin_width + mythendetectorspecifications.min_angle 
+bin_to_diffraction_angle = lambda bin_index : bin_index * anglecalibration.histogram_bin_width + anglecalibration.angular_range[0]
 
 bin_in_degrees = np.apply_along_axis(bin_to_diffraction_angle, 0, bin_indices)
 
-# data stores anything between -180, 180 degrees, we only want to plot region of interest 
-zero_channels = redistributed_photon_counts == 0
-
-#plot_excluding_channels(merged_redistributed_photon_counts, zero_channels, bin_in_degrees)
+# if angular range to big bins are initialized to zero 
+zero_channels = redistributed_photon_counts == 0.0
 
 ### actual diffraction pattern for comparison 
 

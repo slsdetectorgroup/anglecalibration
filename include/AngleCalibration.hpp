@@ -81,6 +81,7 @@ class AngleCalibration {
      * */
     double get_base_peak_ROI_width() const;
 
+    /// @brief  get detector specifications
     std::shared_ptr<MythenDetectorSpecifications>
     get_detector_specifications() const;
 
@@ -165,7 +166,7 @@ class AngleCalibration {
         std::optional<double> bounds_in_angles = std::nullopt) const;
 
     /**
-     * @brief set angle of base peak
+     * @brief set angle of base peak (used for calibration)
      * @param base_peak_angle_ base peak angle [degrees]
      */
     void set_base_peak_angle(const double base_peak_angle_);
@@ -191,6 +192,21 @@ class AngleCalibration {
      * @brief get the currently configured scale factor (if any)
      */
     double get_scale_factor() const;
+
+    /**
+     * @brief sets the angular range for the diffraction pattern e.g.
+     * diffraction pattern calculated for [min_angle, max_angle]
+     * @param min_angle minimum angle [degrees]
+     * @param max_angle maximum angle [degrees]
+     */
+    void set_angular_range(const double min_angle, const double max_angle);
+
+    /**
+     * @brief gets the angular range for the diffraction pattern e.g.
+     * diffraction pattern calculated for [min_angle, max_angle]
+     * @return pair of (min_angle, max_angle) [degrees]
+     */
+    std::pair<double, double> get_angular_range() const;
 
     /**
      * @brief Performs angular conversion e.g. calculates from raw photon counts
@@ -464,9 +480,6 @@ class AngleCalibration {
      */
     double base_peak_roi_width = 0.05;
 
-    // TODO maybe deprecated - only compute in member function
-    ssize_t num_bins{};
-
     /**
      * center of base peak to use for calibration [degrees]
      */
@@ -478,6 +491,12 @@ class AngleCalibration {
      * @default 1.0
      */
     double m_scale_factor{1.0};
+
+    /// @brief  @brief minimum angle for angular conversion [degrees]
+    double m_min_angle = -180.0;
+
+    /// @brief  maximum angle for angular conversion [degrees]
+    double m_max_angle = 180.0;
 
     /**
      * list of acquisition files used for calibration
@@ -514,10 +533,8 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
              0.5 * histogram_bin_width); // in degrees
     } else {
         number_of_bins = num_fixed_angle_width_bins();
-        left_boundary_roi_base_peak =
-            mythen_detector->min_angle(); // dummy values
-        right_boundary_roi_base_peak =
-            mythen_detector->max_angle(); // dummy values
+        left_boundary_roi_base_peak = m_min_angle;  // dummy values
+        right_boundary_roi_base_peak = m_max_angle; // dummy values
     }
 
     // iterate over all strips of module
@@ -539,6 +556,19 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             diffraction_angle_from_BC_parameters(
                 module_index, frame.detector_angle, strip_index,
                 +0.5); // right strip boundary in angles [degrees]
+
+        if (left_strip_boundary_angle < m_min_angle ||
+            right_strip_boundary_angle > m_max_angle) {
+
+            LOG(TLogLevel::logDEBUG) << fmt::format(
+                "strip {} of module {} covers an angle of [{}, {}] and is "
+                "outside "
+                "of the given angular range of [{}, "
+                "{}] and will be skipped",
+                strip_index, module_index, left_strip_boundary_angle,
+                right_strip_boundary_angle, m_min_angle, m_max_angle);
+            continue;
+        }
 
         // skip strip if not in ROI
         if constexpr (base_peak_ROI_only) {
@@ -571,31 +601,24 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             std::pow(strip_width_angle / histogram_bin_width,
                      2); // Var(aX) = a^2 Var(X)
 
-        Errors.append(fmt::format("erates {}\n",
-                                  1. / inverse_photon_counts_variance_per_bin));
-
-        CorrectedPhotonCountsLogFile.append(
-            fmt::format("pcorr {}\n", photon_counts_per_bin));
-
         ssize_t left_bin_index_covered_by_strip{};
 
         ssize_t right_bin_index_covered_by_strip{};
 
         if constexpr (base_peak_ROI_only) {
             left_bin_index_covered_by_strip =
-                static_cast<ssize_t>(round(std::max(left_boundary_roi_base_peak,
-                                                    left_strip_boundary_angle) /
-                                           histogram_bin_width));
-            right_bin_index_covered_by_strip = static_cast<ssize_t>(
-                round(std::min(right_boundary_roi_base_peak,
-                               right_strip_boundary_angle) /
-                      histogram_bin_width));
+                static_cast<ssize_t>((std::max(left_boundary_roi_base_peak,
+                                               left_strip_boundary_angle) /
+                                      histogram_bin_width));
+            right_bin_index_covered_by_strip =
+                static_cast<ssize_t>((std::min(right_boundary_roi_base_peak,
+                                               right_strip_boundary_angle) /
+                                      histogram_bin_width));
         } else {
             left_bin_index_covered_by_strip = static_cast<ssize_t>(
-                round(left_strip_boundary_angle /
-                      histogram_bin_width)); // in Antonios code its rounded
+                (left_strip_boundary_angle / histogram_bin_width));
             right_bin_index_covered_by_strip = static_cast<ssize_t>(
-                round(right_strip_boundary_angle / histogram_bin_width));
+                (right_strip_boundary_angle / histogram_bin_width));
         }
 
         size_t proper_bin_index =
@@ -626,7 +649,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                 proper_bin_index =
                     bin_index -
                     static_cast<ssize_t>(
-                        mythen_detector->min_angle() /
+                        m_min_angle /
                         histogram_bin_width); // bin index starts at zero
             }
 

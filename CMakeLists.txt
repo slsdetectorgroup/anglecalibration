@@ -154,11 +154,13 @@ if(ASAN)
         INTERFACE 
             -fsanitize=address,undefined,pointer-compare 
             -fno-omit-frame-pointer
+            -g
     )
     target_link_options(compiler_flags 
     INTERFACE 
         -fsanitize=address,,undefined,pointer-compare 
             -fno-omit-frame-pointer
+            -g
     )
 endif()
 

@@ -10,8 +10,7 @@ class PlotHelper {
 
         bin_to_diffraction_angle = [this](const size_t bin_index) {
             return bin_index * m_anglecalibration->get_histogram_bin_width() +
-                   m_anglecalibration->get_detector_specifications()
-                       ->min_angle();
+                   m_anglecalibration->get_angle_range().first; // m_min_angle;
         };
 
         bin_to_diffraction_angle_base_peak_ROI_only =
@@ -103,8 +102,7 @@ class PlotHelper {
 
         return (m_anglecalibration->diffraction_angle_from_DG_parameters(
                     module_index, detector_angle, 0, -0.5) -
-                m_anglecalibration->get_detector_specifications()
-                    ->min_angle()) /
+                m_anglecalibration->get_angle_range().first) /
                m_anglecalibration->get_histogram_bin_width();
     }
 
@@ -116,8 +114,7 @@ class PlotHelper {
                     m_anglecalibration->get_detector_specifications()
                         ->strips_per_module(),
                     +0.5) -
-                m_anglecalibration->get_detector_specifications()
-                    ->min_angle()) /
+                m_anglecalibration->get_angle_range().first) /
                m_anglecalibration->get_histogram_bin_width();
     }
 

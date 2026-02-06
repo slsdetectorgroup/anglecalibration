@@ -72,6 +72,8 @@ int main() {
 
     anglecalibration.set_scale_factor(5050880.0);
 
+    anglecalibration.set_angular_range(-90.5, 130);
+
     auto redistributed_photon_counts = anglecalibration.convert(
         file_list); // redistributes and applies pixel wise correction
 

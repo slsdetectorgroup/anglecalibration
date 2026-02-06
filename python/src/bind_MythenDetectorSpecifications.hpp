@@ -89,18 +89,6 @@ offset: double
 
         .def_property_readonly("offset", &MythenDetectorSpecifications::offset)
 
-        .def_property_readonly_static(
-            "min_angle",
-            [](py::object) {
-                return MythenDetectorSpecifications::min_angle();
-            })
-
-        .def_property_readonly_static(
-            "max_angle",
-            [](py::object) {
-                return MythenDetectorSpecifications::max_angle();
-            })
-
         .def_property_readonly("num_strips",
                                &MythenDetectorSpecifications::num_strips);
 }
