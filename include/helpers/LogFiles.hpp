@@ -7,7 +7,10 @@ class LogFile {
 
   public:
     LogFile(std::filesystem::path log_file_path)
-        : m_log_file_path(log_file_path) {}
+        : m_log_file_path(log_file_path) {
+
+            open(); 
+    }
 
     ~LogFile() {
         if (m_log_file.is_open()) {
@@ -49,8 +52,9 @@ inline LogFile IncidentIntensity_correctionfactor(
     "IncidentIntensity_correctionfactor.log");
 inline LogFile Rate_correctionfactor("Rate_correctionfactor.log");
 inline LogFile Transversewidth_correction("Transversewidth_correction.log");
-inline LogFile Errors("Errors.log");
 
 inline LogFile FlatFieldErrors("FlatFieldErrors.log");
 
 inline LogFile CorrectedPhotonCountsLogFile("CorrectedPhotonCounts.log");
+
+inline LogFile CorrectedPhotonCountsErrorsLogFile("CorrectedPhotonCountsErrors.log");

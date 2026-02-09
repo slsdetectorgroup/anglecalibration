@@ -603,6 +603,13 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             std::pow(strip_width_angle / histogram_bin_width,
                      2); // Var(aX) = a^2 Var(X)
 
+        if(photon_counts_per_bin == 0.0) {
+            continue; 
+        }
+
+        CorrectedPhotonCountsLogFile.append(fmt::format("{}\n", photon_counts_per_bin));
+        CorrectedPhotonCountsErrorsLogFile.append(fmt::format("{}\n", 1.0 / inverse_photon_counts_variance_per_bin));
+
         ssize_t left_bin_index_covered_by_strip{};
 
         ssize_t right_bin_index_covered_by_strip{};

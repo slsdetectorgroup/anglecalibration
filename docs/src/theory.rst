@@ -196,7 +196,7 @@ First the raw photon counts are rate corrected by the dead time :math:`\tau_d`. 
 .. math:: 
     I_{rc} = I \cdot \frac{C}{C(\tau_d)}, 
 
-where :math:`C [1/s]` is the actual count rate. :math:`C(\tau_d) [1/s]` is the apparent count rate measured by the detector and dependant on the dead time, which is given by the following formula: 
+where :math:`C [1/s]` is the actual count rate e.g. the raw photon counts divided by the expsoure time :math:`\tau_{e}`. :math:`C(\tau_d) [1/s]` is the apparent count rate measured by the detector and dependant on the dead time, which is given by the following formula: 
 
 .. math::
     :label: eq:countrate
@@ -209,25 +209,41 @@ To obtain the actual count rate, we assume :math:`-C\cdot\tau_d \equiv W`. Equat
     -\tau_d \cdot C(\tau_d) = We^{W}, 
 
 W is thus given by the inverse Lambert W function of :math:`-\tau_d \cdot C(\tau_d)`, which we calculate numerically. 
-The dead time :math:`\tau_d` has been evaluated experimentally. 
+The dead time :math:`\tau_d` has been evaluated experimentally.
 
+The resulting photon variance is then given by: 
+
+.. math:: 
+    \sigma_{rc}² = \sigma \cdot {\left(\frac{C}{C(\tau_d)}\right)}^2.
+
+Note that the correction factor itself is not a constant but depends on the measured count rate, which comes with an error. For simplicity we treat it as a constant.
 
 **Incident Intensity Correction:** 
 
 The photon counts are corrected by the theoretical incident intensity :math:`I_{0}`. The incident intensity is the theoretical intensity of the laser beam.
-:math:`I_{0,1s}` is the incident intensity of the first acquisition divided by the exposure time :math:`\tau_{e}`. 
+:math:`I_{0,1s}` is an arbitary scale factor. Generally a good scale factor is the incident intensity of the first acquisition divided by the exposure time :math:`\tau_{e}`. 
 
 .. It can be measured by adding up all photon counts of one module with no sample present. It changes throughout the acquisitions, but is constant for all modules
 
 .. math::
     I_{I_0,corr} = I * \frac{I_{0,1s}}{I_0}
     
+The resulting variance is then given by: 
 
+.. math:: 
+    \sigma_{I_0,corr}² = \sigma \cdot \left(\frac{I_{0,1s}}{I_0}\right)^{2}
 .. Why is it scaled with the incident intensity of the first acquisitions
 
 **Solid Angle correction:** 
 
+
+
 Don't know what this is. Something to do with actual illuminated surface (transverse width of beam). Pixel height. 
+
+.. math:: 
+    I_{solid\_angle\_corr} = I * \frac{2*\arctan{\left(\frac{w/2}{\bar{L}}\right)}}{2*\arctan{\left(\frac{w/2}{L}\right)}},
+
+where :math:`w` is the pixel's transverse width and :math:`L` is the euclidean distance of the strip to the sample and the constant :math:`\bar{L}` is the average euclidean distance of all strips to the sample. 
 
 **Flatfield Correction:** 
 
