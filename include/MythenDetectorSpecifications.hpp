@@ -34,7 +34,6 @@ struct MythenDetectorSpecifications {
     static constexpr double transverse_width = 8.0;
 
     /// @brief average euclidean distance between sample and pixel [mm]
-    /// (default: 2500.0 / pi mm)
     double average_distance_sample_pixel =
         2500.0 / M_PI; // TODO why are two values
                        // 4420.97064144153710469121564923651006_DP (R_std_H) in
