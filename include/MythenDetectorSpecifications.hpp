@@ -22,88 +22,44 @@ template <class CustomFile> struct badchannel_file_compatibility {
         std::is_constructible<CustomFile, std::string>::value;
 };
 
-class MythenDetectorSpecifications {
+struct MythenDetectorSpecifications {
 
-  public:
-    // TODO: constructor that reads from a config file
-
-    /**
-     * @brief constructor for MythenDetectorSpecifications
-     * @param custom_file_ptr (optional) pass Filereader to read bad channels
-     * file default
-     */
-    MythenDetectorSpecifications() = default;
-
-    /**
-     * @brief constructor for MythenDetectorSpecifications
-     * @param offset Additional offset to sample detector offset.
-     * @param num_counters Number of counters active (default 1)
-     * @param max_modules Number of modules in detector (default 48).
-     */
-    MythenDetectorSpecifications(const double offset,
-                                 const size_t num_counters = 1,
-                                 const size_t max_modules = 48)
-        : offset_(offset), num_counters_(num_counters),
-          max_modules_(max_modules) {}
-
-    void
-    set_unconnected_modules(const std::vector<ssize_t> &unconnected_modules) {
-        m_unconnected_modules = unconnected_modules;
-    }
-
-    std::vector<ssize_t> &get_unconnected_modules() {
-        return m_unconnected_modules;
-    }
-
-    static constexpr double pitch() { return pitch_; }
-
-    static constexpr double transverse_width() { return transverse_width_; }
-
-    static constexpr size_t strips_per_module() { return strips_per_module_; }
-
-    /**
-     * @brief number of modules in detector
-     * (default '48')
-     */
-    size_t max_modules() const { return max_modules_; }
-
-    size_t num_counters() const { return num_counters_; }
-
-    static constexpr double sample_detector_offset() {
-        return sample_detector_offset_;
-    }
-
-    double offset() const { return offset_; }
-
-    /**
-     * @brief total number of strips/channels in detector
-     */
-    ssize_t num_strips() const { return max_modules_ * strips_per_module_; }
-
-  private:
     /// @brief number of strips/channels per module
-    static constexpr size_t strips_per_module_ = 1280;
+    static constexpr size_t strips_per_module = 1280;
 
     /// @brief Strip/channel width of Mythen detector [mm]
-    static constexpr double pitch_ = 0.05;
+    static constexpr double pitch = 0.05;
 
     /// @brief Strip/channel height of Mythen detector [mm]
-    static constexpr double transverse_width_ = 8.0;
+    static constexpr double transverse_width = 8.0;
+
+    /// @brief average euclidean distance between sample and pixel [mm]
+    /// (default: 2500.0 / pi mm)
+    double average_distance_sample_pixel =
+        2500.0 / M_PI; // TODO why are two values
+                       // 4420.97064144153710469121564923651006_DP (R_std_H) in
+                       // Antonios code
 
     /// @brief Offset between sample horizontal plane and detector [degrees]
-    static constexpr double sample_detector_offset_ = 1.4715;
+    double sample_detector_offset = 1.4715;
+
+    /// @brief measured dead-time [s]
+    double dead_time =
+        76.08e-9; // measured dead-time 31.8E-9_DP, 95.E-9_DP other beam
+                  // settings ! TODO: should it be configurable?
 
     /// @brief additional offset to sample detector offset (can change in
     /// experimental setup) [degrees]
-    double offset_ = 0.0;
-
-    /// @brief num counters active in detector
-    size_t num_counters_ = 1;
+    double offset = 0.0;
 
     /// @brief number of modules in detector
-    size_t max_modules_ = 48; // TODO: could be static if bloffset is static
+    size_t max_modules = 48; // TODO can be static
 
-    std::vector<ssize_t> m_unconnected_modules{}; // list of unconnected modules
+    std::vector<ssize_t> unconnected_modules{}; // list of unconnected modules
+
+    ssize_t num_strips() const {
+        return static_cast<ssize_t>(max_modules * strips_per_module);
+    }
 };
 
 } // namespace angcal

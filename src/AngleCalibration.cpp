@@ -31,11 +31,12 @@ AngleCalibration::AngleCalibration(
     : mythen_detector(mythen_detector_), flat_field(flat_field_),
       mythen_file_reader(mythen_file_reader_) {
 
-    DGparameters = DGParameters(mythen_detector->max_modules());
-    BCparameters = BCParameters(mythen_detector->max_modules());
+    DGparameters = DGParameters(mythen_detector->max_modules);
+    BCparameters = BCParameters(mythen_detector->max_modules);
 
-    bad_channels = NDArray<bool, 1>(
-        std::array<ssize_t, 1>{mythen_detector->num_strips()}, false);
+    bad_channels = NDArray<bool, 1>(std::array<ssize_t, 1>{static_cast<ssize_t>(
+                                        mythen_detector->num_strips())},
+                                    false);
 }
 
 void AngleCalibration::set_histogram_bin_width(double bin_width) {
@@ -85,10 +86,10 @@ bool AngleCalibration::module_is_disconnected(const size_t module_index) const {
 
     // all channels in the module are bad
     return std::all_of(bad_channels.begin() +
-                           module_index * mythen_detector->strips_per_module(),
+                           module_index * mythen_detector->strips_per_module,
                        bad_channels.begin() +
                            (module_index + 1) *
-                               mythen_detector->strips_per_module(),
+                               mythen_detector->strips_per_module,
                        [](const auto &elem) { return elem; });
 }
 
@@ -130,13 +131,13 @@ void AngleCalibration::read_bad_channels_from_file(
 
     // update bad_channels
     std::for_each(
-        mythen_detector->get_unconnected_modules().begin(),
-        mythen_detector->get_unconnected_modules().end(),
+        mythen_detector->unconnected_modules.begin(),
+        mythen_detector->unconnected_modules.end(),
         [this](const auto &module_index) {
             for (size_t i = module_index *
-                            MythenDetectorSpecifications::strips_per_module();
+                            MythenDetectorSpecifications::strips_per_module;
                  i < (module_index + 1) *
-                         MythenDetectorSpecifications::strips_per_module();
+                         MythenDetectorSpecifications::strips_per_module;
                  ++i)
                 bad_channels[i] = true;
         });
@@ -151,13 +152,13 @@ void AngleCalibration::set_bad_channels(const NDArray<bool, 1> &bad_channels_) {
 
     // update bad_channels
     std::for_each(
-        mythen_detector->get_unconnected_modules().begin(),
-        mythen_detector->get_unconnected_modules().end(),
+        mythen_detector->unconnected_modules.begin(),
+        mythen_detector->unconnected_modules.end(),
         [this](const auto &module_index) {
             for (size_t i = module_index *
-                            MythenDetectorSpecifications::strips_per_module();
+                            MythenDetectorSpecifications::strips_per_module;
                  i < (module_index + 1) *
-                         MythenDetectorSpecifications::strips_per_module();
+                         MythenDetectorSpecifications::strips_per_module;
                  ++i)
                 this->bad_channels[i] = true;
         });
@@ -166,17 +167,16 @@ void AngleCalibration::set_bad_channels(const NDArray<bool, 1> &bad_channels_) {
 size_t AngleCalibration::global_to_local_strip_index_conversion(
     const size_t global_strip_index) const {
     const size_t module_index =
-        global_strip_index / MythenDetectorSpecifications::strips_per_module();
+        global_strip_index / MythenDetectorSpecifications::strips_per_module;
     // local strip index in module
     size_t local_strip_index =
         global_strip_index -
-        module_index * MythenDetectorSpecifications::strips_per_module();
+        module_index * MythenDetectorSpecifications::strips_per_module;
     // switch if indexing is in clock-wise direction
-    local_strip_index =
-        std::signbit(DGparameters.conversions(module_index))
-            ? MythenDetectorSpecifications::strips_per_module() - 1 -
-                  local_strip_index
-            : local_strip_index;
+    local_strip_index = std::signbit(DGparameters.conversions(module_index))
+                            ? MythenDetectorSpecifications::strips_per_module -
+                                  1 - local_strip_index
+                            : local_strip_index;
 
     return local_strip_index;
 }
@@ -190,18 +190,18 @@ double AngleCalibration::diffraction_angle_from_DG_parameters(
     double center = DGparameters.centers(module_index);
     double conversion = DGparameters.conversions(module_index);
 
-    strip_index = std::signbit(conversion)
-                      ? MythenDetectorSpecifications::strips_per_module() -
-                            strip_index - 1
-                      : strip_index; // TODO: are the values sored in reserve?
+    strip_index =
+        std::signbit(conversion)
+            ? MythenDetectorSpecifications::strips_per_module - strip_index - 1
+            : strip_index; // TODO: are the values sored in reserve?
 
     return offset +
            180.0 / M_PI *
                (center * std::abs(conversion) -
                 std::atan((center - (strip_index + distance_to_strip)) *
                           std::abs(conversion))) +
-           detector_angle + mythen_detector->offset() +
-           mythen_detector->sample_detector_offset();
+           detector_angle + mythen_detector->offset +
+           mythen_detector->sample_detector_offset;
 }
 
 double AngleCalibration::diffraction_angle_from_BC_parameters(
@@ -215,23 +215,23 @@ double AngleCalibration::diffraction_angle_from_BC_parameters(
     const double angle_module_center_beam =
         BCparameters.angle_center_beam(module_index);
 
-    strip_index = std::signbit(distance_center_sample)
-                      ? MythenDetectorSpecifications::strips_per_module() -
-                            strip_index - 1
-                      : strip_index; // TODO: are the values sored in reserve?
+    strip_index =
+        std::signbit(distance_center_sample)
+            ? MythenDetectorSpecifications::strips_per_module - strip_index - 1
+            : strip_index; // TODO: are the values sored in reserve?
 
     return angle_module_center_beam + angle_module_center_normal -
            180.0 / M_PI *
                std::atan(
                    (std::abs(distance_center_sample) *
                         std::sin(M_PI / 180.0 * angle_module_center_normal) +
-                    (MythenDetectorSpecifications::strips_per_module() * 0.5 -
+                    (MythenDetectorSpecifications::strips_per_module * 0.5 -
                      strip_index - distance_to_strip) *
-                        MythenDetectorSpecifications::pitch()) /
+                        MythenDetectorSpecifications::pitch) /
                    (std::abs(distance_center_sample) *
                     std::cos(M_PI / 180.0 * angle_module_center_normal))) +
-           detector_angle + mythen_detector->offset() +
-           mythen_detector->sample_detector_offset();
+           detector_angle + mythen_detector->offset +
+           mythen_detector->sample_detector_offset;
 }
 
 double AngleCalibration::diffraction_angle_from_EE_parameters(
@@ -239,19 +239,19 @@ double AngleCalibration::diffraction_angle_from_EE_parameters(
     const double angle, const double detector_angle, size_t strip_index,
     const double distance_to_strip) const {
 
-    strip_index = std::signbit(normal_distance)
-                      ? MythenDetectorSpecifications::strips_per_module() -
-                            strip_index - 1
-                      : strip_index;
+    strip_index =
+        std::signbit(normal_distance)
+            ? MythenDetectorSpecifications::strips_per_module - strip_index - 1
+            : strip_index;
 
     return angle -
            180.0 / M_PI *
                std::atan((module_center_distance -
-                          MythenDetectorSpecifications::pitch() *
+                          MythenDetectorSpecifications::pitch *
                               (strip_index + distance_to_strip)) /
                          std::abs(normal_distance)) +
-           detector_angle + mythen_detector->offset() +
-           mythen_detector->sample_detector_offset();
+           detector_angle + mythen_detector->offset +
+           mythen_detector->sample_detector_offset;
 }
 
 // TODO maybe template these on parameter type
@@ -337,7 +337,7 @@ bool AngleCalibration::base_peak_is_in_module(
     double left_module_boundary_angle =
         diffraction_angle_from_DG_parameters(module_index, detector_angle, 0);
     double right_module_boundary_angle = diffraction_angle_from_DG_parameters(
-        module_index, detector_angle, mythen_detector->strips_per_module() - 1);
+        module_index, detector_angle, mythen_detector->strips_per_module - 1);
 
     LOG(TLogLevel::logDEBUG1) << fmt::format(
         "module_boundaries_in_angle for module {} [{}, {}]\n", module_index,
@@ -361,23 +361,21 @@ AngleCalibration::rate_correction(const double photon_count,
                                  "correction!");
     }
 
-    constexpr double dead_time =
-        76.08e-9; // 2.915829802160547e-7; // measured dead-time // TODO: in
-                  // Antonios code there are three options
-
     const double maximum_count_rate =
         std::exp(-1); // theoretical maximum count rate for
                       // dead_time*measured_photon_counts_per_second
 
     double photon_counts_per_second = photon_count / exposure_time;
 
-    photon_counts_per_second = std::min(
-        maximum_count_rate,
-        photon_counts_per_second *
-            dead_time); // multiply with dead time - for numerical algorithm
+    photon_counts_per_second =
+        std::min(maximum_count_rate,
+                 photon_counts_per_second *
+                     mythen_detector->dead_time); // multiply with dead time -
+                                                  // for numerical algorithm
 
     double error_photon_counts_per_second =
-        photon_count_error * std::pow(dead_time / exposure_time, 2);
+        photon_count_error *
+        std::pow(mythen_detector->dead_time / exposure_time, 2);
 
     // -actual_count_rate*dead_time = W -> -dead_time*measured_count_rate =
     // We^{W} -> W: Lambert W function
@@ -491,21 +489,15 @@ std::pair<double, double> AngleCalibration::transverse_width_correction(
     const auto [normal_distance, module_center_distance, angle] =
         BCparameters.convert_to_EEParameters(module_index);
 
-    const double distance_sample_pixel =
-        std::sqrt(std::pow(normal_distance, 2) +
-                  std::pow(module_center_distance -
-                               mythen_detector->pitch() * strip_index,
-                           2));
-
-    constexpr double average_distance_sample_pixel =
-        2500.0 / M_PI; // TODO why are there two values
-                       // 4420.97064144153710469121564923651006_DP (R_std_H) in
-                       // Antonios code
+    const double distance_sample_pixel = std::sqrt(
+        std::pow(normal_distance, 2) +
+        std::pow(module_center_distance - mythen_detector->pitch * strip_index,
+                 2));
 
     const double transverse_width_correction_factor =
-        (2 * std::atan(mythen_detector->transverse_width() /
-                       (2 * average_distance_sample_pixel))) /
-        (2 * std::atan(mythen_detector->transverse_width() /
+        (2 * std::atan(mythen_detector->transverse_width /
+                       (2 * mythen_detector->average_distance_sample_pixel))) /
+        (2 * std::atan(mythen_detector->transverse_width /
                        (2 * distance_sample_pixel)));
 
     double transverse_width_normalized_photon_counts =
@@ -539,9 +531,9 @@ std::pair<double, double> AngleCalibration::photon_count_correction(
                                       rate_corrected_photon_counts_error, I0);
 
     const size_t module_index =
-        global_strip_index / MythenDetectorSpecifications::strips_per_module();
+        global_strip_index / MythenDetectorSpecifications::strips_per_module;
     const size_t strip_index =
-        global_strip_index % MythenDetectorSpecifications::strips_per_module();
+        global_strip_index % MythenDetectorSpecifications::strips_per_module;
 
     auto [transverse_width_corrected_photon_counts,
           transverse_width_corrected_photon_counts_variance] =
@@ -803,7 +795,7 @@ void AngleCalibration::calibrate(
         }
     }
 
-    for (size_t module_index = 0; module_index < mythen_detector->max_modules();
+    for (size_t module_index = 0; module_index < mythen_detector->max_modules;
          ++module_index) {
 
         // skip if module is not connected
@@ -907,7 +899,7 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) const {
         //  - how to handle in a generic way? - depends on detector
         //  arrangement
         for (size_t module_index = 0;
-             module_index < mythen_detector->max_modules(); ++module_index) {
+             module_index < mythen_detector->max_modules; ++module_index) {
 
             if (module_is_disconnected(module_index)) {
                 continue;

@@ -539,10 +539,12 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
 
     // iterate over all strips of module
     for (size_t strip_index = 0;
-         strip_index < mythen_detector->strips_per_module(); ++strip_index) {
+         strip_index < MythenDetectorSpecifications::strips_per_module;
+         ++strip_index) {
 
         size_t global_strip_index =
-            module_index * mythen_detector->strips_per_module() + strip_index;
+            module_index * MythenDetectorSpecifications::strips_per_module +
+            strip_index;
 
         if (bad_channels(global_strip_index)) {
             continue; // skip bad channels

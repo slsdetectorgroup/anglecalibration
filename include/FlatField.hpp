@@ -61,8 +61,8 @@ class FlatField {
         std::shared_ptr<MythenFileReader> file_reader,
         const std::filesystem::path &filelist) {
 
-        flat_field = NDArray<double, 2>(
-            std::array<ssize_t, 2>{mythen_detector->num_strips(), 2});
+        flat_field = NDArray<double, 2>(std::array<ssize_t, 2>{
+            static_cast<ssize_t>(mythen_detector->num_strips()), 2});
 
         std::ifstream file_filelist(filelist);
 
@@ -132,8 +132,8 @@ class FlatField {
         const std::string &filename,
         const std::shared_ptr<SimpleFileInterface> file_reader =
             std::make_shared<CustomFlatFieldFile>()) {
-        flat_field = NDArray<double, 2>(
-            std::array<ssize_t, 2>{mythen_detector->num_strips(), 2});
+        flat_field = NDArray<double, 2>(std::array<ssize_t, 2>{
+            static_cast<ssize_t>(mythen_detector->num_strips()), 2});
         file_reader->open(filename);
         file_reader->read_into(reinterpret_cast<std::byte *>(flat_field.data()),
                                8); // TODO: should be int though !!!
@@ -151,8 +151,8 @@ class FlatField {
         const std::string &filename,
         const std::shared_ptr<SimpleFileInterface> file_reader =
             std::make_shared<CustomFlatFieldFile>()) {
-        normalized_flat_field = NDArray<double, 2>(
-            std::array<ssize_t, 2>{mythen_detector->num_strips(), 2});
+        normalized_flat_field = NDArray<double, 2>(std::array<ssize_t, 2>{
+            static_cast<ssize_t>(mythen_detector->num_strips()), 2});
         file_reader->open(filename);
         file_reader->read_into(
             reinterpret_cast<std::byte *>(normalized_flat_field.data()), 8);
@@ -208,8 +208,9 @@ class FlatField {
             mean = calculate_mean();
         }
 
-        inverse_normalized_flat_field = NDArray<double, 2>(
-            std::array<ssize_t, 2>{mythen_detector->num_strips(), 2});
+        inverse_normalized_flat_field =
+            NDArray<double, 2>(std::array<ssize_t, 2>{
+                static_cast<ssize_t>(mythen_detector->num_strips()), 2});
 
         if constexpr (from_normalized_flat_field) {
             if (normalized_flat_field.size() == 0) {

@@ -41,54 +41,50 @@ offset: double
 
         .def(py::init<>())
 
-        .def(py::init<const double, const size_t, const size_t>(),
-             py::arg("offset"), py::arg("num_counters") = 1,
-             py::arg("max_modules") = 48,
-             R"(
-             Parameters
-             ----------
-             offset: double 
-                Additional offset to sample detector offset. 
-             num_counters: int
-                Number of counters active. 
-             max_modules: int 
-                Number of modules in detector (default 48).
-            )")
-
-        .def_property(
-            "unconnected_modules",
-            [](MythenDetectorSpecifications &self) {
-                return self.get_unconnected_modules();
-            },
-            [](MythenDetectorSpecifications &self,
-               std::vector<ssize_t> &unconnected_modules) {
-                self.set_unconnected_modules(unconnected_modules);
-            })
-
         .def_property_readonly_static(
             "pitch",
-            [](py::object) { return MythenDetectorSpecifications::pitch(); })
+            [](py::object) { return MythenDetectorSpecifications::pitch; },
+            R"(Strip/channel width of Mythen detector [mm] (0.05 mm))")
+
+        .def_property_readonly_static(
+            "transverse_width",
+            [](py::object) {
+                return MythenDetectorSpecifications::transverse_width;
+            },
+            R"(Transverse width of Mythen detector [mm] (8.0 mm))")
 
         .def_property_readonly_static(
             "strips_per_module",
             [](py::object) {
-                return MythenDetectorSpecifications::strips_per_module();
-            })
+                return MythenDetectorSpecifications::strips_per_module;
+            },
+            R"(Strips/channels per module for Mythen detector (1280))")
 
-        .def_property_readonly("max_modules",
-                               &MythenDetectorSpecifications::max_modules)
+        .def_readwrite("max_modules",
+                       &MythenDetectorSpecifications::max_modules,
+                       R"(Number of modules in detector. Default (48))")
 
-        .def_property_readonly("num_counters",
-                               &MythenDetectorSpecifications::num_counters)
-
-        .def_property_readonly_static(
+        .def_readwrite(
             "sample_detector_offset",
-            [](py::object) {
-                return MythenDetectorSpecifications::sample_detector_offset();
-            })
+            &MythenDetectorSpecifications::sample_detector_offset,
+            R"(Offset between sample horizontal plane and detector [degrees] (default: 1.4715°))")
 
-        .def_property_readonly("offset", &MythenDetectorSpecifications::offset)
+        .def_readwrite(
+            "offset", &MythenDetectorSpecifications::offset,
+            R"(Additional offset to sample detector offset (can change in experimental setup) [degrees] (default: 0.0°))")
 
-        .def_property_readonly("num_strips",
-                               &MythenDetectorSpecifications::num_strips);
+        .def_readwrite("dead_time", &MythenDetectorSpecifications::dead_time,
+                       R"(Measured dead-time [s] (default: 76.08e-9 s))")
+
+        .def_readwrite(
+            "average_distance_sample_pixel",
+            &MythenDetectorSpecifications::average_distance_sample_pixel,
+            R"(average euclidean distance between sample and pixel [mm] (default: 2500.0 / pi mm))")
+
+        .def_readwrite("unconnected_modules",
+                       &MythenDetectorSpecifications::unconnected_modules,
+                       R"(list of unconnected modules)")
+
+        .def("num_strips", &MythenDetectorSpecifications::num_strips,
+             R"(Total number of strips in Mythen detector)");
 }
