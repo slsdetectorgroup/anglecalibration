@@ -181,6 +181,14 @@ size_t AngleCalibration::global_to_local_strip_index_conversion(
     return local_strip_index;
 }
 
+double AngleCalibration::elastic_correction(const double detector_angle) const {
+    return detector_angle +
+           mythen_detector->elastic_correction_factor *
+               (-std::sin(M_PI / 180.0 *
+                          (detector_angle -
+                           mythen_detector->detector_vertical_axis_offset)));
+}
+
 // TODO: mmh maybe template these on parameter type - use case distinction
 double AngleCalibration::diffraction_angle_from_DG_parameters(
     const size_t module_index, const double detector_angle, size_t strip_index,
@@ -200,7 +208,7 @@ double AngleCalibration::diffraction_angle_from_DG_parameters(
                (center * std::abs(conversion) -
                 std::atan((center - (strip_index + distance_to_strip)) *
                           std::abs(conversion))) +
-           detector_angle + mythen_detector->offset +
+           elastic_correction(detector_angle) + mythen_detector->offset +
            mythen_detector->sample_detector_offset;
 }
 
@@ -230,7 +238,7 @@ double AngleCalibration::diffraction_angle_from_BC_parameters(
                         MythenDetectorSpecifications::pitch) /
                    (std::abs(distance_center_sample) *
                     std::cos(M_PI / 180.0 * angle_module_center_normal))) +
-           detector_angle + mythen_detector->offset +
+           elastic_correction(detector_angle) + mythen_detector->offset +
            mythen_detector->sample_detector_offset;
 }
 
@@ -250,7 +258,7 @@ double AngleCalibration::diffraction_angle_from_EE_parameters(
                           MythenDetectorSpecifications::pitch *
                               (strip_index + distance_to_strip)) /
                          std::abs(normal_distance)) +
-           detector_angle + mythen_detector->offset +
+           elastic_correction(detector_angle) + mythen_detector->offset +
            mythen_detector->sample_detector_offset;
 }
 
@@ -554,7 +562,7 @@ std::pair<double, double> AngleCalibration::photon_count_correction(
 }
 
 double AngleCalibration::calculate_similarity_of_peaks(
-    const size_t module_index, [[maybe_unused]] PlotHandle plot) const {
+    const size_t module_index, [[maybe_unused]] PlotHandle plot) {
 
     ssize_t num_bins_in_ROI =
         2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;
@@ -683,7 +691,7 @@ double AngleCalibration::calculate_similarity_of_peaks(
 }
 
 void AngleCalibration::plot_last_calibration_step(
-    const size_t module_index, [[maybe_unused]] PlotHandle plot) const {
+    const size_t module_index, [[maybe_unused]] PlotHandle plot) {
 
     ssize_t num_bins_in_ROI =
         2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;
@@ -874,7 +882,7 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
 }
 
 NDArray<double, 1>
-AngleCalibration::convert(const std::vector<std::string> &file_list_) const {
+AngleCalibration::convert(const std::vector<std::string> &file_list_) {
 
     ssize_t new_num_bins = num_fixed_angle_width_bins();
 
@@ -933,7 +941,7 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) const {
 
 NDArray<double, 1>
 AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
-    const MythenFrame &frame, const size_t module_index) const {
+    const MythenFrame &frame, const size_t module_index) {
 
     ssize_t new_num_bins =
         num_fixed_angle_width_bins(); // TODO: maybe only use module region then
@@ -971,7 +979,7 @@ AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
 
 NDArray<double, 1>
 AngleCalibration::redistributed_photon_counts_in_base_peak_ROI(
-    const MythenFrame &frame, const size_t module_index) const {
+    const MythenFrame &frame, const size_t module_index) {
 
     NDArray<double, 1> fixed_angle_width_bins_photon_counts =
         NDArray<double, 1>(std::array<ssize_t, 1>{get_base_peak_ROI_num_bins()},

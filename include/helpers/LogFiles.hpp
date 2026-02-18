@@ -9,7 +9,7 @@ class LogFile {
     LogFile(std::filesystem::path log_file_path)
         : m_log_file_path(log_file_path) {
 
-            open(); 
+        open();
     }
 
     ~LogFile() {
@@ -57,4 +57,13 @@ inline LogFile FlatFieldErrors("FlatFieldErrors.log");
 
 inline LogFile CorrectedPhotonCountsLogFile("CorrectedPhotonCounts.log");
 
-inline LogFile CorrectedPhotonCountsErrorsLogFile("CorrectedPhotonCountsErrors.log");
+inline LogFile
+    CorrectedPhotonCountsErrorsLogFile("CorrectedPhotonCountsErrors.log");
+
+inline LogFile BInBoundariesLogFile("BinBoundaries.log");
+
+inline LogFile StripAngles("StripAngles.log");
+
+inline LogFile CenterStripAngles("CenterStripAngles.log");
+
+inline LogFile EnocderMs("EncoderMs.log");

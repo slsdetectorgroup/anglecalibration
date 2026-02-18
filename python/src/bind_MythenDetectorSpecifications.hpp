@@ -10,7 +10,7 @@ void define_MythenDetectorSpecifications_binding(py::module &m) {
 
     py::class_<MythenDetectorSpecifications,
                std::shared_ptr<MythenDetectorSpecifications>>(
-        m, "MythenDetectorSpecifications", 
+        m, "MythenDetectorSpecifications",
         R"(
         Attributes
         ----------
@@ -32,6 +32,12 @@ void define_MythenDetectorSpecifications_binding(py::module &m) {
 
         offset: double
             Additional offset to sample detector offset (can change in experimental setup) [degrees] (default: 0.0°)
+
+        elastic_correction_factor: double
+            Elastic correction factor for torsional compliance correction model (default: 0.0)
+        
+        detector_vertical_axis_offset: double
+            Offset of detector to vertical axis (used for elastic correction) [degrees] (default: 0.0°)
 
         dead_time: double
             Measured dead-time [s] (default: 76.08e-9 s)
@@ -74,6 +80,13 @@ void define_MythenDetectorSpecifications_binding(py::module &m) {
                        &MythenDetectorSpecifications::sample_detector_offset)
 
         .def_readwrite("offset", &MythenDetectorSpecifications::offset)
+
+        .def_readwrite("elastic_correction_factor",
+                       &MythenDetectorSpecifications::elastic_correction_factor)
+
+        .def_readwrite(
+            "detector_vertical_axis_offset",
+            &MythenDetectorSpecifications::detector_vertical_axis_offset)
 
         .def_readwrite("dead_time", &MythenDetectorSpecifications::dead_time)
 

@@ -25,19 +25,6 @@
 using namespace aare;
 namespace angcal {
 
-/*
-template <class CustomFile> struct custom_file_compatibility {
-    static constexpr bool value =
-        std::is_base_of<DetectorFileInterface, CustomFile>::value &&
-        std::is_constructible<CustomFile, std::string, ssize_t, ssize_t,
-                              std::string>::value;
-};
-
-template <class CustomFile>
-constexpr bool custom_file_compatibility_v =
-    custom_file_compatibility<CustomFile>::value;
-*/
-
 class FlatField {
 
   public:

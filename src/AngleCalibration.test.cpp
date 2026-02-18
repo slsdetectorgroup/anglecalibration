@@ -339,3 +339,4 @@ TEST_CASE("check flatfield correction and error propagation",
               Catch::Approx(expected_flatfield_normalized_photon_counts_error));
     }
 }
+

@@ -37,6 +37,10 @@ def plot_excluding_channels(array: np.array, channels_to_exclude: np.array, x = 
 # setup mythen detector specifications - stores all relevant parameters of the detector setup
 mythendetectorspecifications = MythenDetectorSpecifications() 
 
+mythendetectorspecifications.elastic_correction_factor =  0.0045 
+mythendetectorspecifications.detector_vertical_axis_offset = 24.8 
+mythendetectorspecifications.offset = 0.0 # additional offset to sample detector offset 
+
 # setup flatfield 
 flatfield = FlatField(mythendetectorspecifications)
 
@@ -94,8 +98,8 @@ actual_diffraction_pattern = np.loadtxt(data_path() / "Fructose_0p2_60_m_Alice_W
 
 #plot(actual_diffraction_pattern[:,1], actual_diffraction_pattern[:,0])
 
-plt.plot(bin_in_degrees[~zero_channels],redistributed_photon_counts[~zero_channels], label="my conversion")
-plt.plot(actual_diffraction_pattern[:,0], actual_diffraction_pattern[:,1], label="actual diffraction pattern")
+plt.plot(bin_in_degrees[~zero_channels],redistributed_photon_counts[~zero_channels], label="my conversion", color="blue")
+plt.plot(actual_diffraction_pattern[:,0], actual_diffraction_pattern[:,1], label="actual diffraction pattern", color="orange")
 
 plt.xlabel("Diffraction Angle (degrees)")
 plt.ylabel("Photon Counts")

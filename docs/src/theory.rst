@@ -173,7 +173,7 @@ The diffraction angle is given as:
 Calculating the Diffraction Pattern from the Raw Intensity Spectrum
 ---------------------------------------------------------------------
 
-To obtain the diffraction pattern from the raw intensity spectrum the raw photon counts are corrected and then redistributed to fixed angle width bins. 
+To obtain the diffraction pattern from the raw intensity spectrum the raw photon counts are corrected and then redistributed to fixed sized bins covering a fixed angle. 
 
 Raw Photon Count Correction
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -245,35 +245,39 @@ Don't know what this is. Something to do with actual illuminated surface (transv
 
 where :math:`w` is the pixel's transverse width and :math:`L` is the euclidean distance of the strip to the sample and the constant :math:`\bar{L}` is the average euclidean distance of all strips to the sample. 
 
+The resulting variance is then given by:
+
+.. math:: 
+    \sigma_{solid\_angle\_corr} = \sigma \cdot \left(\frac{2*\arctan{\left(\frac{w/2}{\bar{L}}\right)}}{2*\arctan{\left(\frac{w/2}{L}\right)}}\right)^{2}
+
 **Flatfield Correction:** 
 
-The photon counts are corrected by the flatfield values :math:`F`: 
+The photon counts are corrected by the normalized flatfield values :math:`F`: 
 
 .. math:: 
     I_{f, corr} = \frac{I}{F} 
 
+Note that the flatfield values are not constants but also come with an error :math:`\sigma_F`. Following the rules of error propagation the resulting variance is then given by: 
+
+.. math:: 
+    \sigma_{f,corr} = (\frac{\partial I_{f, corr}}{\partial F})^2 \cdot \sigma_F + (\frac{\partial I_{f, corr}}{\partial I})^2 \cdot \sigma = \frac{I^2}{F^4} \cdot \sigma_F+ \frac{1}{F^2} \cdot \sigma.
 
 The corrected photon counts :math:`I_{corr}` are thus: 
 
-
 .. math::
-    I_{corr} = (I + 1) * c, 
+    I_{corr} = (I + 1) \cdot \frac{I_{0,1s}}{I_0} \cdot \frac{C}{C(\tau_d)} \cdot \frac{2*\arctan{\left(\frac{w/2}{\bar{L}}\right)}}{2*\arctan{\left(\frac{w/2}{L}\right)}} \cdot \frac{1}{F}
 
-where :math:`c` is the product of all correction factors:
+with respective variance: 
 
 .. math:: 
-    c = \frac{1}{I_0} * \frac{1}{F}. 
-
-Note that the variance and expected value then results to :math:`\sigma_{corr}² = c*I_{corr}` and :math:`\mu_{corr} = I_{corr}`. `
-
-MMh i dont know if the correction coefficient's are constants or also probablistic variables. - The flatfield for sure is. 
+    \sigma_{corr} = \left(\frac{I_{0,1s}}{I_0}\right)^2 \cdot \left(\frac{C}{C(\tau_d)}\right)^2 \cdot \left(\frac{2*\arctan{\left(\frac{w/2}{\bar{L}}\right)}}{2*\arctan{\left(\frac{w/2}{L}\right)}}\right)^2 \cdot \sigma_{f,corr}. 
+ 
 
 Conversion to fixed angular strip width bins
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Based on the module's parameters one can now convert the strip index to the diffraction angle. 
-However, depending on the location of the strip one strip can cover a larger angular region than others. See :numref:`angularstripwidth`. 
-Additionally the angular width of a strip can be quite large. 
-Thus, to get a more fine grained diffraction pattern we redistribute the photon intensity per strip 
+Depending on the location of the strip one strip can cover a larger angular region than others. See :numref:`angularstripwidth`. 
+To get a more fine grained diffraction pattern we redistribute the photon intensity per strip 
 to small resolution histogram bins covering a fixed angle. 
 
 .. _angularstripwidth:
@@ -320,7 +324,7 @@ The resulting variance is then given as:
 .. math:: 
     \sigma_{red, i}^{2} = \sigma_{red, i}^{2}\left(\frac{w_{bin}}{w_{strip}}\right)^{2}
 
-Note that several strip widths might overlap with one bin. Nor might a strip cover the entire bin. We thus use the weighted average of all the corrected photon counts of strip's, where the strip overlaps with the bin :math:`T`: 
+Note as there will be "holes" between strips we average over several acquisitions with slightly shifted detector positions. Thus several strip widths from different acquisitions might overlap with one bin. Nor might a strip cover the entire bin. We thus use the weighted average of all the corrected photon counts of strip's, where the strip overlaps with the bin :math:`T`: 
 
 .. math:: 
 

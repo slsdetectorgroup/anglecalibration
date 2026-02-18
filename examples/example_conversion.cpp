@@ -33,6 +33,9 @@ int main() {
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
         std::make_shared<MythenDetectorSpecifications>();
 
+    mythen_detector_ptr->elastic_correction_factor = 0.0045;
+    mythen_detector_ptr->detector_vertical_axis_offset = 24.8;
+
     // FileaReader to read Mythen Files
     auto mythen_file_reader = std::make_shared<EpicsMythenFileReader>();
 
@@ -72,7 +75,7 @@ int main() {
 
     anglecalibration.set_scale_factor(5050880.0);
 
-    anglecalibration.set_angular_range(-90.5, 130);
+    anglecalibration.set_angular_range(-90.5, 130.0); // 130
 
     auto redistributed_photon_counts = anglecalibration.convert(
         file_list); // redistributes and applies pixel wise correction
