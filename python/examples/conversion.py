@@ -6,6 +6,7 @@ import os
 import numpy as np 
 import matplotlib.pyplot as plt
 
+
 def data_path():
     return Path("/home/mazzol_a/Documents/VariaMay2025/Antonio20250512/AngularConversionTestData/")
 
@@ -77,11 +78,13 @@ print("file_list: ", file_list)
 
 anglecalibration.histogram_bin_width = 0.0036  # in degrees (dfeault value) 
 
-anglecalibration.angular_range = (0.0, 90.5)  # in degrees
+anglecalibration.angular_range = (0.0, 90.5)  # in degrees 
 
 print("Angle Range: ", anglecalibration.angular_range)
 
 redistributed_photon_counts = anglecalibration.convert(file_list)
+
+print("conversion is done")
 
 # plot converted data
 bin_indices = np.arange(0, redistributed_photon_counts.size,1)
@@ -98,13 +101,26 @@ actual_diffraction_pattern = np.loadtxt(data_path() / "Fructose_0p2_60_m_Alice_W
 
 #plot(actual_diffraction_pattern[:,1], actual_diffraction_pattern[:,0])
 
-plt.plot(bin_in_degrees[~zero_channels],redistributed_photon_counts[~zero_channels], label="my conversion", color="blue")
+
 plt.plot(actual_diffraction_pattern[:,0], actual_diffraction_pattern[:,1], label="actual diffraction pattern", color="orange")
+plt.plot(bin_in_degrees[~zero_channels],redistributed_photon_counts[~zero_channels], label="my conversion", color="blue")
 
 plt.xlabel("Diffraction Angle (degrees)")
 plt.ylabel("Photon Counts")
 plt.legend()
 plt.show()
+
+print("actual diffraction pattern shape: ", actual_diffraction_pattern[:,1].shape)
+print("converted pattern shape: ", redistributed_photon_counts[~zero_channels].shape)
+
+size = redistributed_photon_counts[~zero_channels].size
+is_same = np.allclose(actual_diffraction_pattern[:size,1], redistributed_photon_counts[~zero_channels], atol=1e-6)
+
+print("result is correct: ", is_same)
+
+for i in range(0, redistributed_photon_counts[~zero_channels].size):
+    if not np.isclose(actual_diffraction_pattern[:,1][i], redistributed_photon_counts[~zero_channels][i], atol=1e-6):
+        print("mismatch at index ", i, ": actual: ", actual_diffraction_pattern[:,1][i], " converted: ", redistributed_photon_counts[~zero_channels][i])
 
 
 

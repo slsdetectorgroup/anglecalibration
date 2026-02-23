@@ -568,8 +568,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
 
         if (left_strip_boundary_angle < m_min_angle ||
             right_strip_boundary_angle > m_max_angle) {
-
-            LOG(TLogLevel::logDEBUG) << fmt::format(
+            LOG(TLogLevel::logDEBUG1) << fmt::format(
                 "strip {} of module {} covers an angle of [{}, {}] and is "
                 "outside "
                 "of the given angular range of [{}, "
@@ -613,14 +612,20 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
         if (photon_counts_per_bin == 0.0) {
             bad_channels(global_strip_index) =
                 true; // mark channel as bad if no
-                      // photon counts after correction
-            continue;
+            //  photon counts after correction
+            // continue;
         }
 
-        // CorrectedPhotonCountsLogFile.append(fmt::format("{}\n",
-        // photon_counts_per_bin));
-        // CorrectedPhotonCountsErrorsLogFile.append(fmt::format("{}\n", 1.0 /
-        // inverse_photon_counts_variance_per_bin));
+        LOG(TLogLevel::logDEBUG1)
+            << fmt::format("corrected photon count for strip {} of module {}",
+                           strip_index, module_index);
+
+        /*
+        CorrectedPhotonCountsLogFile.append(
+            fmt::format("{}\n", photon_counts_per_bin));
+        CorrectedPhotonCountsErrorsLogFile.append(
+            fmt::format("{}\n", 1.0 / inverse_photon_counts_variance_per_bin));
+        */
 
         ssize_t left_bin_index_covered_by_strip{};
 
@@ -637,39 +642,49 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                                       histogram_bin_width));
         } else {
 
-            /*
             left_bin_index_covered_by_strip = static_cast<ssize_t>(
                 (left_strip_boundary_angle / histogram_bin_width));
             right_bin_index_covered_by_strip = static_cast<ssize_t>(
                 (right_strip_boundary_angle / histogram_bin_width));
-            */
 
+            /*
             // weird Antonio stuff
             left_bin_index_covered_by_strip = std::floor(
                 (left_strip_boundary_angle / histogram_bin_width) + 0.5);
             right_bin_index_covered_by_strip = std::ceil(
                 (right_strip_boundary_angle / histogram_bin_width) - 0.5);
+            */
         }
 
+        /*
         StripAngles.append(fmt::format("{}, {}\n", left_strip_boundary_angle,
                                        right_strip_boundary_angle));
         BInBoundariesLogFile.append(
             fmt::format("{}, {}\n", left_bin_index_covered_by_strip,
                         right_bin_index_covered_by_strip));
+        */
 
         size_t proper_bin_index =
             0; // the computed bin indices dont start at zero but are relative
                // to detector angle and strip index
 
         for (ssize_t bin_index = left_bin_index_covered_by_strip;
-             bin_index < right_bin_index_covered_by_strip; ++bin_index) {
+             bin_index <= right_bin_index_covered_by_strip; ++bin_index) {
 
             // some strips dont cover an entire bin or extend over multiple bins
+            /*
             double bin_coverage =
                 std::abs(std::min(right_strip_boundary_angle,
                                   (bin_index + 0.5) * histogram_bin_width) -
                          std::max(left_strip_boundary_angle,
                                   (bin_index - 0.5) * histogram_bin_width));
+            */
+
+            double bin_coverage =
+                std::abs(std::min(right_strip_boundary_angle,
+                                  (bin_index + 1) * histogram_bin_width) -
+                         std::max(left_strip_boundary_angle,
+                                  (bin_index)*histogram_bin_width));
 
             double bin_coverage_factor =
                 bin_coverage / histogram_bin_width; // how much of the strip is
@@ -691,6 +706,9 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
 
             double statistical_weight =
                 bin_coverage_factor * inverse_photon_counts_variance_per_bin;
+
+            StatisticalWeightsLogFile1.append(
+                fmt::format("{}, {}\n", bin_index, statistical_weight));
 
             fixed_angle_width_bins_photon_counts(proper_bin_index) +=
                 statistical_weight * photon_counts_per_bin;

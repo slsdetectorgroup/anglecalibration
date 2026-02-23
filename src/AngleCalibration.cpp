@@ -68,8 +68,8 @@ AngleCalibration::get_detector_specifications() const {
 
 ssize_t AngleCalibration::num_fixed_angle_width_bins() const {
     ssize_t num_fixed_angle_width_bins =
-        std::floor(m_max_angle / histogram_bin_width) -
-        std::floor(m_min_angle / histogram_bin_width) + 1;
+        std::ceil(m_max_angle / histogram_bin_width) -
+        std::floor(m_min_angle / histogram_bin_width);
     return num_fixed_angle_width_bins;
 }
 
@@ -460,9 +460,11 @@ AngleCalibration::flatfield_correction(const double photon_counts,
                                        const double photon_counts_error,
                                        const size_t global_strip_index) const {
 
-    if (1. / (flat_field->get_normalized_flatfield()(global_strip_index, 0)) <
-        std::numeric_limits<double>::epsilon()) {
+    if ((flat_field->get_normalized_flatfield()(global_strip_index, 0)) <=
+        0.1) { // std::numeric_limits<double>::epsilon() in Antonios code 0.1
 
+        LOG(TLogLevel::logDEBUG)
+            << fmt::format("Flatfield value for strip {}", global_strip_index);
         return std::pair(0.0, 0.0);
     }
 
@@ -901,6 +903,8 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
     for (const auto &file : file_list_) {
         MythenFrame frame = mythen_file_reader->read_frame(file);
 
+        LOG(TLogLevel::logDEBUG)
+            << fmt::format("redistributing photon counts for file: {}", file);
         // TODO : actually they should not be added up each set of modules is
         // independant - at beamline the module positions overlap (e.g.
         // counterclockwise)
@@ -919,10 +923,26 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
                 fixed_angle_width_bins_photon_variance.view(),
                 sum_statistical_weights.view());
         }
+
+        LOG(TLogLevel::logDEBUG) << fmt::format(
+            "finished redistributing photon counts for file: {}", file);
     }
+
+    LOG(TLogLevel::logDEBUG)
+        << "redistributed photon counts to fixed angle width bins, now "
+           "normalizing by statistical weight";
 
     // divide by statistial weight
     for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.size(); ++i) {
+
+        /*
+        RedistributedPhotonCountsLogFile.append(
+            fmt::format("{}\n", fixed_angle_width_bins_photon_counts(i)));
+
+        StatisticalWeightsLogFile.append(
+            fmt::format("{}\n", sum_statistical_weights(i)));
+        */
+
         fixed_angle_width_bins_photon_counts(i) =
             sum_statistical_weights(i) < std::numeric_limits<double>::epsilon()
                 ? 0.0
