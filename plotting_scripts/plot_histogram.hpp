@@ -33,12 +33,7 @@ void plot_photon_counts(
 
         } else if (mythen_detector_specifications.has_value()) {
 
-            if (!mythen_detector_specifications.value()->get_bad_channels()(
-                    bin)) {
-                plot_data.emplace_back(bin, photon_counts(bin));
-            } else {
-                plot_data.emplace_back(bin, 0);
-            }
+            plot_data.emplace_back(bin, photon_counts(bin));
         }
     }
 

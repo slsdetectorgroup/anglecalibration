@@ -61,13 +61,6 @@ int main() {
 
     assert(std::filesystem::exists(bad_channels_filename));
 
-#ifdef ANGCAL_PLOT
-
-    plot_photon_counts(mythen_detector_ptr->get_bad_channels(),
-                       {0, mythen_detector_ptr->num_strips()}, "Bad channels",
-                       std::nullopt);
-#endif
-
     /*
     std::string unconnected_modules_filename = file_path / "ModOut.txt";
 
@@ -90,7 +83,7 @@ int main() {
     // txt file
     flat_field_ptr->read_normalized_flatfield_from_file(flatfield_filename);
 
-    flat_field_ptr->calculate_inverse_normalized_flatfield<true>();
+    // flat_field_ptr->calculate_inverse_normalized_flatfield<true>();
 
     auto mythen_file_reader = std::make_shared<EpicsMythenFileReader>();
 
@@ -103,6 +96,13 @@ int main() {
     LOG(TLogLevel::logINFO) << "read initial parameters from file";
 
     anglecalibration.read_bad_channels_from_file(bad_channels_filename);
+
+#ifdef ANGCAL_PLOT
+
+    plot_photon_counts(anglecalibration.get_bad_channels(),
+                       {0, mythen_detector_ptr->num_strips()}, "Bad channels",
+                       std::nullopt);
+#endif
 
     LOG(TLogLevel::logINFO) << "read bad channels";
 
@@ -132,50 +132,32 @@ int main() {
 
 #ifdef ANGCAL_PLOT
     // select_base_peak(std::make_shared<AngleCalibration>(anglecalibration),
-    // mythen_file_reader, filelist, 18);
+    // mythen_file_reader, filelist, 0);
 #endif
 
     // take a tabulated peak as base peak
     // or take a base peak for module 0 that is well inside the detector range
     // and not at the module boundaries
-    const double base_peak_angle = 17.599; // 26.7731, 20.5902, 14.0686
+    const double base_peak_angle = 19.0598; // 26.7731, 20.5902, 14.0686
 
     anglecalibration.set_base_peak_angle(base_peak_angle);
 
     anglecalibration.set_base_peak_ROI_width(0.18);
 
+    auto first_frame = mythen_file_reader->read_frame(filelist[0]);
+    LOG(TLogLevel::logINFO)
+        << fmt::format("incident intensity of first frame: {}",
+                       first_frame.incident_intensity);
+    anglecalibration.set_scale_factor(first_frame.incident_intensity);
+
     // anglecalibration.set_histogram_bin_width(0.01);
 
+    auto test_frame = file_path / acquisition_fileprefix.append("0173.h5");
+
     // plot some stuff
-    MythenFrame frame = mythen_file_reader->read_frame(
-        file_path / acquisition_fileprefix.append("1014.h5")); // 0165.h5
+    MythenFrame frame = mythen_file_reader->read_frame(test_frame); // 0165.h5
 
-    size_t module_index = 18; // 0
-
-#ifdef ANGCAL_PLOT
-
-    // normalize photon counts
-    NDArray<double, 1> normalized_photon_counts{
-        std::array<ssize_t, 1>{frame.size()}, 0.0};
-
-    for (ssize_t index = 0; index < frame.size(); ++index) {
-        normalized_photon_counts(index) =
-            frame.photon_counts(index) *
-            flat_field_ptr->get_inverse_normalized_flatfield()(index, 0);
-    }
-
-    plot_photon_counts(normalized_photon_counts.view(),
-                       {0, mythen_detector_ptr->num_strips()},
-                       "Normalized Photon Counts", mythen_detector_ptr);
-
-    plot_photon_counts(
-        normalized_photon_counts.view(),
-        {module_index * mythen_detector_ptr->strips_per_module(),
-         (module_index + 1) * mythen_detector_ptr->strips_per_module()},
-        fmt::format("Normalized Photon Counts for module {}", module_index),
-        mythen_detector_ptr);
-
-#endif
+    size_t module_index = 0; // 0
 
 // plot everything redistributed to fixed angle width bins
 #ifdef ANGCAL_PLOT
@@ -183,8 +165,7 @@ int main() {
     PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
 
     auto new_fixed_angle_width_bins_photon_counts =
-        anglecalibration.redistribute_photon_counts_to_fixed_angle_width_bins(
-            frame);
+        anglecalibration.convert({test_frame});
 
     plotter.plot_redistributed_photon_counts(
         new_fixed_angle_width_bins_photon_counts.view());
