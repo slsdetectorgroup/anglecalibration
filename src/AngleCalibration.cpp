@@ -439,11 +439,6 @@ std::pair<double, double> AngleCalibration::incident_intensity_correction(
                                  "Incident intensity is zero - cannot perform "
                                  "incident intensity correction");
     }
-    if (m_scale_factor == 1.0) {
-        LOG(TLogLevel::logWARNING)
-            << "Scale factor for incident intensity correction not set, "
-               "assuming scale factor of 1.0";
-    }
 
     double I0_correction_factor = get_scale_factor() / (incident_intensity);
 
@@ -566,8 +561,7 @@ std::pair<double, double> AngleCalibration::photon_count_correction(
 double AngleCalibration::calculate_similarity_of_peaks(
     const size_t module_index, [[maybe_unused]] PlotHandle plot) {
 
-    ssize_t num_bins_in_ROI =
-        2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;
+    ssize_t num_bins_in_ROI = get_base_peak_ROI_num_bins();
     // used to calculate similarity criterion between peaks of different
     // acquisition S_index = sum_i^num_runs
     // photon_count^index*photon_variance
@@ -636,14 +630,20 @@ double AngleCalibration::calculate_similarity_of_peaks(
                         : fixed_angle_width_bins_photon_counts_variance(i) /
                               std::pow(sum_statistical_weights(i), 2); // y_k
 
-                S0(i) += 1. / fixed_angle_width_bins_photon_counts_variance(i);
+                double inverse_fixed_angle_width_bins_photon_counts_variance =
+                    fixed_angle_width_bins_photon_counts_variance(i) <
+                            std::numeric_limits<double>::epsilon()
+                        ? 0.0
+                        : 1. / fixed_angle_width_bins_photon_counts_variance(i);
 
-                S1(i) += fixed_angle_width_bins_photon_counts(i) * 1. /
-                         fixed_angle_width_bins_photon_counts_variance(i);
+                S0(i) += inverse_fixed_angle_width_bins_photon_counts_variance;
+
+                S1(i) += fixed_angle_width_bins_photon_counts(i) *
+                         inverse_fixed_angle_width_bins_photon_counts_variance;
 
                 S2(i) += fixed_angle_width_bins_photon_counts(i) *
-                         fixed_angle_width_bins_photon_counts(i) * 1. /
-                         fixed_angle_width_bins_photon_counts_variance(i);
+                         fixed_angle_width_bins_photon_counts(i) *
+                         inverse_fixed_angle_width_bins_photon_counts_variance;
             }
 
 #ifdef ANGCAL_PLOT
@@ -661,9 +661,7 @@ double AngleCalibration::calculate_similarity_of_peaks(
 
                 plot->append_to_plot(
                     fixed_angle_width_bins_photon_counts.view(),
-                    {0, 2 * static_cast<ssize_t>(base_peak_roi_width /
-                                                 histogram_bin_width) +
-                            1},
+                    {0, num_bins_in_ROI},
                     bin_to_diffraction_angle_base_peak_ROI_only, dataset_name);
                 // plot->pause();
             }
@@ -689,6 +687,14 @@ double AngleCalibration::calculate_similarity_of_peaks(
             ? std::numeric_limits<double>::infinity()
             : similarity_criterion(S0.view(), S1.view(), S2.view(), num_runs);
     LOG(TLogLevel::logDEBUG1) << "similarity_of_peaks: " << similarity_of_peaks;
+
+    if (std::isnan(similarity_of_peaks) || std::isinf(similarity_of_peaks)) {
+        throw std::runtime_error(LOCATION +
+                                 "Similarity of peaks is NaN or "
+                                 "infinity - something went wrong in "
+                                 "calculation of similarity of peaks");
+    }
+
     return similarity_of_peaks;
 }
 
@@ -820,7 +826,7 @@ void AngleCalibration::calibrate(
             auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
 
             try {
-                optimization_algorithm(module_index, nullptr);
+                optimization_algorithm(module_index, plot);
             } catch (const NoBasePeakOverLapError &e) {
                 LOG(angcal::TLogLevel::logINFO)
                     << e.what()
@@ -1258,8 +1264,8 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
 // TODO: it just writes to a csv/txt file maybe consider using same file format
 // as in m_custom_file_ptr but then user needs to implement more e.g. custom
 // append
-void AngleCalibration::write_to_file(
-    const std::filesystem::path &filename) const {
+void AngleCalibration::write_DG_parameters_to_file(
+    const std::filesystem::path &filename, const DGParameters &parameters) {
 
     std::ofstream output_file(filename);
 
@@ -1269,13 +1275,21 @@ void AngleCalibration::write_to_file(
 
     output_file.precision(15);
 
-    output_file << "module, center, conversion, offset" << std::endl; // header
+    // output_file << "module, center, conversion, offset" << std::endl; //
+    // header
 
-    for (ssize_t module_index = 0; module_index < BCparameters.num_modules();
+    for (ssize_t module_index = 0; module_index < parameters.num_modules();
          ++module_index) {
-        auto [center, conversion, offset] =
-            BCparameters.convert_to_DGParameters(module_index);
-        append_to_file(output_file, module_index, center, conversion, offset);
+        /*
+        if constexpr (std::is_same_v<decltype(parameters), DGParameters>) {
+            auto [center, conversion, offset] =
+                parameters.convert_to_DGParameters(module_index);
+        }
+        */
+        append_to_file(output_file, module_index,
+                       parameters.centers(module_index),
+                       parameters.conversions(module_index),
+                       parameters.offsets(module_index));
     }
 
     output_file.close();
@@ -1285,9 +1299,11 @@ void AngleCalibration::append_to_file(std::ofstream &os,
                                       const size_t module_index,
                                       const double center,
                                       const double conversion,
-                                      const double offset) const {
-    os << module_index << "," << center << "," << conversion << "," << offset
-       << std::endl;
+                                      const double offset) {
+    os << "module " << module_index << " center " << center << " +- 0.0000"
+       << " conversion " << conversion << " +- 0.0000"
+       << " offset " << offset << " +- 0.0000"
+       << std::endl; // dummy errors for now
 }
 
 } // namespace angcal

@@ -106,6 +106,37 @@ class FlatField {
         file_filelist.close();
     }
 
+    /*
+    void create_flatfield_from_filelist(
+        const std::vector<std::filesystem::path> &filelist,
+        std::shared_ptr<MythenFileReader> file_reader) {
+        flat_field = NDArray<double, 2>(
+            std::array<ssize_t, 2>{
+                static_cast<ssize_t>(mythen_detector->num_strips()), 2},
+            0.0);
+
+        for (const auto &file : filelist) {
+            auto frame = file_reader->read_frame(file);
+            // TODO: throw error if size doesnt match
+            for (ssize_t strip_index = 0;
+                 strip_index < mythen_detector->num_strips(); ++strip_index) {
+                if (!bad_channels(strip_index)) {
+                    flat_field(strip_index, 0) +=
+                        (frame.photon_counts(strip_index) +
+                         1) // mighells correction
+                        // flat_field
+                        // flatfield variance
+                        flat_field(strip_index, 1) +=
+                        std::pow(frame.photon_counts(strip_index) + 1, 1) /
+                            std::pow(frame.incident_intensity + 1, 3) +
+                        (frame.photon_counts(strip_index) + 1) /
+                            std::pow(frame.incident_intensity + 1, 2);
+                }
+            }
+        }
+    }
+    */
+
     // TODO: maybe dont support reading at all
     // caveat user has to pass by value or move otherwise copied twice from
     // filesystem and then into member variable !!!!

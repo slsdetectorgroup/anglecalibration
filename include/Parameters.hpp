@@ -1,4 +1,4 @@
-
+#pragma once
 #include <cmath>
 #include <cstdint>
 
@@ -51,7 +51,7 @@ struct EEParameters : public Parameters {
 
     EEParameters() = default;
 
-    EEParameters(const ssize_t n_modules) : Parameters(n_modules) {};
+    EEParameters(const ssize_t n_modules) : Parameters(n_modules){};
 
     /**
      * @brief normal distance between sample and detector (R)
@@ -96,7 +96,7 @@ struct BCParameters : public Parameters {
 
     BCParameters() = default;
 
-    BCParameters(const ssize_t n_modules) : Parameters(n_modules) {};
+    BCParameters(const ssize_t n_modules) : Parameters(n_modules){};
 
     /** @brief angle between center of module and module normal (from sample)
      * [degrees] (delta)
@@ -166,7 +166,7 @@ struct DGParameters : public Parameters {
 
     DGParameters() = default;
 
-    DGParameters(const ssize_t n_modules) : Parameters(n_modules) {};
+    DGParameters(const ssize_t n_modules) : Parameters(n_modules){};
 
     /**
      * @brief orthogonal projection of sample onto

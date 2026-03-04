@@ -14,8 +14,8 @@ void define_MythenFrame_bindings(py::module &m) {
 
         .def_property_readonly("photon_counts",
                                [](MythenFrame &self) {
-                                   return return_view_data(
-                                       self.photon_counts());
+                                   return return_view_data(self.photon_counts(),
+                                                           py::cast(self));
                                })
         // TODO: handle view
 

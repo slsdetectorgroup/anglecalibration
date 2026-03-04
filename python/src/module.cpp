@@ -2,6 +2,7 @@
 #include "bind_FlatField.hpp"
 #include "bind_MythenDetectorSpecifications.hpp"
 #include "bind_MythenFileReader.hpp"
+#include "bind_Parameters.hpp"
 #include "bind_SimpleFileInterface.hpp"
 
 // Pybind stuff
@@ -17,4 +18,5 @@ PYBIND11_MODULE(_angcal, m) {
     define_SimpleFileInterface_binding(m);
     define_MythenFrame_bindings(m);
     define_MythenFileReader_bindings(m);
+    define_Parameters_binding(m);
 }

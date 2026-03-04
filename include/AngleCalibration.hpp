@@ -124,10 +124,13 @@ class AngleCalibration {
     void set_bad_channels(const NDArray<bool, 1> &bad_channels_);
 
     /**
-     * get the histoic DG parameters
+     * @brief get the histoic DG parameters
      */
     const DGParameters &get_DGparameters() const; // TODO do I need that?
 
+    /**
+     * @brief get the current BC parameters
+     */
     const BCParameters &get_BCparameters() const;
 
     /**
@@ -278,11 +281,12 @@ class AngleCalibration {
         const double angle, const double detector_angle, size_t strip_index,
         const double distance_to_strip = 0) const;
 
-    /** @brief converts optimized best computing parameters back to DG
-     * parameters and writes them to file
+    /** @brief writes DG parameters to file
      * @param filename full path tooutput file
      */
-    void write_to_file(const std::filesystem::path &filename) const;
+    static void
+    write_DG_parameters_to_file(const std::filesystem::path &filename,
+                                const DGParameters &parameters);
 
     /**
      * @brief calculate the rate corrected photon counts taking into account the
@@ -453,9 +457,9 @@ class AngleCalibration {
     /**
      * @brief appends given parameters to file
      */
-    void append_to_file(std::ofstream &file, const size_t module_index,
-                        const double center, const double conversion,
-                        const double offset) const;
+    static void append_to_file(std::ofstream &file, const size_t module_index,
+                               const double center, const double conversion,
+                               const double offset);
 
     void plot_last_calibration_step(const size_t module_index, PlotHandle gp);
 
@@ -707,8 +711,8 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             double statistical_weight =
                 bin_coverage_factor * inverse_photon_counts_variance_per_bin;
 
-            StatisticalWeightsLogFile1.append(
-                fmt::format("{}, {}\n", bin_index, statistical_weight));
+            // StatisticalWeightsLogFile1.append(
+            // fmt::format("{}, {}\n", bin_index, statistical_weight));
 
             fixed_angle_width_bins_photon_counts(proper_bin_index) +=
                 statistical_weight * photon_counts_per_bin;
@@ -716,10 +720,9 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             // TODO: need to fix !!!
             fixed_angle_width_bins_photon_counts_variance(proper_bin_index) +=
                 inverse_photon_counts_variance_per_bin *
-                std::pow(
-                    bin_coverage_factor,
-                    2); // TODO: in Antonios code:
-                        // statistical_weight*photon_counts_per_bin*photon_counts_per_bin
+                std::pow(bin_coverage_factor,
+                         2); // variance * statistical_weight^2 = variance⁻2 *
+                             // bin_coverage_factor^2
 
             sum_statistical_weights(proper_bin_index) += statistical_weight;
         }

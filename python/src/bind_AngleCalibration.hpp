@@ -153,19 +153,20 @@ void define_AngleCalibration_binding(py::module &m) {
         .def_property_readonly(
             "DGparameters",
             [](AngleCalibration &self) {
-                auto DGparameters =
-                    new NDArray<double, 2>(self.get_DGparameters().parameters);
-                return return_image_data(
-                    DGparameters); // maybe return memoryview::from_memory
+                return self.get_DGparameters(); // TODO: in c++ actually returns
+                                                // a const reference, what
+                                                // return value policy to use?
             },
             R"(
             historic DG parameters 
+            )")
 
-            numpy.ndarray (,3)
-                array of shape (n_modules, 3) containing the DG parameters for all modules (first column: center, second column: conversion, third column: offset)
-            )") // should I have a python class with
-                // method centers, etc? - use
-                // py::buffer
+        .def_property_readonly(
+            "BCparameters",
+            [](AngleCalibration &self) { return self.get_BCparameters(); },
+            R"(
+            current "Best Computing" BC parameters 
+            )")
 
         .def_property(
             "bad_channels",
@@ -251,5 +252,23 @@ void define_AngleCalibration_binding(py::module &m) {
             Returns
             -------
             numpy.ndarray (,num_fixed_angle_width_bins)
-                photon counts redistributed to fixed angle width bins, flatfield corrected and variance scaled photon counts)");
+                photon counts redistributed to fixed angle width bins, flatfield corrected and variance scaled photon counts)")
+
+        .def(
+            "write_DG_parameters_to_file",
+            [](AngleCalibration &self, const std::string &filename,
+               const DGParameters &parameters) {
+                self.write_DG_parameters_to_file(filename, parameters);
+            },
+            py::arg("filename"), py::arg("parameters"),
+            R"(
+            writes DG parameters to file
+
+             Parameters
+             ----------
+             filename: str
+                path to output file
+             parameters: DGParameters
+                DGParameters object containing the parameters to write to file
+             )");
 }
