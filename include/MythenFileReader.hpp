@@ -263,6 +263,11 @@ class EpicsMythenFileReader : public HDF5FileReader, public MythenFileReader {
      */
     MythenFrame read_frame(const std::filesystem::path &file_name) override {
 
+        if (!std::filesystem::exists(file_name)) {
+            throw std::runtime_error(
+                fmt::format("File {} does not exist\n", file_name.string()));
+        }
+
         open_file(file_name);
 
         auto dataset_photon_count =
