@@ -138,7 +138,7 @@ int main() {
     // take a tabulated peak as base peak
     // or take a base peak for module 0 that is well inside the detector range
     // and not at the module boundaries
-    const double base_peak_angle = 19.0598; // 26.7731, 20.5902, 14.0686
+    const double base_peak_angle = 19.0489; // 26.7731, 20.5902, 14.0686
 
     anglecalibration.set_base_peak_angle(base_peak_angle);
 

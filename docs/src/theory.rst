@@ -118,10 +118,10 @@ The formula for the diffraction angle using DG parameters is as follows:
 
 **BC Parameters:** 
 
-Another parameter set are the BC "best computing" parameters :math:`\sum(\Psi_m, L_m, \delta_m)`. :math:`L_m` denotes the distance of the module center to the sample. The angle :math:`delta_m` denotes the angle between the module center and the orthogonal projection of the sample onto the module. 
+Another parameter set are the BC "best computing" parameters :math:`\sum(\Psi_m, L_m, \delta_m)`. :math:`L_m` denotes the distance of the module center to the sample. The angle :math:`\delta_m` denotes the angle between the module center and the orthogonal projection of the sample onto the module. 
 And the angle :math:`\Psi_m` denotes the angle between the center of the module and the direction of the beam. See :numref:`BCParameters` for a schemantic representation of the BC and EE parameters for one module. 
 
-Note that :math:`\Psi_m` is completely independant from the other parameters and only depend on the module center and the beam direction. It can thus be redefined independantly. Therefore the parameters are called "best computing" parameters. 
+Note that :math:`\Psi_m` and :math:`L_m` are completely independant from the other parameters and only depend on the module center and the beam direction. Those can thus be refined independantly. Therefore the parameters are called "best computing" parameters as they are optimal for optimization. 
 
 .. _BCParameters:
 
@@ -459,13 +459,13 @@ and resulting variance:
 
 .. math:: 
 
-    \sigma_{a_{min,k}} = \frac{1}{\sum_{j=1}^{M} \sigma_{red,k,j}^{- 2}}. 
+    \sigma_{a_{min,k}}^{2} = \frac{1}{\sum_{j=1}^{M} \sigma_{red,k,j}^{- 2}}. 
 
 The average :math:`\chi_k^{2}|a_{min,k}` is then given by the average residual :math:`av\_res_{k}`: 
 
 .. math:: 
 
-    av\_res_{k} = \sqrt{\frac{1}{M-1} * \chi_k^{2}|a_{min,k}} = \sqrt{\frac{1}{M - 1}*(S_{2,k} -S_{1,k}*S_{0,k}^{-1})}, 
+    av\_res_{k} = \sqrt{\frac{1}{M-1} * \chi_k^{2}|a_{min,k}} = \sqrt{\frac{1}{M - 1}*(S_{2,k} -S_{1,k}^{2}*S_{0,k}^{-1})}, 
 
 
 with: 

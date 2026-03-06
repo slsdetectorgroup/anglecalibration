@@ -1,4 +1,5 @@
 #include "AngleCalibration.hpp"
+#include "Optimization.hpp"
 #include "helpers/ErrorPropagation.hpp"
 #include "helpers/LogFiles.hpp"
 #include "helpers/custom_errors.hpp"
@@ -305,31 +306,31 @@ double AngleCalibration::similarity_criterion(const NDView<double, 1> S0,
                                               const size_t num_runs) const {
 
     double similarity_criterion = 0;
+
+    if (num_runs == 0) {
+        throw std::runtime_error(
+            LOCATION +
+            "Number of runs is zero - cannot calculate similarity criterion!");
+    }
     for (ssize_t bin_index = 0; bin_index < S0.size(); ++bin_index) {
 
         double weighted_average =
             S0(bin_index) < std::numeric_limits<double>::epsilon()
                 ? 0.0
-                : 1. / S0(bin_index); // photon variance over each run //TODO
-                                      // check if this is correct with Antonios
-                                      // code!! - how to caluclate varaince?
-        double goodness_of_fit =
-            S2(bin_index) -
-            S1(bin_index) * S1(bin_index) *
-                weighted_average; // calculates chi value for optimal parameter
-                                  // a over all runs chi_bin = (a-
-                                  // photon_count)*photon_variance
+                : 1. / S0(bin_index);
+
+        double goodness_of_fit = std::sqrt(
+            (S2(bin_index) - S1(bin_index) * S1(bin_index) * weighted_average) /
+            num_runs); // calculates chi value for optimal
+                       // parameter a over all runs chi_bin = (a-
+                       // photon_count)*photon_variance
 
         similarity_criterion +=
-            goodness_of_fit *
-            weighted_average; // TODO in antonios code only goodness of fit is
-                              // added not averaged !!
+            goodness_of_fit * weighted_average; // scale by variance
     }
 
-    return similarity_criterion /
-           std::max(num_runs,
-                    static_cast<size_t>(1)); // should actually only divide by
-                                             // runs or also by num bins?
+    return similarity_criterion; // TODO: do we have to didvide by num bins? -
+                                 // probably?
 }
 
 // TODO maybe inline this
@@ -826,7 +827,7 @@ void AngleCalibration::calibrate(
             auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
 
             try {
-                optimization_algorithm(module_index, plot);
+                optimization_algorithm(module_index, nullptr);
             } catch (const NoBasePeakOverLapError &e) {
                 LOG(angcal::TLogLevel::logINFO)
                     << e.what()
@@ -1050,7 +1051,7 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
     constexpr double tolerance1 =
         0.001; // dont know if this should be configurable
 
-    constexpr size_t max_iterations = 200;
+    constexpr size_t max_iterations = 400;
 
     std::vector<std::pair<double, double>> shift_parameters;
     shift_parameters.reserve(9);
@@ -1058,26 +1059,27 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
     // TODO dont know if order matters for faster convergence - kept it like
     // in Antonios code
     shift_parameters.emplace_back(-shift_parameter1, -shift_parameter2);
-    shift_parameters.emplace_back(-shift_parameter1, shift_parameter2);
-    shift_parameters.emplace_back(shift_parameter1, -shift_parameter2);
-    shift_parameters.emplace_back(shift_parameter1, shift_parameter2);
-    shift_parameters.emplace_back(-shift_parameter1, 0.0);
-    shift_parameters.emplace_back(shift_parameter1, 0.0);
     shift_parameters.emplace_back(0.0, -shift_parameter2);
-    shift_parameters.emplace_back(0.0, shift_parameter2);
+    shift_parameters.emplace_back(shift_parameter1, -shift_parameter2);
+    shift_parameters.emplace_back(-shift_parameter1, 0.0);
     shift_parameters.emplace_back(0.0, 0.0);
+    shift_parameters.emplace_back(shift_parameter1, 0.0);
+    shift_parameters.emplace_back(-shift_parameter1, shift_parameter2);
+    shift_parameters.emplace_back(0.0, shift_parameter2);
+    shift_parameters.emplace_back(shift_parameter1, shift_parameter2);
 
     double previous_similarity_of_peaks =
         calculate_similarity_of_peaks(module_index, gp);
 
+    LOG(logDEBUG) << fmt::format("initial similarity of peaks: {}",
+                                 previous_similarity_of_peaks);
+
     double next_similarity_of_peaks{};
 
-    std::vector<double> sp(
-        shift_parameters
-            .size()); // store values of similarity of peak for different
-                      // shift parameters //0. sp_x-1,y-1 / 1. sp_x-1,y+1
-                      // / 2. sp_x+1,y-1 / 3. sp_x+1,y+1 / 4. sp_x-1,y / 5.
-                      // sp_x+1,y / 6. sp_x,y-1 / 7. sp_x,y+1 / 8 sp_x,y
+    NDArray<double, 2> sp_at_grid_points(
+        std::array<ssize_t, 2>{3, 3},
+        0.0); // store values of similarity of peak for different parameters
+              // shifted by shift parameters
 
     bool convergence_criterion = false;
     size_t iteration_index = 0;
@@ -1089,173 +1091,175 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
         for (size_t parameter_index = 0;
              parameter_index < shift_parameters.size(); ++parameter_index) {
 
-            LOG(TLogLevel::logDEBUG)
-                << fmt::format("Iteration {} with peak similarity of {}",
-                               iteration_index, previous_similarity_of_peaks);
-
-            ++iteration_index;
-
-            BCparameters.angle_center_module_normal(module_index) +=
-                shift_parameters[parameter_index].first;
             BCparameters.module_center_sample_distances(module_index) +=
-                shift_parameters[parameter_index].second;
-            // TODO: pass parameters directly
-            next_similarity_of_peaks =
-                calculate_similarity_of_peaks(module_index, gp);
-            sp[parameter_index] = next_similarity_of_peaks;
-            /*
-            BCparameters.angle_center_module_normal(module_index) -=
                 shift_parameters[parameter_index].first;
-            BCparameters.module_center_sample_distances(module_index) -=
-                shift_parameters[parameter_index].second;
-            */
 
+            BCparameters.angle_center_beam(module_index) +=
+                shift_parameters[parameter_index].second;
+
+            sp_at_grid_points[parameter_index] =
+                calculate_similarity_of_peaks(module_index, gp);
+
+            LOG(logDEBUG1) << fmt::format(
+                "similarity of peaks for parameter set [{},{}]: {}",
+                shift_parameters[parameter_index].first,
+                shift_parameters[parameter_index].second,
+                sp_at_grid_points[parameter_index]);
+
+            // revert shift
+            BCparameters.angle_center_beam(module_index) -=
+                shift_parameters[parameter_index].second;
+            BCparameters.module_center_sample_distances(module_index) -=
+                shift_parameters[parameter_index].first;
+
+            /*
             if (next_similarity_of_peaks < previous_similarity_of_peaks) {
-                // update centers for real
                 previous_similarity_of_peaks = next_similarity_of_peaks;
+                LOG(logDEBUG)
+                    << fmt::format("found better parameters with similarity of "
+                                   "peaks: {} and parameter set: [{},{}]",
+                                   previous_similarity_of_peaks,
+                                   shift_parameters[parameter_index].first,
+                                   shift_parameters[parameter_index].second);
                 // parameter_index = 0;
                 //  break;
             } else {
-                BCparameters.angle_center_module_normal(module_index) -=
-                    shift_parameters[parameter_index].first;
-                BCparameters.module_center_sample_distances(module_index) -=
+                // revert shift
+                BCparameters.angle_center_beam(module_index) -=
                     shift_parameters[parameter_index].second;
+                BCparameters.module_center_sample_distances(module_index) -=
+                    shift_parameters[parameter_index].first;
             }
+            */
         }
 
-        LOG(TLogLevel::logINFO)
+        LOG(TLogLevel::logDEBUG)
             << "peak similarity: " << previous_similarity_of_peaks;
 
-        // deviates from Antonios code
-        // calculate Hessian matrix
+        // calculate gradient
+        auto gradient = calculate_gradient(sp_at_grid_points, shift_parameter1,
+                                           shift_parameter2);
 
-        double Dy =
-            (sp[7] - sp[6] + sp[1] - sp[0] + sp[3] - sp[2]) /
-            (6 * shift_parameter2); //(sp_x,y+1 - sp_x,y-1)/delta_y +
-                                    //(sp_x-1,y+1 - sp_x-1,y-1)/delta_y +
-                                    //(sp_x+1,y+1 - sp_x+1,y-1)/delta_y
-                                    ////averaged central differences
-        double Dx =
-            (sp[5] - sp[4] + sp[2] - sp[0] + sp[3] - sp[1]) /
-            (6 * shift_parameter1); //(sp_x+1,0 - sp_x-1,0)/delta_x +
-                                    //(sp_x+1,y-1 - sp_x-1,y-1)/delta_x +
-                                    //(sp_x+1,y+1 - sp_x-1, y+1)/2delta_x
-        double Dxx =
-            ((sp[3] - 2 * sp[7] + sp[1]) + (sp[5] - 2 * sp[8] + sp[4]) +
-             (sp[2] - 2 * sp[6] + sp[0])) /
-            (shift_parameter1 * shift_parameter2 *
-             3); // (sp_x+1,y+1 - 2sp_x,y+1 + sp_x-1,y-1)/delta_x*delta_x
-                 // etc.
-        double Dyy =
-            ((sp[3] - 2 * sp[5] + sp[2]) + (sp[7] - 2 * sp[8] + sp[6]) +
-             (sp[1] - 2 * sp[4] + sp[0])) /
-            (shift_parameter1 * shift_parameter2 * 3);
+        auto Hessian = calculate_Hessian(sp_at_grid_points, shift_parameter1,
+                                         shift_parameter2);
 
-        double Dyx =
-            ((sp[3] - sp[1]) - sp[2] + sp[0]) /
-            (4 * shift_parameter1 *
-             shift_parameter2); // ((sp_x+1,y+1 - sp_x-1,y+1)/(2*delta_x) -
-                                // (sp_x+1,y-1 -
-                                // sp_x-1,y-1)/(2*delta_x))/2delta_y
+        auto eigenvalues = calculate_eigenvalues(Hessian.view());
 
-        // calculate eigenvalues of Hessian for regularized inversed Hessian
-        double eigenvalue1 =
-            0.5 * (Dxx + Dyy) - std::sqrt(0.25 * (Dxx - Dyy) * (Dxx - Dyy) +
-                                          Dyx * Dyx); // TODO might be negative?
-        double eigenvalue2 =
-            0.5 * (Dxx + Dyy) +
-            std::sqrt(0.25 * (Dxx - Dyy) * (Dxx - Dyy) + Dyx * Dyx);
-
-        double regularization_term = std::max(
+        const double regularization_term = std::max(
             0.0,
             tolerance1 -
-                std::min(eigenvalue1,
-                         eigenvalue2)); // Why is this done? what if eigenvalue
-                                        // is bigger than tolerance and thus
-                                        // value becomes negative?
+                std::min(eigenvalues[0],
+                         eigenvalues[1])); // eigenvalues need to be bigger than
+                                           // tolerance ensures that eigenvalues
+                                           // of regularized Hessian are
+                                           // positive - thus ensuring that we
+                                           // have a descent direction
 
-        double inverse_determinant =
-            1. / (Dxx * Dyy - Dyx * Dyx - regularization_term * (Dxx + Dyy) +
-                  regularization_term * regularization_term);
+        auto inverse_regularized_Hessian =
+            calculate_regularized_inverse_Hessian(Hessian.view(),
+                                                  regularization_term);
 
+        // Newton step x_k+1 = x_k - Hessian^(-1)*gradient
         // steepest descent in direction of Hessian^(-1)*gradient
-        // Hessian^(-1) = 1/determinant [[Dyy + regularization, -Dyx],
-        // [-Dyx, Dxx + regularization]]
-        std::pair<double, double> steepest_descent(
-            ((Dyy + regularization_term) * Dx - Dyx * Dy) * inverse_determinant,
-            ((Dxx + regularization_term) * Dy - Dyx * Dx) *
-                inverse_determinant);
+        std::array<double, 2> steepest_descent{
+            inverse_regularized_Hessian(0, 0) * gradient[0] +
+                inverse_regularized_Hessian(0, 1) * gradient[1],
+            inverse_regularized_Hessian(1, 0) * gradient[0] +
+                inverse_regularized_Hessian(1, 1) * gradient[1]};
 
-        LOG(TLogLevel::logDEBUG) << fmt::format(
+        LOG(TLogLevel::logDEBUG1) << fmt::format(
             " fine tune parameters in direction of steepest descent: [{},{}]",
-            steepest_descent.first, steepest_descent.second);
+            steepest_descent[0], steepest_descent[1]);
 
+        /*
         double scale_factor = std::min(
             1.0,
-            1. / std::max(std::abs(steepest_descent.first /
-                                   BCparameters.angle_center_module_normal(
-                                       module_index)),
-                          std::abs(steepest_descent.second /
+            1. / std::max(std::abs(steepest_descent[0] /
                                    BCparameters.module_center_sample_distances(
+                                       module_index)),
+                          std::abs(steepest_descent[1] /
+                                   BCparameters.angle_center_beam(
                                        module_index))));
 
-        steepest_descent.first *= scale_factor;
-        steepest_descent.second *= scale_factor;
+        steepest_descent[0] *= scale_factor;
+        steepest_descent[1] *= scale_factor;
+        */
 
-        BCparameters.angle_center_module_normal(module_index) +=
-            steepest_descent.first;
         BCparameters.module_center_sample_distances(module_index) +=
-            steepest_descent.second;
+            steepest_descent[0];
+        BCparameters.angle_center_beam(module_index) += steepest_descent[1];
 
         bool found_best_parameters = false;
 
         // check termination criterion iteration_index added on purpose
-        while (!found_best_parameters && iteration_index < max_iterations) {
+        while (!found_best_parameters) {
 
             next_similarity_of_peaks =
                 calculate_similarity_of_peaks(module_index, gp);
 
+            found_best_parameters =
+                next_similarity_of_peaks < previous_similarity_of_peaks;
+
             // TODO what if im stuck in here
             if (next_similarity_of_peaks > previous_similarity_of_peaks) {
-                BCparameters.angle_center_module_normal(module_index) -=
-                    steepest_descent.first;
+                LOG(TLogLevel::logDEBUG1)
+                    << fmt::format("similarity of peaks increased to {} ",
+                                   next_similarity_of_peaks);
                 BCparameters.module_center_sample_distances(module_index) -=
-                    steepest_descent.second;
+                    steepest_descent[0];
+                BCparameters.angle_center_beam(module_index) -=
+                    steepest_descent[1];
+
+                // refine step size
+                steepest_descent[0] *= 0.5;
+                steepest_descent[1] *= 0.5;
+                BCparameters.module_center_sample_distances(module_index) +=
+                    steepest_descent[0];
+                BCparameters.angle_center_beam(module_index) +=
+                    steepest_descent[1];
+            } else {
+                LOG(TLogLevel::logDEBUG1)
+                    << fmt::format("found better parameters with similarity of "
+                                   "peaks: {}",
+                                   next_similarity_of_peaks);
             }
-
-            found_best_parameters =
-                next_similarity_of_peaks <= previous_similarity_of_peaks;
-            // TODO what if im stuck in here
-            steepest_descent.first *= 0.5;
-            steepest_descent.second *= 0.5;
-            BCparameters.angle_center_module_normal(module_index) +=
-                steepest_descent.first;
-            BCparameters.module_center_sample_distances(module_index) +=
-                steepest_descent.second;
-
-            LOG(TLogLevel::logDEBUG)
-                << fmt::format("Iteration {} with peak similarity of {}",
-                               iteration_index, previous_similarity_of_peaks);
-
-            ++iteration_index;
         }
 
+        LOG(TLogLevel::logDEBUG)
+            << fmt::format("Iteration {} with peak similarity of {}",
+                           iteration_index, next_similarity_of_peaks);
+
+        /*
         double relative_change =
             (previous_similarity_of_peaks - next_similarity_of_peaks) /
             previous_similarity_of_peaks;
 
-        LOG(TLogLevel::logINFO)
+        LOG(TLogLevel::logDEBUG1)
             << "relative change of similarity of peaks: " << relative_change;
+        */
 
+        double absolute_change =
+            previous_similarity_of_peaks - next_similarity_of_peaks;
+
+        LOG(TLogLevel::logDEBUG1)
+            << "absolute change of similarity of peaks: " << absolute_change;
+
+        previous_similarity_of_peaks = next_similarity_of_peaks;
+
+        /*
         double some_other_criterion = std::sqrt(
             std::pow(Dx * steepest_descent.first + Dy * steepest_descent.second,
                      2) /
             std::pow(steepest_descent.first + steepest_descent.second, 2));
+        */
 
-        convergence_criterion = (relative_change < 0.001); // &
+        convergence_criterion =
+            (absolute_change < 0.1) && (absolute_change != 0.0);
+
+        // convergence_criterion = (relative_change < 0.001); // &
         //(some_other_criterion <
-        // 0.001); // TODO: should these tolerances also be configurable -
-        // maybe pass as function argument
+        //  0.001); // TODO: should these tolerances also be configurable -
+        //  maybe pass as function argument
 
         ++iteration_index;
     }
