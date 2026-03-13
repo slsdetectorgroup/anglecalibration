@@ -147,6 +147,18 @@ class AngleCalibration {
               std::optional<std::filesystem::path> output_file = std::nullopt);
 
     /**
+     * @brief calibrates distance to module center and angle of module center
+     * and normal (L and delta) for all modules
+     */
+    void calibrate_coupled_parameters();
+
+    /**
+     * @brief calibrates the angle between center of module and beam (phi) for
+     * all modules
+     */
+    void calibrate_offset();
+
+    /**
      * @brief calibrates the BC (best computing) parameters for one module
      * @param file_list vector of file_names of acquisition files
      * @param base_peak_angle angle of the selcted base peak given in degrees
@@ -377,6 +389,8 @@ class AngleCalibration {
     double calculate_similarity_of_peaks(const size_t module_index,
                                          PlotHandle gp = nullptr);
 
+    double calculate_similarity_of_peaks_between_modules();
+
     /**
      * @brief compares multiple base peak ROIS from different acquisitions and
      * calculate similarity/variance based on goodness_of_fit and weighted
@@ -409,8 +423,9 @@ class AngleCalibration {
     // TODO have PlotHandle as a member change title accordingly
     void optimization_algorithm(const size_t module_index,
                                 PlotHandle gp = nullptr,
-                                const double shift_parameter1 = 0.01,
-                                const double shift_parameter2 = 0.005);
+                                const double delta_parameter1 = 0.01,
+                                const double delta_parameter2 = 0.005,
+                                const double delta_parameter3 = 0.001);
 
     /**
      * @brief calculated the flatfield corrected photon counts and the error
@@ -461,7 +476,7 @@ class AngleCalibration {
                                const double center, const double conversion,
                                const double offset);
 
-    void plot_last_calibration_step(const size_t module_index, PlotHandle gp);
+    void plot_calibration_step(const size_t module_index, PlotHandle gp);
 
   private:
     DGParameters DGparameters{};
@@ -561,12 +576,12 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             continue; // skip bad channels
         }
 
-        double left_strip_boundary_angle = diffraction_angle_from_DG_parameters(
+        double left_strip_boundary_angle = diffraction_angle_from_BC_parameters(
             module_index, frame.detector_angle, strip_index,
             -0.5); // left strip boundary in angles [degrees] // -0.5
 
         double right_strip_boundary_angle =
-            diffraction_angle_from_DG_parameters(
+            diffraction_angle_from_BC_parameters(
                 module_index, frame.detector_angle, strip_index,
                 +0.5); // right strip boundary in angles [degrees] // +0.5
 

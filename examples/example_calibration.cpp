@@ -97,12 +97,12 @@ int main() {
 
     anglecalibration.read_bad_channels_from_file(bad_channels_filename);
 
-#ifdef ANGCAL_PLOT
-
-    plot_photon_counts(anglecalibration.get_bad_channels(),
-                       {0, mythen_detector_ptr->num_strips()}, "Bad channels",
-                       std::nullopt);
-#endif
+    /*
+    #ifdef ANGCAL_PLOT
+        plot_photon_counts(anglecalibration.get_bad_channels(),
+                           {0, mythen_detector_ptr->num_strips()}, "Bad
+    channels", std::nullopt); #endif
+    */
 
     LOG(TLogLevel::logINFO) << "read bad channels";
 
@@ -130,15 +130,21 @@ int main() {
     // get_module_angle_ranges(mythen_file_reader, filelist, anglecalibration,
     // mythen_detector_ptr->max_modules());
 
+    LOG(TLogLevel::logDEBUG) << "selecting base peak";
+
 #ifdef ANGCAL_PLOT
     // select_base_peak(std::make_shared<AngleCalibration>(anglecalibration),
     // mythen_file_reader, filelist, 0);
 #endif
 
+    LOG(TLogLevel::logDEBUG) << "done selecting base peak";
     // take a tabulated peak as base peak
     // or take a base peak for module 0 that is well inside the detector range
     // and not at the module boundaries
-    const double base_peak_angle = 19.0489; // 26.7731, 20.5902, 14.0686
+
+    // TODO: choosing the base peak is very hard - good average
+    const double base_peak_angle = 19.0678; // 19.0648;
+    // 19.0537; // 19.1119; // 26.7731, 20.5902, 14.0686
 
     anglecalibration.set_base_peak_angle(base_peak_angle);
 

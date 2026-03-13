@@ -13,11 +13,16 @@ bc_parameters_array = bcparameters.parameters()
 
 #print("my base: ", bc_parameters_array.base)
 
-#bc_parameters_array[:,0] += random.choice([-1.0,1.0], size=bc_parameters_array.shape[0])*0.01 # angle_center_module_normal 
+#scale 0.0125
+bc_parameters_array[:,0] += random.choice([-1.0,1.0], size=bc_parameters_array.shape[0])*0.001 # angle_center_module_normal 
 
-bc_parameters_array[:,1] += random.choice([-1.0,1.0], size=bc_parameters_array.shape[0])*0.05*bc_parameters_array[:,1] #modify module_center_sample_distances 
+#scale 760.269933299994
+bc_parameters_array[:,1] += random.choice([-1.0,1.0], size=bc_parameters_array.shape[0]) #modify module_center_sample_distances 
 
-bc_parameters_array[:,2] += random.choice([-1.0,1.0], size=bc_parameters_array.shape[0])*0.01 # modify angle_center_beam
+#scale 2.4115973918850107
+#bc_parameters_array[:,2] += random.choice([-1.0,1.0], size=bc_parameters_array.shape[0])*0.01 # modify angle_center_beam
+
+print(bc_parameters_array[0,:]) 
 
 modified_bc_parameters =  bcparameters.parameters()# get modified parameters back as BCParameters object
 

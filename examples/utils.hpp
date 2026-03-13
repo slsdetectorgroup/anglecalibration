@@ -117,11 +117,13 @@ void select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
 
     std::shared_ptr<Gnuplot> gp = std::make_shared<Gnuplot>();
 
-    auto detector_angle_range = std::make_pair(6.0, 33.0);
-    double strip_angle = anglecalibration->diffraction_angle_from_DG_parameters(
-        module_index, 0.0, 0, -0.5);
-    detector_angle_range.first -= strip_angle - 5.0;
-    detector_angle_range.second -= strip_angle + 5.0;
+    auto detector_angle_range = std::make_pair(
+        6.0, 33.0); // TODO: is this absolute to beam source or relative?
+    double left_module_strip_angle =
+        anglecalibration->diffraction_angle_from_DG_parameters(module_index,
+                                                               0.0, 0, -0.5);
+    LOG(TLogLevel::logDEBUG)
+        << fmt::format("strip angle: {}", left_module_strip_angle);
 
     LOG(TLogLevel::logINFO) << fmt::format(
         "adjusted detector angle range for module {}: {} to {}", module_index,
@@ -132,8 +134,11 @@ void select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
         LOG(TLogLevel::logDEBUG) << fmt::format("reading file {}", file);
         auto frame = mythen_file_reader->read_frame(file);
 
-        if (frame.detector_angle > detector_angle_range.first &&
-            frame.detector_angle < detector_angle_range.second) {
+        // -5.0, 5.0 adjust for movement
+        if (frame.detector_angle + left_module_strip_angle - 5.0 >
+                detector_angle_range.first &&
+            frame.detector_angle + left_module_strip_angle + 5.0 <
+                detector_angle_range.second) {
 
             LOG(TLogLevel::logINFO)
                 << fmt::format("plotting file {} with detector angle {}", file,
@@ -143,7 +148,9 @@ void select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
             auto module_redistributed_to_fixed_angle_bins =
                 anglecalibration
                     ->redistribute_photon_counts_to_fixed_angle_width_bins(
-                        frame, module_index);
+                        frame,
+                        module_index); // always plots diffraction pattern
+                                       // independant of detector location.
 
             plotter.plot_module_redistributed_to_fixed_angle_width_bins(
                 module_index, module_redistributed_to_fixed_angle_bins.view(),
