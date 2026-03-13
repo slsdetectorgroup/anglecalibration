@@ -300,10 +300,10 @@ void AngleCalibration::set_base_peak_angle(const double base_peak_angle_) {
 
 double AngleCalibration::get_base_peak_angle() const { return base_peak_angle; }
 
-double AngleCalibration::similarity_criterion(const NDView<double, 1> S0,
-                                              const NDView<double, 1> S1,
-                                              const NDView<double, 1> S2,
-                                              const size_t num_runs) const {
+double AngleCalibration::chi_similarity_criterion(const NDView<double, 1> S0,
+                                                  const NDView<double, 1> S1,
+                                                  const NDView<double, 1> S2,
+                                                  const size_t num_runs) const {
 
     double similarity_criterion = 0;
 
@@ -559,15 +559,139 @@ std::pair<double, double> AngleCalibration::photon_count_correction(
         flatfield_normalized_photon_counts_variance};
 }
 
-double AngleCalibration::calculate_similarity_of_peaks_between_modules() {
-    return 0.0;
+double AngleCalibration::calculate_similarity_of_peaks_between_modules(
+    const size_t module_index, [[maybe_unused]] PlotHandle plot) {
+
+    if (module_index == 0) {
+        throw std::runtime_error(LOCATION +
+                                 "Module index is zero - offset of module 0 is "
+                                 "fixed to zero and cannot be optimized");
+    }
+
+    ssize_t num_bins_in_ROI = get_base_peak_ROI_num_bins();
+
+    // used to calculate chi similarity criterion between peaks of different
+    // modules S_index = sum_i^num_modules
+    // photon_count^index*photon_variance
+    NDArray<double, 1> S2(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+    NDArray<double, 1> S1(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+    NDArray<double, 1> S0(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+
+    size_t num_modules_with_base_peak_overlap = 2;
+
+    size_t num_runs{};
+
+    for (const size_t mod_index : {module_index - 1, module_index}) {
+
+        if (!module_is_disconnected(mod_index)) {
+
+            for (const auto &file : file_list) {
+                MythenFrame frame = mythen_file_reader->read_frame(file);
+
+                if (base_peak_is_in_module(mod_index, frame.detector_angle)) {
+
+                    LOG(TLogLevel::logDEBUG1) << fmt::format(
+                        "file name: {} - module {} has base peak overlap\n",
+                        file, mod_index);
+
+                    NDArray<double, 1> fixed_angle_width_bins_photon_counts(
+                        std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+                    NDArray<double, 1>
+                        fixed_angle_width_bins_photon_counts_variance(
+                            std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+
+                    NDArray<double, 1> sum_statistical_weights(
+                        std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+
+                    // calculates flatfield normalized photon counts and
+                    // photon_count_variance for ROI around base_peak and
+                    // redistributes to fixed angle width bins
+                    redistribute_photon_counts_to_fixed_angle_width_bins<true>(
+                        mod_index, frame,
+                        fixed_angle_width_bins_photon_counts.view(),
+                        fixed_angle_width_bins_photon_counts_variance.view(),
+                        sum_statistical_weights.view());
+
+                    // S_index = sum_i^num_runs
+                    // photon_count^index*photon_variance
+                    // normalize statistical weights
+                    for (ssize_t i = 0;
+                         i < fixed_angle_width_bins_photon_counts.size(); ++i) {
+                        fixed_angle_width_bins_photon_counts(i) =
+                            sum_statistical_weights(i) <
+                                    std::numeric_limits<double>::epsilon()
+                                ? 0.0
+                                : fixed_angle_width_bins_photon_counts(i) /
+                                      sum_statistical_weights(i); // y_k
+
+                        fixed_angle_width_bins_photon_counts_variance(i) =
+                            sum_statistical_weights(i) <
+                                    std::numeric_limits<double>::epsilon()
+                                ? 0.0
+                                : fixed_angle_width_bins_photon_counts_variance(
+                                      i) /
+                                      std::pow(sum_statistical_weights(i),
+                                               2); // y_k
+
+                        double inverse_fixed_angle_width_bins_photon_counts_variance =
+                            fixed_angle_width_bins_photon_counts_variance(i) <
+                                    std::numeric_limits<double>::epsilon()
+                                ? 0.0
+                                : 1. /
+                                      fixed_angle_width_bins_photon_counts_variance(
+                                          i);
+
+                        S0(i) +=
+                            inverse_fixed_angle_width_bins_photon_counts_variance;
+
+                        S1(i) +=
+                            fixed_angle_width_bins_photon_counts(i) *
+                            inverse_fixed_angle_width_bins_photon_counts_variance;
+
+                        S2(i) +=
+                            fixed_angle_width_bins_photon_counts(i) *
+                            fixed_angle_width_bins_photon_counts(i) *
+                            inverse_fixed_angle_width_bins_photon_counts_variance;
+                    }
+                    ++num_runs;
+                    // break; // TODO for now only take one acquisition
+                }
+            }
+            if (num_runs == 0) {
+                --num_modules_with_base_peak_overlap;
+                throw NoBasePeakOverLapError();
+            }
+        } else {
+            --num_modules_with_base_peak_overlap;
+            LOG(TLogLevel::logINFO) << fmt::format(
+                "Module {} is disconnected - skipping module", module_index);
+        }
+    }
+
+    if (num_modules_with_base_peak_overlap != 2) {
+        throw std::runtime_error(
+            LOCATION + "Base peak does not overlap with both modules - cannot "
+                       "calculate similarity of peaks between modules");
+    }
+
+    double similarity_of_peaks = chi_similarity_criterion(
+        S0.view(), S1.view(), S2.view(), num_modules_with_base_peak_overlap);
+
+    if (std::isnan(similarity_of_peaks) || std::isinf(similarity_of_peaks)) {
+        throw std::runtime_error(LOCATION +
+                                 "Similarity of peaks is NaN or "
+                                 "infinity - something went wrong in "
+                                 "calculation of similarity of peaks");
+    }
+
+    return similarity_of_peaks;
 }
 
-double AngleCalibration::calculate_similarity_of_peaks(
+double AngleCalibration::calculate_similarity_of_peaks_between_acquisitions(
     const size_t module_index, [[maybe_unused]] PlotHandle plot) {
 
     ssize_t num_bins_in_ROI = get_base_peak_ROI_num_bins();
-    // used to calculate similarity criterion between peaks of different
+    // used to calculate chi similarity criterion between peaks of different
     // acquisition S_index = sum_i^num_runs
     // photon_count^index*photon_variance
     NDArray<double, 1> S2(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
@@ -648,9 +772,9 @@ double AngleCalibration::calculate_similarity_of_peaks(
     }
 
     double similarity_of_peaks =
-        num_runs == 0
-            ? std::numeric_limits<double>::infinity()
-            : similarity_criterion(S0.view(), S1.view(), S2.view(), num_runs);
+        num_runs == 0 ? std::numeric_limits<double>::infinity()
+                      : chi_similarity_criterion(S0.view(), S1.view(),
+                                                 S2.view(), num_runs);
     LOG(TLogLevel::logDEBUG1) << "similarity_of_peaks: " << similarity_of_peaks;
 
     if (std::isnan(similarity_of_peaks) || std::isinf(similarity_of_peaks)) {
@@ -663,8 +787,174 @@ double AngleCalibration::calculate_similarity_of_peaks(
     return similarity_of_peaks;
 }
 
-void AngleCalibration::plot_calibration_step(const size_t module_index,
-                                             [[maybe_unused]] PlotHandle plot) {
+double AngleCalibration::center_base_peak(const size_t module_index) {
+
+    if (module_is_disconnected(module_index)) {
+        throw std::runtime_error(
+            LOCATION + "Module is disconnected - cannot calculate center base "
+                       "peak in module");
+    }
+
+    ssize_t num_bins_in_ROI = get_base_peak_ROI_num_bins();
+
+    size_t num_runs = 0;
+
+    double average_peak_center{};
+
+    for (const auto &file : file_list) {
+
+        LOG(TLogLevel::logDEBUG1) << "file: " << file;
+
+        MythenFrame frame = mythen_file_reader->read_frame(file);
+
+        // base peak angle is in module
+        if (base_peak_is_in_module(module_index, frame.detector_angle)) {
+
+            NDArray<double, 1> fixed_angle_width_bins_photon_counts(
+                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+            NDArray<double, 1> fixed_angle_width_bins_photon_counts_variance(
+                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+
+            NDArray<double, 1> sum_statistical_weights(
+                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+
+            // calculates flatfield normalized photon counts and
+            // photon_count_variance for ROI around base_peak and
+            // redistributes to fixed angle width bins
+            redistribute_photon_counts_to_fixed_angle_width_bins<true>(
+                module_index, frame,
+                fixed_angle_width_bins_photon_counts.view(),
+                fixed_angle_width_bins_photon_counts_variance.view(),
+                sum_statistical_weights.view());
+
+            for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.size();
+                 ++i) {
+                fixed_angle_width_bins_photon_counts(i) =
+                    sum_statistical_weights(i) <
+                            std::numeric_limits<double>::epsilon()
+                        ? 0.0
+                        : fixed_angle_width_bins_photon_counts(i) /
+                              sum_statistical_weights(i); // y_k
+            }
+
+            // peak center
+            auto it =
+                std::max_element(fixed_angle_width_bins_photon_counts.begin(),
+                                 fixed_angle_width_bins_photon_counts.end());
+            size_t max_index =
+                std::distance(fixed_angle_width_bins_photon_counts.begin(), it);
+
+            // convert to angle
+            average_peak_center += max_index * histogram_bin_width -
+                                   base_peak_roi_width + base_peak_angle;
+
+            ++num_runs;
+        }
+    }
+    if (num_runs == 0) {
+        throw NoBasePeakOverLapError();
+    }
+
+    return average_peak_center / num_runs;
+}
+
+void AngleCalibration::plot_calibration_step_offset_parameter(
+    const size_t module_index, PlotHandle plot) {
+
+    if (module_index == 0) {
+        throw std::runtime_error(LOCATION +
+                                 "Module index is zero - offset of module 0 is "
+                                 "fixed to zero and cannot be optimized");
+    }
+
+    ssize_t num_bins_in_ROI =
+        2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;
+
+    auto data_file_path =
+        std::filesystem::current_path().parent_path() / "build" / "data";
+    if (!std::filesystem::exists(data_file_path))
+        std::filesystem::create_directories(data_file_path);
+
+#ifdef ANGCAL_PLOT
+    if (plot) {
+        plot->clear();
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+#endif
+
+    for (const size_t mod_index : {module_index - 1, module_index}) {
+
+        for (const auto &file : file_list) {
+            MythenFrame frame = mythen_file_reader->read_frame(file);
+
+            if (base_peak_is_in_module(mod_index, frame.detector_angle)) {
+
+                NDArray<double, 1> fixed_angle_width_bins_photon_counts(
+                    std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+                NDArray<double, 1>
+                    fixed_angle_width_bins_photon_counts_variance(
+                        std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+
+                NDArray<double, 1> sum_statistical_weights(
+                    std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+
+                // calculates flatfield normalized photon counts and
+                // photon_count_variance for ROI around base_peak and
+                // redistributes to fixed angle width bins
+                redistribute_photon_counts_to_fixed_angle_width_bins<true>(
+                    mod_index, frame,
+                    fixed_angle_width_bins_photon_counts.view(),
+                    fixed_angle_width_bins_photon_counts_variance.view(),
+                    sum_statistical_weights.view());
+
+                for (ssize_t i = 0;
+                     i < fixed_angle_width_bins_photon_counts.size(); ++i) {
+                    fixed_angle_width_bins_photon_counts(i) =
+                        sum_statistical_weights(i) <
+                                std::numeric_limits<double>::epsilon()
+                            ? 0.0
+                            : fixed_angle_width_bins_photon_counts(i) /
+                                  sum_statistical_weights(i); // y_k
+                }
+
+#ifdef ANGCAL_PLOT
+                if (plot) {
+                    auto bin_to_diffraction_angle_base_peak_ROI_only =
+                        [this](const size_t bin_index) {
+                            return bin_index * this->histogram_bin_width -
+                                   this->base_peak_roi_width +
+                                   this->base_peak_angle;
+                        };
+
+                    std::string filename =
+                        std::filesystem::path(file).stem().string() + ".dat";
+                    auto dataset_name = data_file_path / filename;
+
+                    plot->append_to_plot(
+                        fixed_angle_width_bins_photon_counts.view(),
+                        {0, 2 * static_cast<ssize_t>(base_peak_roi_width /
+                                                     histogram_bin_width) +
+                                1},
+                        bin_to_diffraction_angle_base_peak_ROI_only,
+                        dataset_name);
+                    // plot->pause();
+                }
+
+#endif
+            }
+        }
+    }
+#ifdef ANGCAL_PLOT
+    if (plot) {
+        plot->flush(); // make plot appear
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(50)); // let gnuplot update
+    }
+#endif
+}
+
+void AngleCalibration::plot_calibration_step_coupled_parameters(
+    const size_t module_index, [[maybe_unused]] PlotHandle plot) {
 
     ssize_t num_bins_in_ROI =
         2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;
@@ -676,7 +966,7 @@ void AngleCalibration::plot_calibration_step(const size_t module_index,
         std::filesystem::create_directories(data_file_path);
     if (plot) {
         plot->clear();
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 #endif
 
@@ -750,12 +1040,83 @@ void AngleCalibration::plot_calibration_step(const size_t module_index,
     if (plot) {
         plot->flush(); // make plot appear
         std::this_thread::sleep_for(
-            std::chrono::milliseconds(100)); // let gnuplot update
+            std::chrono::milliseconds(50)); // let gnuplot update
     }
 #endif
 }
 
-void AngleCalibration::calibrate_offset() {}
+void AngleCalibration::calibrate_offset() {
+
+    for (size_t module_index = 1; module_index < mythen_detector->max_modules;
+         ++module_index) {
+
+        // skip if module is not connected
+        if (module_is_disconnected(module_index) or
+            module_is_disconnected(module_index - 1)) {
+            LOG(TLogLevel::logINFO)
+                << fmt::format("module {} or module {} is disconnected",
+                               module_index, module_index - 1);
+            continue;
+        }
+
+#ifdef ANGCAL_PLOT
+        std::string plot_title =
+            fmt::format("Base Peaks between modules {} and {} ",
+                        module_index - 1, module_index);
+        auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
+
+        optimize_offset_parameter(module_index, plot, 1.0e-3);
+
+        // plot_calibration_step(module_index, plot);
+#else
+        try {
+            optimize_offset_parameter(module_index, nullptr, 1.0e-3);
+        } catch (const NoBasePeakOverLapError &e) {
+            LOG(angcal::TLogLevel::logINFO)
+                << e.what()
+                << fmt::format(" Skipping module {}.", module_index);
+            continue;
+        }
+#endif
+    }
+}
+
+void AngleCalibration::calibrate_offset(const size_t module_index) {
+
+    if (module_index == 0) {
+        throw std::runtime_error(LOCATION +
+                                 "Module index is zero - offset of module 0 is "
+                                 "fixed to zero and cannot be optimized");
+    }
+
+    // skip if module is not connected
+    if (module_is_disconnected(module_index) or
+        module_is_disconnected(module_index - 1)) {
+        LOG(TLogLevel::logINFO)
+            << fmt::format("module {} or module {} is disconnected",
+                           module_index, module_index - 1);
+        return;
+    }
+
+#ifdef ANGCAL_PLOT
+    std::string plot_title =
+        fmt::format("Base Peaks between modules {} and {} ", module_index - 1,
+                    module_index);
+    auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
+
+    optimize_offset_parameter(module_index, plot, 1.0e-3);
+
+    // plot_calibration_step(module_index, plot);
+#else
+    try {
+        optimize_offset_parameter(module_index, nullptr, 1.0e-3);
+    } catch (const NoBasePeakOverLapError &e) {
+        LOG(angcal::TLogLevel::logINFO)
+            << e.what() << fmt::format(" Skipping module {}.", module_index);
+        return;
+    }
+#endif
+}
 
 void AngleCalibration::calibrate_coupled_parameters() {
 
@@ -774,8 +1135,8 @@ void AngleCalibration::calibrate_coupled_parameters() {
             auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
 
             try {
-                optimization_algorithm(module_index, plot, 0.5, 1.0e-6,
-                                       1.0e-3); // 0.5, 0.001
+                optimize_coupled_parameters(module_index, plot, 0.5,
+                                            1.0e-6); // 0.5, 1.0e-6, 1.0e-3
             } catch (const NoBasePeakOverLapError &e) {
                 LOG(angcal::TLogLevel::logINFO)
                     << e.what()
@@ -783,10 +1144,10 @@ void AngleCalibration::calibrate_coupled_parameters() {
                 continue;
             }
 
-            plot_calibration_step(module_index, plot);
+            plot_calibration_step_coupled_parameters(module_index, plot);
 #else
             try {
-                optimization_algorithm(module_index);
+                optimize_coupled_parameters(module_index);
             } catch (const NoBasePeakOverLapError &e) {
                 LOG(angcal::TLogLevel::logINFO)
                     << e.what()
@@ -802,6 +1163,47 @@ void AngleCalibration::calibrate_coupled_parameters() {
     }
 }
 
+void AngleCalibration::calibrate_coupled_parameters(const size_t module_index) {
+
+    // skip if module is not connected
+    if (!module_is_disconnected(module_index)) {
+
+        LOG(angcal::TLogLevel::logINFO)
+            << "starting calibration for module " << module_index;
+
+#ifdef ANGCAL_PLOT
+        std::string plot_title =
+            fmt::format("Base Peaks for module {} ", module_index);
+        auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
+
+        try {
+            optimize_coupled_parameters(module_index, plot, 0.5,
+                                        1.0e-6); // 0.5, 1.0e-6, 1.0e-3
+        } catch (const NoBasePeakOverLapError &e) {
+            LOG(angcal::TLogLevel::logINFO)
+                << e.what()
+                << fmt::format(" Skipping module {}.", module_index);
+            return;
+        }
+
+        plot_calibration_step_coupled_parameters(module_index, plot);
+#else
+        try {
+            optimize_coupled_parameters(module_index);
+        } catch (const NoBasePeakOverLapError &e) {
+            LOG(angcal::TLogLevel::logINFO)
+                << e.what()
+                << fmt::format(" Skipping module {}.", module_index);
+            return;
+        }
+#endif
+
+    } else {
+        LOG(TLogLevel::logINFO)
+            << fmt::format("module {} is disconnected", module_index);
+    }
+}
+
 void AngleCalibration::calibrate(
     const std::vector<std::string> &file_list_, const double base_peak_angle_,
     std::optional<std::filesystem::path> output_file) {
@@ -814,12 +1216,13 @@ void AngleCalibration::calibrate(
     if (output_file.has_value()) {
         file.open(output_file.value(), std::ios::out | std::ios::app);
         if (file.tellp() == 0) {
-            file << "module,center,conversion,offset\n"; // only write header if
+            file << "module,center,conversion,offset\n"; // only write
+                                                         // header if
                                                          // file is empty
         }
     }
 
-    calibrate_coupled_parameters();
+    // calibrate_coupled_parameters();
 
     calibrate_offset();
 
@@ -844,22 +1247,9 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
     file_list = file_list_;
     base_peak_angle = base_peak_angle_;
 
-    if (!module_is_disconnected(module_index)) {
-        LOG(angcal::TLogLevel::logINFO)
-            << "starting calibration for module " << module_index;
+    // calibrate_coupled_parameters(module_index);
 
-#ifdef ANGCAL_PLOT
-        std::string plot_title =
-            fmt::format("Base Peaks for module {} ", module_index);
-
-        optimization_algorithm(
-            module_index, std::make_shared<PlotCalibrationProcess>(plot_title));
-#else
-
-        optimization_algorithm(module_index);
-
-#endif
-    }
+    calibrate_offset(module_index);
 }
 
 NDArray<double, 1>
@@ -884,9 +1274,9 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
 
         LOG(TLogLevel::logDEBUG)
             << fmt::format("redistributing photon counts for file: {}", file);
-        // TODO : actually they should not be added up each set of modules is
-        // independant - at beamline the module positions overlap (e.g.
-        // counterclockwise)
+        // TODO : actually they should not be added up each set of
+        // modules is independant - at beamline the module positions
+        // overlap (e.g. counterclockwise)
         //  - how to handle in a generic way? - depends on detector
         //  arrangement
         for (size_t module_index = 0;
@@ -916,7 +1306,8 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
 
         /*
         RedistributedPhotonCountsLogFile.append(
-            fmt::format("{}\n", fixed_angle_width_bins_photon_counts(i)));
+            fmt::format("{}\n",
+        fixed_angle_width_bins_photon_counts(i)));
 
         StatisticalWeightsLogFile.append(
             fmt::format("{}\n", sum_statistical_weights(i)));
@@ -942,8 +1333,8 @@ NDArray<double, 1>
 AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     const MythenFrame &frame, const size_t module_index) {
 
-    ssize_t new_num_bins =
-        num_fixed_angle_width_bins(); // TODO: maybe only use module region then
+    ssize_t new_num_bins = num_fixed_angle_width_bins(); // TODO: maybe only use
+                                                         // module region then
 
     NDArray<double, 1> fixed_angle_width_bins_photon_counts =
         NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
@@ -1013,13 +1404,244 @@ AngleCalibration::redistributed_photon_counts_in_base_peak_ROI(
     return fixed_angle_width_bins_photon_counts;
 }
 
-// actually used to optimize BC parameters, first parameters used to optimze
-// Lm second parameter used to optimize phi
-void AngleCalibration::optimization_algorithm(const size_t module_index,
-                                              PlotHandle gp,
-                                              const double delta_parameter1,
-                                              const double delta_parameter2,
-                                              const double delta_parameter3) {
+void AngleCalibration::optimize_offset_parameter(const size_t module_index,
+                                                 PlotHandle gp,
+                                                 const double delta_parameter) {
+
+    // old reference parameters: // parameters can only change +,-
+    // base_peak_roi_width
+    double old_reference_left_strip_boundary_angle =
+        diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, -0.5);
+
+    LOG(TLogLevel::logDEBUG) << fmt::format(
+        "initial parameter: {}", BCparameters.angle_center_beam(module_index));
+
+    auto objective_function = [this, &module_index, &gp,
+                               &old_reference_left_strip_boundary_angle](
+                                  const double x) {
+        const double prev_value = BCparameters.angle_center_beam(module_index);
+        BCparameters.angle_center_beam(module_index) = x;
+        double similarity_of_peaks{};
+
+        double new_reference_left_strip_boundary_angle =
+            diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, -0.5);
+
+        if (std::abs(new_reference_left_strip_boundary_angle -
+                     old_reference_left_strip_boundary_angle) >
+            base_peak_roi_width) {
+            similarity_of_peaks = std::numeric_limits<double>::infinity();
+        } else {
+
+            try {
+                similarity_of_peaks =
+                    calculate_similarity_of_peaks_between_modules(module_index,
+                                                                  gp);
+            } catch (const NoBasePeakOverLapError &e) {
+                similarity_of_peaks = std::numeric_limits<
+                    double>::infinity(); // if there is no overlap of base
+                                         // peaks return infinity for
+                                         // similarity of peaks
+                                         // - this should lead to a shift
+                                         // back into direction of overlap in
+                                         // line search
+            }
+        }
+        BCparameters.angle_center_beam(module_index) =
+            prev_value; // revert shift
+        return similarity_of_peaks;
+    };
+
+    double previous_similarity_of_peaks =
+        calculate_similarity_of_peaks_between_modules(module_index, gp);
+
+    LOG(TLogLevel::logDEBUG) << fmt::format("initial similarity of peaks: {}",
+                                            previous_similarity_of_peaks);
+
+    plot_calibration_step_offset_parameter(module_index, gp);
+
+    double next_similarity_of_peaks{};
+
+    /*
+    bool convergence_criterion = false;
+
+    size_t iteration_index = 0;
+    while (!convergence_criterion) {
+        const double central_finite_difference =
+            (objective_function({BCparameters.angle_center_beam(module_index) +
+                                 delta_parameter}) -
+             objective_function({BCparameters.angle_center_beam(module_index) -
+                                 delta_parameter})) /
+            (2 * delta_parameter);
+
+        LOG(TLogLevel::logDEBUG)
+            << fmt::format("central finite difference for line search: {}",
+                           central_finite_difference);
+
+        // perform line search in direction of central finite
+        // difference
+        auto [optimized_parameter, f_optimized_parameter] =
+            backtracking_line_search(
+                std::array<double, 1>{
+                    BCparameters.angle_center_beam(module_index)},
+                previous_similarity_of_peaks,
+                std::array<double, 1>{central_finite_difference},
+                objective_function);
+
+        BCparameters.angle_center_beam(module_index) = optimized_parameter[0];
+        next_similarity_of_peaks = f_optimized_parameter;
+
+        double relative_change =
+            std::abs(previous_similarity_of_peaks - next_similarity_of_peaks) /
+            previous_similarity_of_peaks;
+
+        convergence_criterion = relative_change < 1.0e-5;
+
+        previous_similarity_of_peaks = next_similarity_of_peaks;
+
+        ++iteration_index;
+
+        LOG(TLogLevel::logDEBUG)
+            << fmt::format("Iteration {} with peak similarity of {}",
+                           iteration_index, next_similarity_of_peaks);
+        plot_calibration_step_offset_parameter(module_index, gp);
+    }
+    */
+
+    /*
+    double best_step_size{};
+    // this is not feasable
+    size_t num_steps = static_cast<size_t>(1.25 / delta_parameter);
+    for (double step_size = -delta_parameter * num_steps;
+         step_size < delta_parameter * num_steps;
+         step_size += delta_parameter) {
+        double next_similarity_of_peaks = objective_function(
+            BCparameters.angle_center_beam(module_index) + step_size);
+        LOG(TLogLevel::logDEBUG)
+            << fmt::format("similarity at step size {}: {}", step_size,
+                           next_similarity_of_peaks);
+        if (next_similarity_of_peaks < previous_similarity_of_peaks) {
+            previous_similarity_of_peaks = next_similarity_of_peaks;
+            best_step_size = step_size;
+        }
+    }
+    BCparameters.angle_center_beam(module_index) += best_step_size;
+    plot_calibration_step_offset_parameter(module_index, gp);
+    */
+
+    // define search direction
+    const double peak_center_reference_module =
+        center_base_peak(module_index - 1);
+
+    const double peak_center_current_module = center_base_peak(module_index);
+
+    LOG(TLogLevel::logDEBUG)
+        << fmt::format("module {} has peak_center : {}", module_index - 1,
+                       peak_center_reference_module);
+
+    LOG(TLogLevel::logDEBUG)
+        << fmt::format("module {} has peak_center : {}", module_index,
+                       peak_center_current_module);
+
+    size_t iteration_index = 0;
+
+    double central_finite_difference =
+        (objective_function(
+             {BCparameters.angle_center_beam(module_index) + delta_parameter}) -
+         objective_function({BCparameters.angle_center_beam(module_index) -
+                             delta_parameter})) /
+        (2.0 * delta_parameter);
+
+    central_finite_difference = 0.0;
+
+    if (peak_center_current_module < peak_center_reference_module) {
+        // line search in positive direction
+        LOG(TLogLevel::logDEBUG) << "in plus: ";
+
+        next_similarity_of_peaks = objective_function(
+            BCparameters.angle_center_beam(module_index) + delta_parameter);
+
+        // TODO: How to ensure that one does not overshoot? - recalculate step
+        // size - check if left or right?
+        // TODO: probably need convergence criterion
+        while (next_similarity_of_peaks < previous_similarity_of_peaks ||
+               central_finite_difference <= 0.0) {
+            BCparameters.angle_center_beam(module_index) += delta_parameter;
+
+            LOG(TLogLevel::logDEBUG)
+                << fmt::format("Iteration {} with peak similarity of {}",
+                               iteration_index, next_similarity_of_peaks);
+
+            ++iteration_index;
+            plot_calibration_step_offset_parameter(module_index, gp);
+
+            previous_similarity_of_peaks = next_similarity_of_peaks;
+            next_similarity_of_peaks = objective_function(
+                BCparameters.angle_center_beam(module_index) + delta_parameter);
+
+            central_finite_difference =
+                (objective_function(
+                     {BCparameters.angle_center_beam(module_index) +
+                      delta_parameter}) -
+                 objective_function(
+                     {BCparameters.angle_center_beam(module_index) -
+                      delta_parameter})) /
+                (2.0 * delta_parameter);
+
+            central_finite_difference = 0.0;
+
+            LOG(TLogLevel::logDEBUG)
+                << fmt::format("central finite difference for line search: {}",
+                               central_finite_difference);
+        }
+        LOG(TLogLevel::logDEBUG) << fmt::format(
+            "previous_similarity_of_peaks: {}, next_similarity_of_peaks: {}",
+            previous_similarity_of_peaks, next_similarity_of_peaks);
+    } else {
+        // line search in negative direction
+        LOG(TLogLevel::logDEBUG) << "in minus: ";
+        next_similarity_of_peaks = objective_function(
+            BCparameters.angle_center_beam(module_index) - delta_parameter);
+        // TODO: probably need convergence criterion
+        while (next_similarity_of_peaks < previous_similarity_of_peaks ||
+               central_finite_difference >= 0.0) {
+            BCparameters.angle_center_beam(module_index) -= delta_parameter;
+
+            LOG(TLogLevel::logDEBUG)
+                << fmt::format("Iteration {} with peak similarity of {}",
+                               iteration_index, next_similarity_of_peaks);
+            ++iteration_index;
+
+            plot_calibration_step_coupled_parameters(module_index, gp);
+
+            previous_similarity_of_peaks = next_similarity_of_peaks;
+            next_similarity_of_peaks = objective_function(
+                BCparameters.angle_center_beam(module_index) - delta_parameter);
+
+            central_finite_difference =
+                (objective_function(
+                     {BCparameters.angle_center_beam(module_index) -
+                      delta_parameter}) -
+                 objective_function(
+                     {BCparameters.angle_center_beam(module_index) +
+                      delta_parameter})) /
+                (-2.0 * delta_parameter);
+
+            LOG(TLogLevel::logDEBUG)
+                << fmt::format("central finite difference for line search: {}",
+                               central_finite_difference);
+        }
+        LOG(TLogLevel::logDEBUG) << fmt::format(
+            "previous_similarity_of_peaks: {}, next_similarity_of_peaks: {}",
+            previous_similarity_of_peaks, next_similarity_of_peaks);
+    }
+    gp->pause();
+}
+
+// actually used to optimize BC parameters, first parameters used to
+// optimze Lm second parameter used to optimize phi
+void AngleCalibration::optimize_coupled_parameters(
+    const size_t module_index, PlotHandle gp, const double delta_parameter1,
+    const double delta_parameter2) {
 
     constexpr size_t max_iterations = 20;
     bool convergence_criterion = false;
@@ -1027,7 +1649,8 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
 
     LOG(TLogLevel::logDEBUG) << fmt::format(
         "starting optimization for module {} with initial "
-        "parameters: center_sample_distance: {}, angle_center_module_normal: "
+        "parameters: center_sample_distance: {}, "
+        "angle_center_module_normal: "
         "{}, angle_center_beam: {}",
         module_index, BCparameters.module_center_sample_distances(module_index),
         BCparameters.angle_center_module_normal(module_index),
@@ -1041,7 +1664,7 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
     double next_similarity_of_peaks{};
 
     double previous_similarity_of_peaks =
-        calculate_similarity_of_peaks(module_index, gp);
+        calculate_similarity_of_peaks_between_acquisitions(module_index, gp);
 
     LOG(logDEBUG) << fmt::format("initial similarity of peaks: {}",
                                  previous_similarity_of_peaks);
@@ -1070,14 +1693,17 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
         } else {
             try {
                 similarity_of_peaks =
-                    calculate_similarity_of_peaks(module_index, gp);
+                    calculate_similarity_of_peaks_between_acquisitions(
+                        module_index, gp);
             } catch (const NoBasePeakOverLapError &e) {
 
-                similarity_of_peaks = std::numeric_limits<double>::
-                    infinity(); // if there is no overlap of base peaks
-                                // return infinity for similarity of peaks
-                                // - this should lead to a shift back into
-                                // direction of overlap in line search
+                similarity_of_peaks = std::numeric_limits<
+                    double>::infinity(); // if there is no overlap of
+                                         // base peaks return infinity
+                                         // for similarity of peaks
+                                         // - this should lead to a
+                                         // shift back into direction of
+                                         // overlap in line search
             }
         }
 
@@ -1086,38 +1712,6 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
         BCparameters.angle_center_module_normal(module_index) =
             prev_parameter2; // revert shift
 
-        return similarity_of_peaks;
-    };
-
-    auto objective_function2 = [this, &module_index, &gp,
-                                &old_reference_left_strip_boundary_angle](
-                                   const std::array<double, 1> &x) {
-        const double prev_value = BCparameters.angle_center_beam(module_index);
-        BCparameters.angle_center_beam(module_index) = x[0];
-        double similarity_of_peaks{};
-
-        double new_reference_left_strip_boundary_angle =
-            diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, -0.5);
-
-        if (std::abs(new_reference_left_strip_boundary_angle -
-                     old_reference_left_strip_boundary_angle) >
-            base_peak_roi_width) {
-            similarity_of_peaks = std::numeric_limits<double>::infinity();
-        } else {
-
-            try {
-                similarity_of_peaks =
-                    calculate_similarity_of_peaks(module_index, gp);
-            } catch (const NoBasePeakOverLapError &e) {
-                similarity_of_peaks = std::numeric_limits<double>::
-                    infinity(); // if there is no overlap of base peaks
-                                // return infinity for similarity of peaks
-                                // - this should lead to a shift back into
-                                // direction of overlap in line search
-            }
-        }
-        BCparameters.angle_center_beam(module_index) =
-            prev_value; // revert shift
         return similarity_of_peaks;
     };
 
@@ -1132,43 +1726,12 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
                  BCparameters.angle_center_module_normal(module_index)},
                 previous_similarity_of_peaks, objective_function1);
 
-        // previous_similarity_of_peaks = optimized_similarity;
-
-        // optimize third parameter
-
-        /*
-        LOG(TLogLevel::logDEBUG) << "optimization for third parameter";
-
-        const double central_finite_difference =
-            (objective_function2({BCparameters.angle_center_beam(module_index) +
-                                  delta_parameter3}) -
-             objective_function2({BCparameters.angle_center_beam(module_index) -
-                                  delta_parameter3})) /
-            (2 * delta_parameter3);
-
-        LOG(TLogLevel::logDEBUG)
-            << fmt::format("central finite difference for line search: {}",
-                           central_finite_difference);
-
-        // perform line search in direction of central finite
-        // difference
-        auto [optimized_parameter, f_optimized_parameter] = line_search(
-            std::array<double, 1>{BCparameters.angle_center_beam(module_index)},
-            previous_similarity_of_peaks,
-            std::array<double, 1>{central_finite_difference},
-            objective_function2);
-
-        BCparameters.angle_center_beam(module_index) = optimized_parameter[0];
-
-        next_similarity_of_peaks = f_optimized_parameter;
-        */
-
         LOG(TLogLevel::logDEBUG)
             << fmt::format("Iteration {} with peak similarity of {}",
                            iteration_index, next_similarity_of_peaks);
 
 #ifdef ANGCAL_PLOT
-        plot_calibration_step(module_index, gp);
+        plot_calibration_step_coupled_parameters(module_index, gp);
 #endif
 
         double relative_change =
@@ -1205,9 +1768,9 @@ void AngleCalibration::optimization_algorithm(const size_t module_index,
 
 // maybe better L-BFGS !!!!
 
-// TODO: it just writes to a csv/txt file maybe consider using same file format
-// as in m_custom_file_ptr but then user needs to implement more e.g. custom
-// append
+// TODO: it just writes to a csv/txt file maybe consider using same file
+// format as in m_custom_file_ptr but then user needs to implement more
+// e.g. custom append
 void AngleCalibration::write_DG_parameters_to_file(
     const std::filesystem::path &filename, const DGParameters &parameters) {
 
@@ -1219,14 +1782,14 @@ void AngleCalibration::write_DG_parameters_to_file(
 
     output_file.precision(15);
 
-    // output_file << "module, center, conversion, offset" << std::endl; //
-    // header
+    // output_file << "module, center, conversion, offset" << std::endl;
+    // // header
 
     for (ssize_t module_index = 0; module_index < parameters.num_modules();
          ++module_index) {
         /*
-        if constexpr (std::is_same_v<decltype(parameters), DGParameters>) {
-            auto [center, conversion, offset] =
+        if constexpr (std::is_same_v<decltype(parameters),
+        DGParameters>) { auto [center, conversion, offset] =
                 parameters.convert_to_DGParameters(module_index);
         }
         */

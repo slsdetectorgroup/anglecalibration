@@ -130,12 +130,19 @@ calculate_eigenvalues(const aare::NDView<double, 2> matrix) {
     return {eigenvalue1, eigenvalue2};
 }
 
+/*
+template <typename Func>
+std::pair<double, double> line_search(const double initial_value, const double
+f_initial, Func&& function) {
+
+}
+*/
+
 template <size_t Size, typename Func>
-std::pair<std::array<double, Size>, double>
-line_search(const std::array<double, Size> &initial_value,
-            const double f_initial,
-            const std::array<double, Size> &direction_of_steepest_descent,
-            Func &&function) {
+std::pair<std::array<double, Size>, double> backtracking_line_search(
+    const std::array<double, Size> &initial_value, const double f_initial,
+    const std::array<double, Size> &direction_of_steepest_descent,
+    Func &&function) {
 
     double alpha = 1.0; // step size for line search
 
@@ -155,9 +162,9 @@ line_search(const std::array<double, Size> &initial_value,
 
         f_next = function(next_value);
 
-        found_best_parameters = f_next < f_prev;
+        found_best_parameters = f_next <= f_prev;
 
-        if (f_next >= f_prev) {
+        if (f_next > f_prev) {
             LOG(TLogLevel::logDEBUG1)
                 << fmt::format("function value increased to {} ", f_next);
 
@@ -239,8 +246,8 @@ std::tuple<std::array<double, 2>, double, double> newton_method(
         << fmt::format("direction of steepest descent: [{},{}]",
                        steepest_descent[0], steepest_descent[1]);
 
-    auto [next_value, f_next] =
-        line_search(initial_parameters, f_initial, steepest_descent, function);
+    auto [next_value, f_next] = backtracking_line_search(
+        initial_parameters, f_initial, steepest_descent, function);
 
     std::array<double, 2> change_in_parameter = {
         next_value[0] - initial_parameters[0],

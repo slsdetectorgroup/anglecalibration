@@ -134,6 +134,26 @@ class PlotCalibrationProcess {
         gp.flush();
     }
 
+    template <typename Func>
+    inline void plot(const aare::NDView<double, 1> photon_counts,
+                     const std::pair<size_t, size_t> bin_range,
+                     Func &&bin_index_to_angle_conversion) {
+
+        std::vector<std::pair<double, double>> plot_data;
+        const size_t num_bins = bin_range.second - bin_range.first;
+        plot_data.reserve(num_bins);
+
+        for (size_t bin = bin_range.first; bin < bin_range.second; ++bin) {
+            plot_data.emplace_back(bin_index_to_angle_conversion(bin),
+                                   photon_counts(bin));
+        }
+
+        gp << "plot '-' using 1:2 with lines lc rgb 'orange' notitle\n";
+
+        gp.send1d(plot_data);
+        gp.flush();
+    }
+
   private:
     Gnuplot gp;
     static size_t plot_window;

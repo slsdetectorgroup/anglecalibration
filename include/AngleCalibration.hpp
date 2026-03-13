@@ -152,11 +152,15 @@ class AngleCalibration {
      */
     void calibrate_coupled_parameters();
 
+    void calibrate_coupled_parameters(const size_t module_index);
+
     /**
      * @brief calibrates the angle between center of module and beam (phi) for
      * all modules
      */
     void calibrate_offset();
+
+    void calibrate_offset(const size_t module_index);
 
     /**
      * @brief calibrates the BC (best computing) parameters for one module
@@ -166,6 +170,14 @@ class AngleCalibration {
      */
     void calibrate(const std::vector<std::string> &file_list_,
                    const double base_peak_angle_, const size_t module_index);
+
+    /**
+     * @brief calculates the average angle of the base peak center over several
+     * acquisitions for a given module index
+     * @param module_index index of module to calculate base peak center for
+     * @return average angle of base peak center [degrees]
+     */
+    double center_base_peak(const size_t module_index);
 
     /** @brief check if base peak ROI is contained within module region
      * @param detector_angle: detector position (offset of first strip from
@@ -386,10 +398,12 @@ class AngleCalibration {
      * (default nullptr)
      * @return similarity of peaks
      */
-    double calculate_similarity_of_peaks(const size_t module_index,
-                                         PlotHandle gp = nullptr);
+    double calculate_similarity_of_peaks_between_acquisitions(
+        const size_t module_index, PlotHandle gp = nullptr);
 
-    double calculate_similarity_of_peaks_between_modules();
+    double
+    calculate_similarity_of_peaks_between_modules(const size_t module_index,
+                                                  PlotHandle gp = nullptr);
 
     /**
      * @brief compares multiple base peak ROIS from different acquisitions and
@@ -402,30 +416,37 @@ class AngleCalibration {
      * the respective module
      * @return similarity criterion
      */
-    double similarity_criterion(const NDView<double, 1> S0,
-                                const NDView<double, 1> S1,
-                                const NDView<double, 1> S2,
-                                const size_t num_runs) const;
+    double chi_similarity_criterion(const NDView<double, 1> S0,
+                                    const NDView<double, 1> S1,
+                                    const NDView<double, 1> S2,
+                                    const size_t num_runs) const;
 
-    // TODO: also a bad design - make shift_parameter configurable - consider
-    // having second class Optimization
     /**
-     * @brief optimizes BC parameters of given module based on similarity
-     * criterion
+     * @brief optimizes module center distance L and angle center module normal
+     * delta of BC parameters of given module based on chi similarity criterion
      * @param gp plot wrapper for gnuplot plot to visualize calibration process
      * (default nullptr)
-     * @param shift_parameter1 parameter step for parameter angle between module
-     * center and module normal (angle_center_module_normal) (default '0.01')
-     * @param shift_parameter2 parameter step for parameter distance between
-     * module center and sample (module_center_sample_distances) (default
-     * '0.005')
+     * @param delta_parameter1 parameter step for parameter module center
+     * distance L (default '0.01')
+     * @param delta_parameter2 parameter step for parameter angle between center
+     * of module and module normal (delta) (default '0.005')
      */
-    // TODO have PlotHandle as a member change title accordingly
-    void optimization_algorithm(const size_t module_index,
-                                PlotHandle gp = nullptr,
-                                const double delta_parameter1 = 0.01,
-                                const double delta_parameter2 = 0.005,
-                                const double delta_parameter3 = 0.001);
+    void optimize_coupled_parameters(const size_t module_index,
+                                     PlotHandle gp = nullptr,
+                                     const double delta_parameter1 = 0.01,
+                                     const double delta_parameter2 = 0.005);
+
+    /**
+     * @brief optimizes angle between center of module and beam (\psi) of BC
+     * parameters of given module based on chi similarity criterion
+     * @param gp plot wrapper for gnuplot plot to visualize calibration process
+     * (default nullptr)
+     * @param delta_parameter parameter step for angle between center of module
+     * and beam (default '0.005')
+     */
+    void optimize_offset_parameter(const size_t module_index,
+                                   PlotHandle gp = nullptr,
+                                   const double delta_parameter = 0.005);
 
     /**
      * @brief calculated the flatfield corrected photon counts and the error
@@ -476,7 +497,11 @@ class AngleCalibration {
                                const double center, const double conversion,
                                const double offset);
 
-    void plot_calibration_step(const size_t module_index, PlotHandle gp);
+    void plot_calibration_step_coupled_parameters(const size_t module_index,
+                                                  PlotHandle gp);
+
+    void plot_calibration_step_offset_parameter(const size_t module_index,
+                                                PlotHandle gp);
 
   private:
     DGParameters DGparameters{};

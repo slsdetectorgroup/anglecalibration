@@ -27,14 +27,15 @@ int main() {
         file_path /
         "Flatfield_EkeV22p0_T11000eV_up_TESTFF1_clean_Jun2025_open_WS.raw";
 
-    auto initial_angles_filename = file_path / "angcal_Jul2025_P12_0p0105.off";
+    auto initial_angles_filename =
+        file_path / "angcal_Jul2025_P12_0p0105_calibrated.off";
 
     std::string acquisition_fileprefix = "ang1up_22keV_MIX_0p5mm_48M_a_";
 
     const size_t num_files = 1501;
 
     auto output_filename =
-        file_path / "angcal_Jul2025_P12_0p0105_calibrated.off";
+        file_path / "angcal_Jul2025_P12_0p0105_calibrated2.off";
 
     // export
     // ANGCAL_TEST_DATA=~/Documents/VariaMay2025/Antonio20250512/angcal_M3_Mar21_2
@@ -158,7 +159,7 @@ int main() {
 
     // anglecalibration.set_histogram_bin_width(0.01);
 
-    auto test_frame = file_path / acquisition_fileprefix.append("0173.h5");
+    auto test_frame = file_path / (acquisition_fileprefix + "0173.h5");
 
     // plot some stuff
     MythenFrame frame = mythen_file_reader->read_frame(test_frame); // 0165.h5
@@ -197,18 +198,29 @@ int main() {
 // plot base peak for one module
 #ifdef ANGCAL_PLOT
 
+    std::string file_name = file_path / (acquisition_fileprefix + "0206.h5");
+
+    auto frame1 = mythen_file_reader->read_frame(file_name);
+
+    module_index = 1;
+
     auto base_peak_for_module =
         anglecalibration.redistributed_photon_counts_in_base_peak_ROI(
-            frame, module_index);
-
+            frame1, module_index);
     plotter.plot_base_peak_region_of_interest(module_index,
                                               base_peak_for_module.view());
     plotter.pause();
 
 #endif
 
-    // anglecalibration.calibrate(filelist, base_peak_angle, module_index);
-    anglecalibration.calibrate(filelist, base_peak_angle); //, output_filename);
+    anglecalibration.calibrate(filelist, base_peak_angle, 4);
+    // anglecalibration.calibrate(filelist, base_peak_angle);
 
-    // anglecalibration.write_to_file(output_filename);
+    /*
+    auto bcparameters = anglecalibration.get_BCparameters();
+    auto dgparameters = anglecalibration.get_DGparameters();
+    bcparameters.convert_to_DGParameters(dgparameters);
+
+    anglecalibration.write_DG_parameters_to_file(output_filename, dgparameters);
+    */
 }
