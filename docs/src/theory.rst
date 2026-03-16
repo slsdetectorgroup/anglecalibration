@@ -121,7 +121,7 @@ The formula for the diffraction angle using DG parameters is as follows:
 Another parameter set are the BC "best computing" parameters :math:`\sum(\Psi_m, L_m, \delta_m)`. :math:`L_m` denotes the distance of the module center to the sample. The angle :math:`\delta_m` denotes the angle between the module center and the orthogonal projection of the sample onto the module. 
 And the angle :math:`\Psi_m` denotes the angle between the center of the module and the direction of the beam. See :numref:`BCParameters` for a schemantic representation of the BC and EE parameters for one module. 
 
-Note that :math:`\Psi_m` and :math:`L_m` are completely independant from the other parameters and only depend on the module center and the beam direction. Those can thus be refined independantly. Therefore the parameters are called "best computing" parameters as they are optimal for optimization. 
+Note that :math:`\delta_m` and :math:`L_m` are completely independant of :math:`\Psi_m` and only depend on the module center and the beam direction. Those can thus be refined independantly. Therefore the parameters are called "best computing" parameters as they are optimal for optimization. 
 
 .. _BCParameters:
 
@@ -363,15 +363,6 @@ Parameter Calibration
 
 In order to calibrate the module's parameters we choose one of the peaks 
 in the diffraction pattern, also referred to as base peak. The base peak is denoted by the peak's central diffraction angle :math:`\alpha`. An example of a base peak is depicted in :numref:`base_peak`. 
-We take several acquisition's of the same sample, however with slightly shifted detector position. We shift the detector position by rotating the detector around the sample. 
-Remember that the module's parameters are rotation invariant. 
-In theory this results in the same diffraction pattern as well as the same base peak just
-shifted by the rotation angle, in practice the diffraction patterns are slightly off. See :numref:`overlapping_base_peak` for an example of overlapping base peak regions.
-We thus minimize the Pearsons :math:`\chi²`-similarity of the shifted acquired base peaks within one module to get the optimal parameters for each module.
- 
-.. 
-    add a figure of overlapping base peak angles, e.g. selected base peak of diffraction angle
-
 
 
 .. container:: figures-side-by-side
@@ -383,6 +374,7 @@ We thus minimize the Pearsons :math:`\chi²`-similarity of the shifted acquired 
 
       Diffraction pattern for module 0. 
 
+
    .. figure:: ../figures/base_peak.png
       :name: base_peak
       :width: 85%
@@ -390,16 +382,6 @@ We thus minimize the Pearsons :math:`\chi²`-similarity of the shifted acquired 
       :target: ../figures/base_peak.png
 
       Selected base peak around :math:`-49.4786^{\circ}` for a single acquisition of module 0. 
-
-.. _overlapping_base_peak: 
-
-.. figure:: ../figures/overlapping_base_peaks.png
-    :target: ../figures/overlapping_base_peaks.png
-    :width: 650px
-    :align: center
-    :alt: Two base peaks of different acquisitions but for the same module 0.  
-
-    Two base peaks of different acquisitions but for the same module 0. 
 
 To choose the base peak one can either use a tabulated Bragg's angle 
 known by the theoretical structure of the sample or qualitatively select 
@@ -415,10 +397,59 @@ well within the detector rotation range. For the current Mythen setup at SLS cho
     The sample is placed at angle :math:`0^{\circ}`. Positive angles mean the module is below the horizontal sample plane and negative angles above the horizontal sample plane. 
     Thus rotating the detector in clockwise order decreases the angle. (Mythen setup at SLS)
 
+
+As mentioned before we use the BC parameters to calibrate the module's parameters. We first calibrate the angle :math:`\delta_m` and the distance :math:`L_m`. 
+
+
+Calibration of :math:`\delta_m` and :math:`L_m`:
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+To calibrate :math:`\delta_m` and :math:`L_m` we take several acquisition's of the same sample, however with slightly shifted detector position. We shift the detector position by rotating the detector around the sample. 
+Remember that the module's parameters are rotation invariant. 
+In theory this results in the same diffraction pattern as well as the same base peak just
+shifted by the rotation angle. However, as the diffraction angle :math:`\theta_B` also depends on the strip index, the diffraction patterns are slightly off for not perfectly calibrated module parameters :math:`L_m`, :math:`\delta_m`. 
+See :numref:`overlapping_base_peak` for an example of overlapping base peak regions.
+We thus minimize the Pearsons :math:`\chi²`-similarity of the shifted acquired base peaks within one module to get the optimal parameters :math:`\delta_m` and :math:`L_m` for each module.
+We use regularized Newton method to minimize the :math:`\chi²`-similarity criterion.
+
+
+.. 
+    add a figure of overlapping base peak angles, e.g. selected base peak of diffraction angle
+
+
+
+
+
+.. _overlapping_base_peak: 
+
+.. figure:: ../figures/overlapping_base_peaks.png
+    :target: ../figures/overlapping_base_peaks.png
+    :width: 650px
+    :align: center
+    :alt: Two base peaks of different acquisitions but for the same module 0.  
+
+    Two base peaks of different acquisitions but for the same module 0. 
+
+
+Calibration of :math:`\Psi_m`:
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+After having calibrated :math:`\delta_m` and :math:`L_m` for all modules we can now calibrate the angle :math:`\Psi_m`. Change in :math:`Psi_m` simply shifts the diffraction pattern. We thus compare different base peaks across modules. We assume module 0 with detector position :math:`0^{\circ}` to be aligned with the beam direction. We thus hardcode :math:`\Psi_0 = 0^{\circ}`. 
+We then iteratively align the base peaks of the other modules to the base peak of module 0 by minimizing the Pearson :math:`\chi²`-similarity criterion. To optimize the parameter we perform a simple line search over the angle :math:`\Psi_m`. The direction is choosen according to the weighted center of mass :math:`\theta_{com}` of the base peak across different acquisitions of module :math:`m` and weighted center of mass of the base peak across different acquisitions of module :math:`m-1`. 
+
+.. math:: 
+    \theta_{com, j} = \frac{\sum_{strip\_index \in ROI_{\alpha}} I_{red, strip\_index, j} * \theta_{B}(strip_{index})}{\sum_{strip\_index \in ROI_{\alpha}} I_{red, strip\_index, j}}, 
+
+where :math:`ROI_{\alpha}` denotes the region of interest covering the base peak, :math:`I_{red, strip\_index, j}` the redistributed photon counts for strip index :math:`strip\_index` and acquisition :math:`j` and :math:`\theta_{B}(strip_{index})` the diffraction angle for strip index :math:`strip\_index`.
+
+We then take the average center of mass across different acquisitions. 
+
+If :math:`\theta_{com, m} < \theta_{com, m-1}` we shift the base peak of module :math:`m` to the right and thus increase :math:`\Psi_m`. If :math:`\theta_{com, m} > \theta_{com, m-1}` we shift the base peak of module :math:`m` to the left and thus decrease :math:`\Psi_m`.
+
 .. 
     Is the measurement error prone or only the conversion 
     How to work with errors in measurements 
-
 
 
 .. _pearsonchisquare:
@@ -426,7 +457,7 @@ well within the detector rotation range. For the current Mythen setup at SLS cho
 :math:`\chi²`- similarity criterion 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Let :math:`ROI_{\alpha} = \{ \{I_{red,0}, \sigma^{2}_{red,0} \cdots , \{I_{red,N}, \sigma^{2}_{red,N} \} \}` 
+Let :math:`ROI_{\alpha} = \{ \{I_{red,0}, \sigma^{2}_{red,0}\}, \cdots , \{I_{red,N}, \sigma^{2}_{red,N} \} \}` 
 denote redistributed photon intensities within the base peak region 
 of interest, where :math:`N` is the number of bins covered by the 
 base peak region. With M acquisition's we have :math:`M` regions of interests. 
@@ -438,12 +469,8 @@ We now want to minimize the Neyman (variance-weighted) :math:`\chi²`-similarity
     \chi^{2}_{k} = \sum_{j=1}^M \frac{(I_{red, k, j} - \mathbb{E}_{k}(\sum))^{2}}{\sigma_{k,j}^{2}}, 
 
 
-where :math:`I_{red,k,j}` is the redistributed corrected photon intensity for fixed angle width bin :math:`k` and acquisition :math:`j`, :math:`\sigma_{k}^{2}(\sum)` and :math:`\mathbb{E}_{k}(\sum)` denote the variance and expected value for the bin :math:`k` using the module parameters :math:`\sum`.
+where :math:`I_{red,k,j}` is the redistributed corrected photon intensity for fixed angle width bin :math:`k` and acquisition :math:`j` and :math:`\mathbb{E}_{k}(\sum)` denote the variance and expected value for the bin :math:`k` using the module parameters :math:`\sum`.
 With the module's parameter set :math:`R`, :math:`D` and :math:`\phi` these are: 
-
-.. math:: 
-
-    \sigma_{k}^{2}(R, D, \phi) = \sigma_{red, k,j}^{2} 
 
 
 MMh im confused - the observed values also depend on the module parameters. 
