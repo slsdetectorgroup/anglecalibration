@@ -412,10 +412,12 @@ AngleCalibration::rate_correction(const double photon_count,
     double rate_correction_factor =
         actual_count_rate / photon_counts_per_second;
 
+    /*
     double error_rate_correction_factor = error_propagation(
         1. / photon_counts_per_second,
         -actual_count_rate / std::pow(photon_counts_per_second, 2),
         propagated_error, error_photon_counts_per_second);
+    */
 
     double rate_corrected_photon_counts = photon_count * rate_correction_factor;
 
@@ -859,7 +861,7 @@ double AngleCalibration::center_base_peak(const size_t module_index) {
 }
 
 void AngleCalibration::plot_calibration_step_offset_parameter(
-    const size_t module_index, PlotHandle plot) {
+    const size_t module_index, [[maybe_unused]] PlotHandle plot) {
 
     if (module_index == 0) {
         throw std::runtime_error(LOCATION +
@@ -878,7 +880,7 @@ void AngleCalibration::plot_calibration_step_offset_parameter(
 #ifdef ANGCAL_PLOT
     if (plot) {
         plot->clear();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 #endif
 
@@ -947,8 +949,8 @@ void AngleCalibration::plot_calibration_step_offset_parameter(
 #ifdef ANGCAL_PLOT
     if (plot) {
         plot->flush(); // make plot appear
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(50)); // let gnuplot update
+        // std::this_thread::sleep_for(
+        // std::chrono::milliseconds(10)); // let gnuplot update
     }
 #endif
 }
@@ -966,7 +968,7 @@ void AngleCalibration::plot_calibration_step_coupled_parameters(
         std::filesystem::create_directories(data_file_path);
     if (plot) {
         plot->clear();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 #endif
 
@@ -1039,8 +1041,8 @@ void AngleCalibration::plot_calibration_step_coupled_parameters(
 #ifdef ANGCAL_PLOT
     if (plot) {
         plot->flush(); // make plot appear
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(50)); // let gnuplot update
+        // std::this_thread::sleep_for(
+        //     std::chrono::milliseconds(10)); // let gnuplot update
     }
 #endif
 }
@@ -1065,7 +1067,7 @@ void AngleCalibration::calibrate_offset() {
                         module_index - 1, module_index);
         auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
 
-        optimize_offset_parameter(module_index, plot, 5.0e-3); // 1.0e-3
+        optimize_offset_parameter(module_index, plot, 5.0e-3);
 
         // plot_calibration_step(module_index, plot);
 #else
@@ -1222,18 +1224,19 @@ void AngleCalibration::calibrate(
         }
     }
 
-    // calibrate_coupled_parameters();
+    calibrate_coupled_parameters();
+
+    if (output_file.has_value()) {
+        BCparameters.convert_to_DGParameters(DGparameters);
+        write_DG_parameters_to_file(output_file.value(), DGparameters);
+    }
 
     calibrate_offset();
 
-    // write to file
-    /*
     if (output_file.has_value()) {
-        auto [center, conversion, offset] =
-            BCparameters.convert_to_DGParameters(module_index);
-        append_to_file(file, module_index, center, conversion, offset);
+        BCparameters.convert_to_DGParameters(DGparameters);
+        write_DG_parameters_to_file(output_file.value(), DGparameters);
     }
-    */
 
     if (output_file.has_value()) {
         file.close();
@@ -1524,8 +1527,8 @@ void AngleCalibration::optimize_offset_parameter(const size_t module_index,
         while (next_similarity_of_peaks < previous_similarity_of_peaks ||
                ((std::abs(next_difference_in_peaks) <
                  std::abs(previous_difference_in_peaks)) &&
-                (relative_change_difference_in_peaks > 1e-4)) &&
-                   std::abs(next_difference_in_peaks) > 1e-10) {
+                (relative_change_difference_in_peaks > 1e-4) &&
+                (std::abs(next_difference_in_peaks) > 1e-10))) {
             BCparameters.angle_center_beam(module_index) += delta_parameter;
 
             LOG(TLogLevel::logDEBUG)
@@ -1608,8 +1611,8 @@ void AngleCalibration::optimize_offset_parameter(const size_t module_index,
         while (next_similarity_of_peaks < previous_similarity_of_peaks ||
                (std::abs(next_difference_in_peaks) <
                     std::abs(previous_difference_in_peaks) &&
-                relative_change_difference_in_peaks > 1e-4) &&
-                   std::abs(next_difference_in_peaks) > 1e-10) {
+                relative_change_difference_in_peaks > 1e-4 &&
+                (std::abs(next_difference_in_peaks) > 1e-10))) {
             BCparameters.angle_center_beam(module_index) -= delta_parameter;
 
             LOG(TLogLevel::logDEBUG)
