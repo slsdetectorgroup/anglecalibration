@@ -1250,7 +1250,7 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
     file_list = file_list_;
     base_peak_angle = base_peak_angle_;
 
-    // calibrate_coupled_parameters(module_index);
+    calibrate_coupled_parameters(module_index);
 
     calibrate_offset(module_index);
 }
