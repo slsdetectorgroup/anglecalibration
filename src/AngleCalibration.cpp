@@ -1052,6 +1052,11 @@ void AngleCalibration::calibrate_offset() {
     for (size_t module_index = 1; module_index < mythen_detector->max_modules;
          ++module_index) {
 
+        LOG(TLogLevel::logINFO)
+            << fmt::format("starting calibration for module {} ", module_index);
+
+        const auto t0 = std::chrono::steady_clock::now();
+
         // skip if module is not connected
         if (module_is_disconnected(module_index) or
             module_is_disconnected(module_index - 1)) {
@@ -1080,6 +1085,12 @@ void AngleCalibration::calibrate_offset() {
             continue;
         }
 #endif
+        const auto t1 = std::chrono::steady_clock::now();
+        const auto elapsed_time =
+            std::chrono::duration_cast<std::chrono::seconds>(t1 - t0).count();
+        LOG(TLogLevel::logINFO)
+            << fmt::format("calibration for module {} took {} seconds",
+                           module_index, elapsed_time);
     }
 }
 
@@ -1125,6 +1136,11 @@ void AngleCalibration::calibrate_coupled_parameters() {
     for (size_t module_index = 0; module_index < mythen_detector->max_modules;
          ++module_index) {
 
+        LOG(TLogLevel::logINFO)
+            << fmt::format("starting calibration for module {} ", module_index);
+
+        const auto t0 = std::chrono::steady_clock::now();
+
         // skip if module is not connected
         if (!module_is_disconnected(module_index)) {
 
@@ -1162,6 +1178,13 @@ void AngleCalibration::calibrate_coupled_parameters() {
             LOG(TLogLevel::logINFO)
                 << fmt::format("module {} is disconnected", module_index);
         }
+
+        const auto t1 = std::chrono::steady_clock::now();
+        const auto elapsed_time =
+            std::chrono::duration_cast<std::chrono::seconds>(t1 - t0).count();
+        LOG(TLogLevel::logINFO)
+            << fmt::format("calibration for module {} took {} seconds",
+                           module_index, elapsed_time);
     }
 }
 
@@ -1250,9 +1273,22 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
     file_list = file_list_;
     base_peak_angle = base_peak_angle_;
 
+    const auto t0 = std::chrono::steady_clock::now();
+
     calibrate_coupled_parameters(module_index);
 
-    calibrate_offset(module_index);
+    if (module_index > 0) {
+        calibrate_coupled_parameters(module_index - 1);
+
+        calibrate_offset(module_index);
+    }
+
+    const auto t1 = std::chrono::steady_clock::now();
+    const auto elapsed_time =
+        std::chrono::duration_cast<std::chrono::seconds>(t1 - t0).count();
+    LOG(TLogLevel::logINFO)
+        << fmt::format("calibration for module {} took {} seconds",
+                       module_index, elapsed_time);
 }
 
 NDArray<double, 1>
@@ -1445,8 +1481,8 @@ void AngleCalibration::optimize_offset_parameter(const size_t module_index,
                                          // peaks return infinity for
                                          // similarity of peaks
                                          // - this should lead to a shift
-                                         // back into direction of overlap in
-                                         // line search
+                                         // back into direction of overlap
+                                         // in line search
             }
         }
         BCparameters.angle_center_beam(module_index) =
