@@ -27,15 +27,14 @@ int main() {
         file_path /
         "Flatfield_EkeV22p0_T11000eV_up_TESTFF1_clean_Jun2025_open_WS.raw";
 
-    auto initial_angles_filename =
-        file_path / "angcal_Jul2025_P12_0p0105_calibrated.off";
+    auto initial_angles_filename = file_path / "angcal_Jul2025_P12_0p0105.off";
 
     std::string acquisition_fileprefix = "ang1up_22keV_MIX_0p5mm_48M_a_";
 
     const size_t num_files = 1501;
 
     auto output_filename =
-        file_path / "angcal_Jul2025_P12_0p0105_calibrated2.off";
+        file_path / "angcal_Jul2025_P12_0p0105_new_calibrated.off";
 
     // export
     // ANGCAL_TEST_DATA=~/Documents/VariaMay2025/Antonio20250512/angcal_M3_Mar21_2
@@ -76,15 +75,7 @@ int main() {
 
     LOG(TLogLevel::logINFO) << "read normalized flatfield from file";
 
-    // TODO: probably normalized flatfield is stored or inverse?
-    // TODO: maybe allocate normalized flatfield somewhere else and directly
-    // read into it- decouble filesystem from FlatField class completely
-    // Flatfield and normalized flatfield use different file formats e.g. no
-    // error stored in flatfield - flatfield is a simple mythenfile!!!! - not a
-    // txt file
     flat_field_ptr->read_normalized_flatfield_from_file(flatfield_filename);
-
-    // flat_field_ptr->calculate_inverse_normalized_flatfield<true>();
 
     auto mythen_file_reader = std::make_shared<EpicsMythenFileReader>();
 
@@ -136,16 +127,15 @@ int main() {
 #ifdef ANGCAL_PLOT
     // select_base_peak(std::make_shared<AngleCalibration>(anglecalibration),
     // mythen_file_reader, filelist, 0);
+    // LOG(TLogLevel::logDEBUG) << "done selecting base peak";
 #endif
 
-    LOG(TLogLevel::logDEBUG) << "done selecting base peak";
     // take a tabulated peak as base peak
     // or take a base peak for module 0 that is well inside the detector range
     // and not at the module boundaries
 
     // TODO: choosing the base peak is very hard - good average
     const double base_peak_angle = 19.0678; // 19.0648;
-    // 19.0537; // 19.1119; // 26.7731, 20.5902, 14.0686
 
     anglecalibration.set_base_peak_angle(base_peak_angle);
 
@@ -162,11 +152,15 @@ int main() {
     auto test_frame = file_path / (acquisition_fileprefix + "0173.h5");
 
     // plot some stuff
-    MythenFrame frame = mythen_file_reader->read_frame(test_frame); // 0165.h5
+    MythenFrame frame = mythen_file_reader->read_frame(test_frame);
 
-    size_t module_index = 0; // 0
+    // plot everything redistributed to fixed angle width bins
 
-// plot everything redistributed to fixed angle width bins
+#ifdef ANGCAL_PLOT
+    PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
+#endif
+
+/*
 #ifdef ANGCAL_PLOT
 
     PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
@@ -179,10 +173,13 @@ int main() {
 
     plotter.pause();
 #endif
+*/
 
 // plot one module for fixed angle width bins
 #ifdef ANGCAL_PLOT
     // plot module
+
+    size_t module_index = 0;
 
     auto module_redistributed_to_fixed_angle_bins =
         anglecalibration.redistribute_photon_counts_to_fixed_angle_width_bins(
@@ -197,16 +194,9 @@ int main() {
 
 // plot base peak for one module
 #ifdef ANGCAL_PLOT
-
-    std::string file_name = file_path / (acquisition_fileprefix + "0206.h5");
-
-    auto frame1 = mythen_file_reader->read_frame(file_name);
-
-    module_index = 1;
-
     auto base_peak_for_module =
         anglecalibration.redistributed_photon_counts_in_base_peak_ROI(
-            frame1, module_index);
+            frame, module_index);
     plotter.plot_base_peak_region_of_interest(module_index,
                                               base_peak_for_module.view());
     plotter.pause();

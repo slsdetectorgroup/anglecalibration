@@ -35,6 +35,13 @@ void define_AngleCalibration_binding(py::module &m) {
                       bin width of fixed angle width histogram [degrees]
                       default: '0.0036°')")
 
+        .def_property("base_peak_ROI_width",
+                      &AngleCalibration::get_base_peak_ROI_width,
+                      &AngleCalibration::set_base_peak_ROI_width, R"(
+                      width of base peak region of interest [degrees]
+                      e.g. [base_peak - base_peak_ROI_width, base_peak + base_peak_ROI_width] given in angles
+                      default: '0.05°')")
+
         .def_property_readonly(
             "num_fixed_angle_width_bins",
             &AngleCalibration::num_fixed_angle_width_bins,
@@ -219,10 +226,12 @@ void define_AngleCalibration_binding(py::module &m) {
             "calibrate",
             [](AngleCalibration &self,
                const std::vector<std::string> &file_list,
-               const double base_peak_angle) {
-                self.calibrate(file_list, base_peak_angle);
+               const double base_peak_angle,
+               std::optional<std::string> output_filename = std::nullopt) {
+                self.calibrate(file_list, base_peak_angle, output_filename);
             },
             py::arg("file_list"), py::arg("base_peak_angle"),
+            py::arg("output_filename"),
             R"(
             calibrates BC parameters for all modules
             
@@ -230,6 +239,7 @@ void define_AngleCalibration_binding(py::module &m) {
                 list of paths to acquisition files
             base_peak_angle : double
                 angle of base peak center [degree]
+            output_filename : str, optional 
             )")
 
         .def(
