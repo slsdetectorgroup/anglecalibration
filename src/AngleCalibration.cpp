@@ -807,6 +807,9 @@ double AngleCalibration::center_base_peak(const size_t module_index) {
 
         MythenFrame frame = mythen_file_reader->read_frame(file);
 
+        double sum_intensities_in_ROI = 0.0;
+        double weighted_sum = 0.0;
+
         // base peak angle is in module
         if (base_peak_is_in_module(module_index, frame.detector_angle)) {
 
@@ -835,18 +838,15 @@ double AngleCalibration::center_base_peak(const size_t module_index) {
                         ? 0.0
                         : fixed_angle_width_bins_photon_counts(i) /
                               sum_statistical_weights(i); // y_k
+                sum_intensities_in_ROI +=
+                    fixed_angle_width_bins_photon_counts(i);
+                weighted_sum += i * fixed_angle_width_bins_photon_counts(i);
             }
 
-            // peak center
-            auto it =
-                std::max_element(fixed_angle_width_bins_photon_counts.begin(),
-                                 fixed_angle_width_bins_photon_counts.end());
-            size_t max_index =
-                std::distance(fixed_angle_width_bins_photon_counts.begin(), it);
-
-            // convert to angle
-            average_peak_center += max_index * histogram_bin_width -
-                                   base_peak_roi_width + base_peak_angle;
+            // centerof mass - peak center converted to angles
+            average_peak_center +=
+                weighted_sum / sum_intensities_in_ROI * histogram_bin_width -
+                base_peak_roi_width + base_peak_angle;
 
             ++num_runs;
         }
@@ -1065,7 +1065,7 @@ void AngleCalibration::calibrate_offset() {
                         module_index - 1, module_index);
         auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
 
-        optimize_offset_parameter(module_index, plot, 1.0e-3);
+        optimize_offset_parameter(module_index, plot, 5.0e-3); // 1.0e-3
 
         // plot_calibration_step(module_index, plot);
 #else
@@ -1406,7 +1406,7 @@ AngleCalibration::redistributed_photon_counts_in_base_peak_ROI(
 
 void AngleCalibration::optimize_offset_parameter(const size_t module_index,
                                                  PlotHandle gp,
-                                                 const double delta_parameter) {
+                                                 double delta_parameter) {
 
     // old reference parameters: // parameters can only change +,-
     // base_peak_roi_width
@@ -1451,190 +1451,212 @@ void AngleCalibration::optimize_offset_parameter(const size_t module_index,
         return similarity_of_peaks;
     };
 
+    const double peak_center_reference_module =
+        center_base_peak(module_index - 1);
+
+    auto difference_peak_centers =
+        [this, &module_index, &peak_center_reference_module](const double x) {
+            const double prev_value =
+                BCparameters.angle_center_beam(module_index);
+            BCparameters.angle_center_beam(module_index) = x;
+
+            double peak_center_current_module = center_base_peak(module_index);
+
+            BCparameters.angle_center_beam(module_index) =
+                prev_value; // revert shift
+
+            return peak_center_current_module - peak_center_reference_module;
+        };
+
     double previous_similarity_of_peaks =
         calculate_similarity_of_peaks_between_modules(module_index, gp);
 
     LOG(TLogLevel::logDEBUG) << fmt::format("initial similarity of peaks: {}",
                                             previous_similarity_of_peaks);
-
+#ifdef ANGCAL_PLOT
     plot_calibration_step_offset_parameter(module_index, gp);
+#endif
 
     double next_similarity_of_peaks{};
 
-    /*
-    bool convergence_criterion = false;
-
-    size_t iteration_index = 0;
-    while (!convergence_criterion) {
-        const double central_finite_difference =
-            (objective_function({BCparameters.angle_center_beam(module_index) +
-                                 delta_parameter}) -
-             objective_function({BCparameters.angle_center_beam(module_index) -
-                                 delta_parameter})) /
-            (2 * delta_parameter);
-
-        LOG(TLogLevel::logDEBUG)
-            << fmt::format("central finite difference for line search: {}",
-                           central_finite_difference);
-
-        // perform line search in direction of central finite
-        // difference
-        auto [optimized_parameter, f_optimized_parameter] =
-            backtracking_line_search(
-                std::array<double, 1>{
-                    BCparameters.angle_center_beam(module_index)},
-                previous_similarity_of_peaks,
-                std::array<double, 1>{central_finite_difference},
-                objective_function);
-
-        BCparameters.angle_center_beam(module_index) = optimized_parameter[0];
-        next_similarity_of_peaks = f_optimized_parameter;
-
-        double relative_change =
-            std::abs(previous_similarity_of_peaks - next_similarity_of_peaks) /
-            previous_similarity_of_peaks;
-
-        convergence_criterion = relative_change < 1.0e-5;
-
-        previous_similarity_of_peaks = next_similarity_of_peaks;
-
-        ++iteration_index;
-
-        LOG(TLogLevel::logDEBUG)
-            << fmt::format("Iteration {} with peak similarity of {}",
-                           iteration_index, next_similarity_of_peaks);
-        plot_calibration_step_offset_parameter(module_index, gp);
-    }
-    */
-
-    /*
-    double best_step_size{};
-    // this is not feasable
-    size_t num_steps = static_cast<size_t>(1.25 / delta_parameter);
-    for (double step_size = -delta_parameter * num_steps;
-         step_size < delta_parameter * num_steps;
-         step_size += delta_parameter) {
-        double next_similarity_of_peaks = objective_function(
-            BCparameters.angle_center_beam(module_index) + step_size);
-        LOG(TLogLevel::logDEBUG)
-            << fmt::format("similarity at step size {}: {}", step_size,
-                           next_similarity_of_peaks);
-        if (next_similarity_of_peaks < previous_similarity_of_peaks) {
-            previous_similarity_of_peaks = next_similarity_of_peaks;
-            best_step_size = step_size;
-        }
-    }
-    BCparameters.angle_center_beam(module_index) += best_step_size;
-    plot_calibration_step_offset_parameter(module_index, gp);
-    */
-
     // define search direction
-    const double peak_center_reference_module =
-        center_base_peak(module_index - 1);
+    double diff_peak_centers =
+        difference_peak_centers(BCparameters.angle_center_beam(module_index));
 
-    const double peak_center_current_module = center_base_peak(module_index);
+    double previous_difference_in_peaks = diff_peak_centers;
 
-    LOG(TLogLevel::logDEBUG)
-        << fmt::format("module {} has peak_center : {}", module_index - 1,
-                       peak_center_reference_module);
+    double next_difference_in_peaks{};
 
-    LOG(TLogLevel::logDEBUG)
-        << fmt::format("module {} has peak_center : {}", module_index,
-                       peak_center_current_module);
+    double relative_change_difference_in_peaks{};
 
     size_t iteration_index = 0;
 
-    double central_finite_difference =
-        (objective_function(
-             {BCparameters.angle_center_beam(module_index) + delta_parameter}) -
-         objective_function({BCparameters.angle_center_beam(module_index) -
-                             delta_parameter})) /
-        (2.0 * delta_parameter);
-
-    central_finite_difference = 0.0;
-
-    if (peak_center_current_module < peak_center_reference_module) {
+    if (diff_peak_centers < 0.0) {
         // line search in positive direction
-        LOG(TLogLevel::logDEBUG) << "in plus: ";
+        LOG(TLogLevel::logDEBUG) << "moving peak to the right: ";
+
+        next_difference_in_peaks = difference_peak_centers(
+            BCparameters.angle_center_beam(module_index) + delta_parameter);
+
+        // reduce step size if overshoot reference peak
+        while (next_difference_in_peaks > 0.0) {
+            LOG(TLogLevel::logDEBUG) << fmt::format("reducing step size");
+
+            delta_parameter *= 0.5; // reduce step size
+            next_difference_in_peaks = difference_peak_centers(
+                BCparameters.angle_center_beam(module_index) + delta_parameter);
+
+            relative_change_difference_in_peaks =
+                std::abs(std::abs(next_difference_in_peaks) -
+                         std::abs(previous_difference_in_peaks)) /
+                (std::abs(previous_difference_in_peaks) +
+                 std::numeric_limits<double>::epsilon());
+        }
 
         next_similarity_of_peaks = objective_function(
             BCparameters.angle_center_beam(module_index) + delta_parameter);
 
-        // TODO: How to ensure that one does not overshoot? - recalculate step
-        // size - check if left or right?
-        // TODO: probably need convergence criterion
+        relative_change_difference_in_peaks =
+            std::abs(next_difference_in_peaks - previous_difference_in_peaks) /
+            (std::abs(previous_difference_in_peaks) +
+             std::numeric_limits<double>::epsilon());
+
         while (next_similarity_of_peaks < previous_similarity_of_peaks ||
-               central_finite_difference <= 0.0) {
+               ((std::abs(next_difference_in_peaks) <
+                 std::abs(previous_difference_in_peaks)) &&
+                (relative_change_difference_in_peaks > 1e-4)) &&
+                   std::abs(next_difference_in_peaks) > 1e-10) {
             BCparameters.angle_center_beam(module_index) += delta_parameter;
 
             LOG(TLogLevel::logDEBUG)
-                << fmt::format("Iteration {} with peak similarity of {}",
-                               iteration_index, next_similarity_of_peaks);
+                << fmt::format("Iteration {} with peak similarity of {}, "
+                               "difference in peak centers: {}",
+                               iteration_index, next_similarity_of_peaks,
+                               next_difference_in_peaks);
 
             ++iteration_index;
             plot_calibration_step_offset_parameter(module_index, gp);
 
             previous_similarity_of_peaks = next_similarity_of_peaks;
+            previous_difference_in_peaks = next_difference_in_peaks;
+
+            next_difference_in_peaks = difference_peak_centers(
+                BCparameters.angle_center_beam(module_index) + delta_parameter);
+
+            relative_change_difference_in_peaks =
+                std::abs(next_difference_in_peaks -
+                         previous_difference_in_peaks) /
+                (std::abs(previous_difference_in_peaks) +
+                 std::numeric_limits<double>::epsilon());
+
+            // reduce step size if overshoot reference peak
+            while (next_difference_in_peaks > 0.0) {
+                LOG(TLogLevel::logDEBUG) << fmt::format("reducing step size");
+                delta_parameter *= 0.5; // reduce step size
+                next_difference_in_peaks = difference_peak_centers(
+                    BCparameters.angle_center_beam(module_index) +
+                    delta_parameter);
+            }
+
             next_similarity_of_peaks = objective_function(
                 BCparameters.angle_center_beam(module_index) + delta_parameter);
 
-            central_finite_difference =
-                (objective_function(
-                     {BCparameters.angle_center_beam(module_index) +
-                      delta_parameter}) -
-                 objective_function(
-                     {BCparameters.angle_center_beam(module_index) -
-                      delta_parameter})) /
-                (2.0 * delta_parameter);
+            LOG(TLogLevel::logDEBUG1) << fmt::format(
+                "previous difference peak centers: {}, next differnce peak "
+                "centers: {}",
+                previous_difference_in_peaks, next_difference_in_peaks);
 
-            central_finite_difference = 0.0;
+            LOG(TLogLevel::logDEBUG1) << fmt::format(
+                "previous similarity: {}, next similarity: {}",
+                previous_similarity_of_peaks, next_similarity_of_peaks);
 
-            LOG(TLogLevel::logDEBUG)
-                << fmt::format("central finite difference for line search: {}",
-                               central_finite_difference);
+            relative_change_difference_in_peaks =
+                std::abs(std::abs(next_difference_in_peaks) -
+                         std::abs(previous_difference_in_peaks)) /
+                (std::abs(previous_difference_in_peaks) +
+                 std::numeric_limits<double>::epsilon());
         }
-        LOG(TLogLevel::logDEBUG) << fmt::format(
-            "previous_similarity_of_peaks: {}, next_similarity_of_peaks: {}",
-            previous_similarity_of_peaks, next_similarity_of_peaks);
     } else {
         // line search in negative direction
-        LOG(TLogLevel::logDEBUG) << "in minus: ";
+        LOG(TLogLevel::logDEBUG) << "moving peak to the left: ";
+
+        next_difference_in_peaks = difference_peak_centers(
+            BCparameters.angle_center_beam(module_index) - delta_parameter);
+
+        // reduce step size if overshoot reference peak
+        while (next_difference_in_peaks < 0.0) {
+            LOG(TLogLevel::logDEBUG) << fmt::format("reducing step size");
+            delta_parameter *= 0.5; // reduce step size
+            next_difference_in_peaks = difference_peak_centers(
+                BCparameters.angle_center_beam(module_index) - delta_parameter);
+
+            relative_change_difference_in_peaks =
+                std::abs(std::abs(next_difference_in_peaks) -
+                         std::abs(previous_difference_in_peaks)) /
+                (std::abs(previous_difference_in_peaks) +
+                 std::numeric_limits<double>::epsilon());
+        }
+
         next_similarity_of_peaks = objective_function(
             BCparameters.angle_center_beam(module_index) - delta_parameter);
+
+        relative_change_difference_in_peaks =
+            std::abs(next_difference_in_peaks - previous_difference_in_peaks) /
+            (std::abs(previous_difference_in_peaks) +
+             std::numeric_limits<double>::epsilon());
         // TODO: probably need convergence criterion
         while (next_similarity_of_peaks < previous_similarity_of_peaks ||
-               central_finite_difference >= 0.0) {
+               (std::abs(next_difference_in_peaks) <
+                    std::abs(previous_difference_in_peaks) &&
+                relative_change_difference_in_peaks > 1e-4) &&
+                   std::abs(next_difference_in_peaks) > 1e-10) {
             BCparameters.angle_center_beam(module_index) -= delta_parameter;
 
             LOG(TLogLevel::logDEBUG)
-                << fmt::format("Iteration {} with peak similarity of {}",
-                               iteration_index, next_similarity_of_peaks);
+                << fmt::format("Iteration {} with peak similarity of {}, "
+                               "difference in peak centers: {}",
+                               iteration_index, next_similarity_of_peaks,
+                               next_difference_in_peaks);
+
             ++iteration_index;
 
             plot_calibration_step_coupled_parameters(module_index, gp);
 
             previous_similarity_of_peaks = next_similarity_of_peaks;
+            previous_difference_in_peaks = next_difference_in_peaks;
+
+            next_difference_in_peaks = difference_peak_centers(
+                BCparameters.angle_center_beam(module_index) - delta_parameter);
+
+            // reduce step size if overshoot reference peak
+            while (next_difference_in_peaks < 0.0) {
+                LOG(TLogLevel::logDEBUG) << fmt::format("reducing step size");
+                delta_parameter *= 0.5; // reduce step size
+
+                next_difference_in_peaks = difference_peak_centers(
+                    BCparameters.angle_center_beam(module_index) -
+                    delta_parameter);
+            }
+
             next_similarity_of_peaks = objective_function(
                 BCparameters.angle_center_beam(module_index) - delta_parameter);
 
-            central_finite_difference =
-                (objective_function(
-                     {BCparameters.angle_center_beam(module_index) -
-                      delta_parameter}) -
-                 objective_function(
-                     {BCparameters.angle_center_beam(module_index) +
-                      delta_parameter})) /
-                (-2.0 * delta_parameter);
+            LOG(TLogLevel::logDEBUG1) << fmt::format(
+                "previous difference peak centers: {}, next differnce peak "
+                "centers: {}",
+                previous_difference_in_peaks, next_difference_in_peaks);
 
-            LOG(TLogLevel::logDEBUG)
-                << fmt::format("central finite difference for line search: {}",
-                               central_finite_difference);
+            LOG(TLogLevel::logDEBUG1) << fmt::format(
+                "previous similarity: {}, next similarity: {}",
+                previous_similarity_of_peaks, next_similarity_of_peaks);
+
+            relative_change_difference_in_peaks =
+                std::abs(std::abs(next_difference_in_peaks) -
+                         std::abs(previous_difference_in_peaks)) /
+                (std::abs(previous_difference_in_peaks) +
+                 std::numeric_limits<double>::epsilon());
         }
-        LOG(TLogLevel::logDEBUG) << fmt::format(
-            "previous_similarity_of_peaks: {}, next_similarity_of_peaks: {}",
-            previous_similarity_of_peaks, next_similarity_of_peaks);
     }
-    gp->pause();
 }
 
 // actually used to optimize BC parameters, first parameters used to

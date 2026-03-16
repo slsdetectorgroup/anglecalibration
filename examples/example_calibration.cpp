@@ -213,14 +213,12 @@ int main() {
 
 #endif
 
-    anglecalibration.calibrate(filelist, base_peak_angle, 4);
-    // anglecalibration.calibrate(filelist, base_peak_angle);
+    // anglecalibration.calibrate(filelist, base_peak_angle, 3);
+    anglecalibration.calibrate(filelist, base_peak_angle);
 
-    /*
     auto bcparameters = anglecalibration.get_BCparameters();
     auto dgparameters = anglecalibration.get_DGparameters();
     bcparameters.convert_to_DGParameters(dgparameters);
 
     anglecalibration.write_DG_parameters_to_file(output_filename, dgparameters);
-    */
 }

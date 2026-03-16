@@ -435,7 +435,7 @@ We now want to minimize the Neyman (variance-weighted) :math:`\chi²`-similarity
 
 .. math:: 
 
-    \chi^{2}_{k} = \sum_{j=1}^M \frac{(I_{red, k, j} - \mathbb{E}_{k}(\sum))^{2}}{\sigma_{k}^{2}(\sum)}, 
+    \chi^{2}_{k} = \sum_{j=1}^M \frac{(I_{red, k, j} - \mathbb{E}_{k}(\sum))^{2}}{\sigma_{k,j}^{2}}, 
 
 
 where :math:`I_{red,k,j}` is the redistributed corrected photon intensity for fixed angle width bin :math:`k` and acquisition :math:`j`, :math:`\sigma_{k}^{2}(\sum)` and :math:`\mathbb{E}_{k}(\sum)` denote the variance and expected value for the bin :math:`k` using the module parameters :math:`\sum`.

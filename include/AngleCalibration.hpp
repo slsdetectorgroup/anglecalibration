@@ -152,6 +152,11 @@ class AngleCalibration {
      */
     void calibrate_coupled_parameters();
 
+    /**
+     * @brief calibrates distance to module center and angle of module center
+     * and normal (L and delta) for a specific module
+     * @param module_index index of module to be calibrated
+     */
     void calibrate_coupled_parameters(const size_t module_index);
 
     /**
@@ -160,6 +165,11 @@ class AngleCalibration {
      */
     void calibrate_offset();
 
+    /**
+     * @brief calibrates the angle between center of module and beam (phi) for a
+     * specific module
+     * @param module_index index of module to be calibrated
+     */
     void calibrate_offset(const size_t module_index);
 
     /**
@@ -427,18 +437,19 @@ class AngleCalibration {
      * @param gp plot wrapper for gnuplot plot to visualize calibration process
      * (default nullptr)
      * @param delta_parameter1 parameter step for parameter module center
-     * distance L (default '0.01')
+     * distance L (default '0.5')
      * @param delta_parameter2 parameter step for parameter angle between center
-     * of module and module normal (delta) (default '0.005')
+     * of module and module normal (delta) (default '1.0e-6')
      */
     void optimize_coupled_parameters(const size_t module_index,
                                      PlotHandle gp = nullptr,
-                                     const double delta_parameter1 = 0.01,
-                                     const double delta_parameter2 = 0.005);
+                                     const double delta_parameter1 = 0.5,
+                                     const double delta_parameter2 = 1.0e-6);
 
     /**
      * @brief optimizes angle between center of module and beam (\psi) of BC
-     * parameters of given module based on chi similarity criterion
+     * parameters of given module based on chi similarity criterion and center
+     * of base peak
      * @param gp plot wrapper for gnuplot plot to visualize calibration process
      * (default nullptr)
      * @param delta_parameter parameter step for angle between center of module
@@ -446,7 +457,7 @@ class AngleCalibration {
      */
     void optimize_offset_parameter(const size_t module_index,
                                    PlotHandle gp = nullptr,
-                                   const double delta_parameter = 0.005);
+                                   double delta_parameter = 0.005);
 
     /**
      * @brief calculated the flatfield corrected photon counts and the error
