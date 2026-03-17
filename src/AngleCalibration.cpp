@@ -769,6 +769,8 @@ double AngleCalibration::calculate_similarity_of_peaks_between_acquisitions(
         }
     }
 
+    LOG(TLogLevel::logDEBUG) << "num_runs: " << num_runs;
+
     if (num_runs == 0) {
         throw NoBasePeakOverLapError();
     }
@@ -1143,9 +1145,6 @@ void AngleCalibration::calibrate_coupled_parameters() {
 
         // skip if module is not connected
         if (!module_is_disconnected(module_index)) {
-
-            LOG(angcal::TLogLevel::logINFO)
-                << "starting calibration for module " << module_index;
 
 #ifdef ANGCAL_PLOT
             std::string plot_title =
