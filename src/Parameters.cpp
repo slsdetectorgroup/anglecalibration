@@ -136,13 +136,13 @@ DGParameters::convert_to_EEParameters(const size_t module_index) const {
         offsets(module_index) + 180.0 / M_PI * centers(module_index) *
                                     std::abs(conversions(module_index));
 
-    return std::make_tuple(module_center_distance, normal_distance, angle);
+    return std::make_tuple(normal_distance, module_center_distance, angle);
 }
 
 void DGParameters::convert_to_EEParameters(EEParameters &eeparameters) const {
 
     for (ssize_t i = 0; i < parameters.shape(0); ++i) {
-        auto [module_center_distance, normal_distance, angle] =
+        auto [normal_distance, module_center_distance, angle] =
             convert_to_EEParameters(i);
         eeparameters.normal_distances(i) = normal_distance;
         eeparameters.module_center_distances(i) = module_center_distance;
