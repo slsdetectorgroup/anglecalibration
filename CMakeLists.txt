@@ -181,6 +181,7 @@ set(PUBLICHEADERS
 
 set(SourceFiles 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AngleCalibration.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/FlatField.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Parameters.cpp
 )
 
