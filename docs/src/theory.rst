@@ -234,21 +234,35 @@ The resulting variance is then given by:
     \sigma_{I_0,corr}² = \sigma \cdot \left(\frac{I_{0,1s}}{I_0}\right)^{2}
 .. Why is it scaled with the incident intensity of the first acquisitions
 
-**Solid Angle correction:** 
+**Transverse width correction:** 
 
-
-
-Don't know what this is. Something to do with actual illuminated surface (transverse width of beam). Pixel height. 
+To correct the number of measured photon counts by the solid angle we need to calculate the solid angle of each pixel. If the detector is closer to the sample, the solid angle becomes larger. If the detector is further away from the sample, the solid angle becomes smaller. 
+The solid angle is given by the projection of the strip area onto a plane orthogonal to the diffracted beam direction divided by the squared euclidean distance of the strip to the sample: 
 
 .. math:: 
-    I_{solid\_angle\_corr} = I * \frac{2*\arctan{\left(\frac{w/2}{\bar{L}}\right)}}{2*\arctan{\left(\frac{w/2}{L}\right)}},
+    d\Omega = \frac{A_{projection}}{R^2} = \frac{p \cdot w \cdot \cos(\mu)}{R^2}, 
 
-where :math:`w` is the pixel's transverse width and :math:`L` is the euclidean distance of the strip to the sample and the constant :math:`\bar{L}` is the average euclidean distance of all strips to the sample. 
+where :math:`p` is the strip pitch, :math:`w` is the pixel's transverse width, :math:`\mu` is the angle between the strip normal and the diffracted beam direction and :math:`R` is the euclidean distance of the strip to the sample.
+
+For small angles and detectors far away one can simplify the above formula:
+
+.. math:: 
+    d\Omega \approx \theta_w \cdot \theta_h, 
+
+where :math:`\theta_w` is the angular strip width in diffraction plane and :math:`\theta_h` is the angular strip height.
+
+As we implicitly correct by the angular strip width in the redistribution step, we only need to correct by the angular strip height. 
+
+.. math:: 
+    I_{solid\_angle\_corr} = I * \frac{2*\arctan{\left(\frac{w/2}{\bar{R}}\right)}}{2*\arctan{\left(\frac{w/2}{R}\right)}},
+
+where :math:`w` is the pixel's transverse width and :math:`R` is the euclidean distance of the strip to the sample and the constant :math:`\bar{R}` is the average euclidean distance of all strips to the sample. The eculiden distance :math:`R` can be calculated from the "EE" module parameters and the strip index. 
+Note that the above formula assumes :math:`R` to be orthogonal to the strip plane.
 
 The resulting variance is then given by:
 
 .. math:: 
-    \sigma_{solid\_angle\_corr} = \sigma \cdot \left(\frac{2*\arctan{\left(\frac{w/2}{\bar{L}}\right)}}{2*\arctan{\left(\frac{w/2}{L}\right)}}\right)^{2}
+    \sigma_{solid\_angle\_corr} = \sigma \cdot \left(\frac{2*\arctan{\left(\frac{w/2}{\bar{R}}\right)}}{2*\arctan{\left(\frac{w/2}{R}\right)}}\right)^{2}
 
 **Flatfield Correction:** 
 
