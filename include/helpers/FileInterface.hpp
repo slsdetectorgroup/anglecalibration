@@ -23,14 +23,11 @@ class SimpleFileInterface {
     virtual void open(const std::string &filename) {
         m_filename = filename;
         m_file.close();
-        try {
-            m_file = std::ifstream(filename, std::ios_base::in);
+        m_file = std::ifstream(filename, std::ios_base::in);
 
-            if (!m_file.good()) {
-                throw std::logic_error("file does not exist");
-            }
-        } catch (std::exception &e) {
-            LOG(angcal::TLogLevel::logERROR) << "file does not exist\n";
+        if (!m_file.good()) {
+            throw std::logic_error(
+                fmt::format("file does not exist: {}", filename));
         }
     }
 

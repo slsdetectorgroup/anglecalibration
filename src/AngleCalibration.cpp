@@ -458,7 +458,7 @@ AngleCalibration::flatfield_correction(const double photon_counts,
                                        const double photon_counts_error,
                                        const size_t global_strip_index) const {
 
-    if ((flat_field->get_normalized_flatfield()(global_strip_index, 0)) <=
+    if ((flat_field->get_normalized_flatfield_view()(global_strip_index, 0)) <=
         0.1) { // std::numeric_limits<double>::epsilon() in Antonios code 0.1
 
         LOG(TLogLevel::logDEBUG)
@@ -469,17 +469,17 @@ AngleCalibration::flatfield_correction(const double photon_counts,
     // flatfield normalization
     const double flatfield_normalized_photon_counts =
         photon_counts /
-        flat_field->get_normalized_flatfield()(global_strip_index, 0);
+        flat_field->get_normalized_flatfield_view()(global_strip_index, 0);
 
     const double normalized_flatfield_variance = std::pow(
-        flat_field->get_normalized_flatfield()(global_strip_index, 1), 2);
+        flat_field->get_normalized_flatfield_view()(global_strip_index, 1), 2);
 
     const double flatfield_normalized_photon_counts_error = error_propagation(
-        1. / flat_field->get_normalized_flatfield()(global_strip_index, 0),
+        1. / flat_field->get_normalized_flatfield_view()(global_strip_index, 0),
         -1.0 * photon_counts /
-            std::pow(
-                flat_field->get_normalized_flatfield()(global_strip_index, 0),
-                2),
+            std::pow(flat_field->get_normalized_flatfield_view()(
+                         global_strip_index, 0),
+                     2),
         photon_counts_error,
         normalized_flatfield_variance); // Variance // TODO: change should be
                                         // squared per default always talk about

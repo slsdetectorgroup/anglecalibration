@@ -33,7 +33,12 @@ struct MythenDetectorSpecifications {
                        // 4420.97064144153710469121564923651006_DP (R_std_H) in
                        // Antonios code
 
-    /// @brief Offset between sample horizontal plane and detector [degrees]
+    /// @brief average solid angle of pixels in Mythen detector [sr]
+    double average_solid_angle = 6.31654681669718951605407423992073673e-7;
+    // 2.0465611686098894032015200537343187d - 8 TODO again two values
+
+    /// @brief Offset between sample horizontal plane and detector
+    /// [degrees]
     double sample_detector_offset = 1.4715;
 
     /// @brief additional offset to sample detector offset (can change in

@@ -76,3 +76,5 @@ inline LogFile StatisticalWeightsLogFile("StatisticalWeights.log");
 inline LogFile StatisticalWeightsLogFile1("StatisticalWeights1.log");
 
 inline LogFile BadChannelsLogFile("BadChannels.log");
+
+inline LogFile SolidAngleCorrectionLogFile2("SolidAngleCorrection.log");
