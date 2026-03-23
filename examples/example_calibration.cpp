@@ -203,10 +203,23 @@ int main() {
 
 #endif
 
-    // anglecalibration.calibrate(filelist, base_peak_angle, 3);
     anglecalibration.calibrate(filelist, base_peak_angle, 1);
 
     /*
+    #ifdef ANGCAL_PLOT
+        anglecalibration.set_base_peak_angle(base_peak_angle);
+        anglecalibration.set_calibration_files(filelist);
+        anglecalibration.read_initial_calibration_from_file(output_filename);
+        std::string plot_title = fmt::format("Overlaping Base Peaks");
+        auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
+
+        anglecalibration.plot_all_base_peaks(plot);
+    #endif
+    */
+
+    /*
+    anglecalibration.calibrate(filelist, base_peak_angle);
+
     auto bcparameters = anglecalibration.get_BCparameters();
     auto dgparameters = anglecalibration.get_DGparameters();
     bcparameters.convert_to_DGParameters(dgparameters);

@@ -46,7 +46,9 @@ option(ANGCAL_FETCH_HDF5 "Use FetchContent to download hdf5-devel" OFF)
 option(ANGCAL_FETCH_AARE "Use FetchContent to download aare from github" ON)
 option(ANGCAL_FETCH_CATCH "Use FetchContent to download catch2" ON)
 option(ANGCAL_FETCH_PYBIND11 "Use FetchContent to download pybind11" ON)
+option(ANGCAL_FETCH_MATPLOTLIBCPP "Use FetchContent to download matplotlib-cpp" ON)
 option(ANGCAL_FETCH_BOOST "Use FetchContent to download boost-iostreams" OFF)
+
 
 if(ANGCAL_FETCH_AARE)
     FetchContent_Declare(aare GIT_REPOSITORY https://github.com/slsdetectorgroup/aare
@@ -86,7 +88,32 @@ else()
     endif()
 endif()
 
+if(ANGCAL_PLOT)
+if(ANGCAL_FETCH_MATPLOTLIBCPP)
+    #set(POSITION_INDEPENDENT_CODE ON) #needed for matplot++ on linux
+    FetchContent_Declare(matplotplusplus
+        GIT_REPOSITORY https://github.com/alandefreitas/matplotplusplus
+        GIT_TAG v1.2.2)
+    FetchContent_MakeAvailable(matplotplusplus)
 
+    # ensure the target is PIC
+    set_target_properties(matplot PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+    set_target_properties(nodesoup PROPERTIES POSITION_INDEPENDENT_CODE ON) # needed for matplot++ on linux
+
+
+    message(STATUS "matplot++ found via FetchContent")
+    if(TARGET matplot)
+        message(STATUS "Matplot++ target is available: matplot")
+    else()
+        message(FATAL_ERROR "Matplot++ target was not found!")
+    endif()
+else()
+    find_package(Matplot++ REQUIRED)
+endif()
+endif()
+
+#set(POSITION_INDEPENDENT_CODE OFF) 
 
 add_library(compiler_flags INTERFACE) #INTERFACE 
 target_compile_features(compiler_flags INTERFACE cxx_std_17)
@@ -177,23 +204,34 @@ set(PUBLICHEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenFileReader.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenDetectorSpecifications.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Parameters.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/PlotHelper.hpp
 ) 
 
 set(SourceFiles 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AngleCalibration.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/FlatField.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Parameters.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PlotHelper.cpp
 )
 
-add_library(angle_calibration STATIC ${SourceFiles}) 
+add_library(angle_calibration STATIC ${SourceFiles})  
 
 target_include_directories(angle_calibration PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" 
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
 target_link_libraries(angle_calibration PUBLIC aare_core HDF5::HDF5 PRIVATE compiler_flags) 
 
+
+if(ANGCAL_PLOT)
+    message("linking target matplotlib")
+    target_link_libraries(angle_calibration PUBLIC matplot)
+endif()
+
 get_property(allTargets DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY BUILDSYSTEM_TARGETS)
 message(STATUS "Available targets: ${allTargets}")
+
+get_target_property(LIBS angle_calibration INTERFACE_LINK_LIBRARIES)
+message(STATUS "angle_calibration link libraries: ${LIBS}")
 
 if(ANGCAL_PLOT)
 set(TARGET_NAME angle_calibration)
@@ -229,7 +267,7 @@ else()
 endif()
 
 set_target_properties(angle_calibration PROPERTIES
-    PUBLIC_HEADER "${PUBLICHEADERS}"
+    PUBLIC_HEADER "${PUBLICHEADERS}" 
 )
 
 #only build library if not added in other cmake with add_subdirectory 

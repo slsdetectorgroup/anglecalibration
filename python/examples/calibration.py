@@ -71,7 +71,8 @@ anglecalibration.base_peak_ROI_width = 0.18 # in degrees width of base peak ROI
 
 base_peak_angle = 19.0678
 
-anglecalibration.calibrate(file_list, base_peak_angle, output_filename=str(env_data_path() / "angcal_Jul2025_P12_0p0105_new_calibrated.off"))
+anglecalibration.calibrate(file_list, base_peak_angle, module_index = 1) 
+#anglecalibration.calibrate(file_list, base_peak_angle, output_filename=str(env_data_path() / "angcal_Jul2025_P12_0p0105_new_calibrated2.off"))
 
 print("calibration is done")
 

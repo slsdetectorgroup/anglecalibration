@@ -23,7 +23,8 @@
 #include "helpers/LogFiles.hpp"
 
 #ifdef ANGCAL_PLOT
-#include "plot_histogram.hpp"
+// #include "plot_histogram.hpp"
+#include "PlotHelper.hpp"
 using PlotHandle =
     std::shared_ptr<angcal::PlotCalibrationProcess>; // Or reference wrapper
 #else
@@ -50,7 +51,7 @@ class AngleCalibration {
         std::shared_ptr<FlatField> flat_field_,
         std::shared_ptr<MythenFileReader> mythen_file_reader_);
 
-    void plot_all_base_peaks(PlotHandle gp);
+    // void plot_all_base_peaks(PlotHandle gp);
 
     /** @brief set the histogram bin width [degrees]
      * default '0.0036°'
@@ -430,7 +431,7 @@ class AngleCalibration {
     double calculate_similarity_of_peaks_between_acquisitions(
         const size_t module_index,
         const std::vector<MythenFrame> &frames_with_base_peak_overlap,
-        PlotHandle gp = nullptr);
+        PlotHandle plot = nullptr);
 
     double calculate_similarity_of_peaks_between_modules(
         const size_t module_index,
@@ -540,17 +541,21 @@ class AngleCalibration {
                                const double center, const double conversion,
                                const double offset);
 
+    /*
     void plot_calibration_step_coupled_parameters(
         const size_t module_index,
         const std::vector<MythenFrame> &frames_with_base_peak_overlap,
         PlotHandle gp);
+    */
 
+    /*
     void plot_calibration_step_offset_parameter(
         const size_t module_index,
         const std::vector<MythenFrame> &frames_with_base_peak_overlap_module,
         const std::vector<MythenFrame>
             &frames_with_base_peak_overlap_prev_module,
         PlotHandle gp);
+    */
 
   private:
     DGParameters DGparameters{};

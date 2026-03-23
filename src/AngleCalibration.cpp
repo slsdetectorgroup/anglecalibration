@@ -12,7 +12,7 @@
 
 #ifdef ANGCAL_PLOT
 #include "PlotHelpers.hpp"
-#include "plot_histogram.hpp"
+// #include "plot_histogram.hpp"
 #endif
 
 namespace angcal {
@@ -565,7 +565,7 @@ double AngleCalibration::calculate_similarity_of_peaks_between_modules(
     const size_t module_index,
     const std::vector<MythenFrame> &frames_with_base_peak_overlap_module,
     const std::vector<MythenFrame> &frames_with_base_peak_overlap_prev_module,
-    [[maybe_unused]] PlotHandle plot) {
+    PlotHandle plot) {
 
     if (module_index == 0) {
         throw std::runtime_error(LOCATION +
@@ -659,6 +659,11 @@ double AngleCalibration::calculate_similarity_of_peaks_between_modules(
                     }
                     ++num_runs;
                     // break; // TODO for now only take one acquisition
+
+                    if (plot) {
+                        plot->add_curve(
+                            fixed_angle_width_bins_photon_counts.view());
+                    }
                 }
             }
             if (num_runs == 0) {
@@ -694,7 +699,7 @@ double AngleCalibration::calculate_similarity_of_peaks_between_modules(
 double AngleCalibration::calculate_similarity_of_peaks_between_acquisitions(
     const size_t module_index,
     const std::vector<MythenFrame> &frames_with_base_peak_overlap,
-    [[maybe_unused]] PlotHandle plot) {
+    PlotHandle plot) {
 
     ssize_t num_bins_in_ROI = get_base_peak_ROI_num_bins();
     // used to calculate chi similarity criterion between peaks of different
@@ -766,8 +771,12 @@ double AngleCalibration::calculate_similarity_of_peaks_between_acquisitions(
                          fixed_angle_width_bins_photon_counts(i) *
                          inverse_fixed_angle_width_bins_photon_counts_variance;
             }
+            if (plot) {
+                plot->add_curve(fixed_angle_width_bins_photon_counts.view());
+            }
             ++num_runs;
         }
+
         ++file_number;
     }
 
@@ -860,6 +869,7 @@ double AngleCalibration::center_base_peak(
     return average_peak_center / num_runs;
 }
 
+/*
 void AngleCalibration::plot_calibration_step_offset_parameter(
     const size_t module_index,
     const std::vector<MythenFrame> &frames_with_base_peak_overlap_module,
@@ -963,7 +973,9 @@ void AngleCalibration::plot_calibration_step_offset_parameter(
     }
 #endif
 }
+*/
 
+/*
 void AngleCalibration::plot_calibration_step_coupled_parameters(
     const size_t module_index,
     const std::vector<MythenFrame> &frames_with_base_peak_overlap,
@@ -972,16 +984,18 @@ void AngleCalibration::plot_calibration_step_coupled_parameters(
     ssize_t num_bins_in_ROI =
         2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;
 
-#ifdef ANGCAL_PLOT
-    auto data_file_path =
-        std::filesystem::current_path().parent_path() / "build" / "data";
-    if (!std::filesystem::exists(data_file_path))
-        std::filesystem::create_directories(data_file_path);
-    if (plot) {
-        plot->clear();
-        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-#endif
+
+    #ifdef ANGCAL_PLOT
+        auto data_file_path =
+            std::filesystem::current_path().parent_path() / "build" / "data";
+        if (!std::filesystem::exists(data_file_path))
+            std::filesystem::create_directories(data_file_path);
+        if (plot) {
+            plot->clear();
+            // std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+    #endif
+
 
     for (const auto &frame : frames_with_base_peak_overlap) {
 
@@ -1017,41 +1031,15 @@ void AngleCalibration::plot_calibration_step_coupled_parameters(
                               sum_statistical_weights(i); // y_k
             }
 
-#ifdef ANGCAL_PLOT
             if (plot) {
-                auto bin_to_diffraction_angle_base_peak_ROI_only =
-                    [this](const size_t bin_index) {
-                        return bin_index * this->histogram_bin_width -
-                               this->base_peak_roi_width +
-                               this->base_peak_angle;
-                    };
-
-                std::string filename = fmt::format(
-                    "file_{}_{}.dat", module_index, frame.detector_angle);
-                auto dataset_name = data_file_path / filename;
-
-                plot->append_to_plot(
-                    fixed_angle_width_bins_photon_counts.view(),
-                    {0, 2 * static_cast<ssize_t>(base_peak_roi_width /
-                                                 histogram_bin_width) +
-                            1},
-                    bin_to_diffraction_angle_base_peak_ROI_only, dataset_name);
-                // plot->pause();
+                plot->add_curve(fixed_angle_width_bins_photon_counts.view());
             }
-
-#endif
         }
     }
-
-#ifdef ANGCAL_PLOT
-    if (plot) {
-        plot->flush(); // make plot appear
-        // std::this_thread::sleep_for(
-        //     std::chrono::milliseconds(10)); // let gnuplot update
-    }
-#endif
 }
+*/
 
+/*
 void AngleCalibration::plot_all_base_peaks([[maybe_unused]] PlotHandle plot) {
     ssize_t num_bins_in_ROI =
         2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;
@@ -1154,6 +1142,7 @@ void AngleCalibration::plot_all_base_peaks([[maybe_unused]] PlotHandle plot) {
     }
 #endif
 }
+*/
 
 void AngleCalibration::calibrate_offset(
     const std::vector<double> &detector_angles) {
@@ -1215,7 +1204,7 @@ void AngleCalibration::calibrate_offset(
         std::string plot_title =
             fmt::format("Base Peaks between modules {} and {} ",
                         module_index - 1, module_index);
-        auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
+        auto plot = std::make_shared<PlotCalibrationProcess>(this, plot_title);
 
         optimize_offset_parameter(module_index, frames_with_base_peak_overlap,
                                   frames_with_base_peak_overlap_prev_module,
@@ -1267,7 +1256,7 @@ void AngleCalibration::calibrate_offset(
     std::string plot_title =
         fmt::format("Base Peaks between modules {} and {} ", module_index - 1,
                     module_index);
-    auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
+    auto plot = std::make_shared<PlotCalibrationProcess>(this, plot_title);
 
     optimize_offset_parameter(module_index, frames_with_base_peak_overlap,
                               frames_with_base_peak_overlap_prev_module, plot,
@@ -1322,7 +1311,8 @@ void AngleCalibration::calibrate_coupled_parameters(
 #ifdef ANGCAL_PLOT
             std::string plot_title =
                 fmt::format("Base Peaks for module {} ", module_index);
-            auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
+            auto plot =
+                std::make_shared<PlotCalibrationProcess>(this, plot_title);
 
             try {
                 optimize_coupled_parameters(
@@ -1335,8 +1325,8 @@ void AngleCalibration::calibrate_coupled_parameters(
                 continue;
             }
 
-            plot_calibration_step_coupled_parameters(
-                module_index, frames_with_base_peak_overlap, plot);
+            // plot_calibration_step_coupled_parameters(
+            // module_index, frames_with_base_peak_overlap, plot);
 #else
             try {
                 optimize_coupled_parameters(module_index,
@@ -1375,7 +1365,7 @@ void AngleCalibration::calibrate_coupled_parameters(
 #ifdef ANGCAL_PLOT
     std::string plot_title =
         fmt::format("Base Peaks for module {} ", module_index);
-    auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
+    auto plot = std::make_shared<PlotCalibrationProcess>(this, plot_title);
 
     try {
         optimize_coupled_parameters(module_index, frames_with_base_peak_overlap,
@@ -1387,8 +1377,8 @@ void AngleCalibration::calibrate_coupled_parameters(
         return;
     }
 
-    plot_calibration_step_coupled_parameters(
-        module_index, frames_with_base_peak_overlap, plot);
+    // plot_calibration_step_coupled_parameters(
+    //  module_index, frames_with_base_peak_overlap, plot);
 #else
     try {
         optimize_coupled_parameters(module_index,
@@ -1690,7 +1680,7 @@ void AngleCalibration::optimize_offset_parameter(
 
     auto objective_function = [this, &module_index,
                                &frames_with_base_peak_overlap,
-                               &frames_with_base_peak_overlap_prev_module, &gp,
+                               &frames_with_base_peak_overlap_prev_module,
                                &old_reference_left_strip_boundary_angle](
                                   const double x) {
         const double prev_value = BCparameters.angle_center_beam(module_index);
@@ -1710,7 +1700,7 @@ void AngleCalibration::optimize_offset_parameter(
                 similarity_of_peaks =
                     calculate_similarity_of_peaks_between_modules(
                         module_index, frames_with_base_peak_overlap,
-                        frames_with_base_peak_overlap_prev_module, gp);
+                        frames_with_base_peak_overlap_prev_module, nullptr);
             } catch (const NoBasePeakOverLapError &e) {
                 similarity_of_peaks = std::numeric_limits<
                     double>::infinity(); // if there is no overlap of base
@@ -1748,15 +1738,17 @@ void AngleCalibration::optimize_offset_parameter(
     double previous_similarity_of_peaks =
         calculate_similarity_of_peaks_between_modules(
             module_index, frames_with_base_peak_overlap,
-            frames_with_base_peak_overlap_prev_module, gp);
+            frames_with_base_peak_overlap_prev_module, nullptr);
 
     LOG(TLogLevel::logDEBUG) << fmt::format("initial similarity of peaks: {}",
                                             previous_similarity_of_peaks);
-#ifdef ANGCAL_PLOT
-    plot_calibration_step_offset_parameter(
-        module_index, frames_with_base_peak_overlap,
-        frames_with_base_peak_overlap_prev_module, gp);
-#endif
+    if (gp) {
+        calculate_similarity_of_peaks_between_modules(
+            module_index, frames_with_base_peak_overlap,
+            frames_with_base_peak_overlap_prev_module, gp);
+
+        gp->show();
+    }
 
     double next_similarity_of_peaks{};
 
@@ -1816,9 +1808,17 @@ void AngleCalibration::optimize_offset_parameter(
                                next_difference_in_peaks);
 
             ++iteration_index;
-            plot_calibration_step_offset_parameter(
-                module_index, frames_with_base_peak_overlap,
-                frames_with_base_peak_overlap_prev_module, gp);
+
+            if (gp) {
+                calculate_similarity_of_peaks_between_modules(
+                    module_index, frames_with_base_peak_overlap,
+                    frames_with_base_peak_overlap_prev_module, gp);
+                gp->show();
+            }
+
+            // plot_calibration_step_offset_parameter(
+            // module_index, frames_with_base_peak_overlap,
+            // frames_with_base_peak_overlap_prev_module, gp);
 
             previous_similarity_of_peaks = next_similarity_of_peaks;
             previous_difference_in_peaks = next_difference_in_peaks;
@@ -1903,8 +1903,14 @@ void AngleCalibration::optimize_offset_parameter(
 
             ++iteration_index;
 
-            plot_calibration_step_coupled_parameters(
-                module_index, frames_with_base_peak_overlap, gp);
+            // plot_calibration_step_coupled_parameters(
+            // module_index, frames_with_base_peak_overlap, gp);
+            if (gp) {
+                calculate_similarity_of_peaks_between_modules(
+                    module_index, frames_with_base_peak_overlap,
+                    frames_with_base_peak_overlap_prev_module, gp);
+                gp->show();
+            }
 
             previous_similarity_of_peaks = next_similarity_of_peaks;
             previous_difference_in_peaks = next_difference_in_peaks;
@@ -1973,13 +1979,13 @@ void AngleCalibration::optimize_coupled_parameters(
 
     double previous_similarity_of_peaks =
         calculate_similarity_of_peaks_between_acquisitions(
-            module_index, frames_with_base_peak_overlap, gp);
+            module_index, frames_with_base_peak_overlap, nullptr);
 
     LOG(logDEBUG) << fmt::format("initial similarity of peaks: {}",
                                  previous_similarity_of_peaks);
 
     auto objective_function1 = [this, &module_index,
-                                &frames_with_base_peak_overlap, &gp,
+                                &frames_with_base_peak_overlap,
                                 &old_reference_left_strip_boundary_angle](
                                    const std::array<double, 2> &parameters) {
         const double prev_parameter1 =
@@ -2004,7 +2010,7 @@ void AngleCalibration::optimize_coupled_parameters(
             try {
                 similarity_of_peaks =
                     calculate_similarity_of_peaks_between_acquisitions(
-                        module_index, frames_with_base_peak_overlap, gp);
+                        module_index, frames_with_base_peak_overlap, nullptr);
             } catch (const NoBasePeakOverLapError &e) {
 
                 similarity_of_peaks = std::numeric_limits<
@@ -2041,8 +2047,9 @@ void AngleCalibration::optimize_coupled_parameters(
                            iteration_index, next_similarity_of_peaks);
 
 #ifdef ANGCAL_PLOT
-        plot_calibration_step_coupled_parameters(
+        calculate_similarity_of_peaks_between_acquisitions(
             module_index, frames_with_base_peak_overlap, gp);
+        gp->show();
 #endif
 
         double relative_change =

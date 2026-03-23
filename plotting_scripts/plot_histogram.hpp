@@ -79,6 +79,7 @@ inline void plot_photon_counts_for_fixed_angle_width_bins(
     gp.flush();
 }
 
+/*
 class PlotCalibrationProcess {
 
   public:
@@ -160,5 +161,6 @@ class PlotCalibrationProcess {
 };
 
 inline size_t PlotCalibrationProcess::plot_window = 0;
+*/
 
 } // namespace angcal
