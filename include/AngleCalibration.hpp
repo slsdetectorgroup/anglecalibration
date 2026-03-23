@@ -50,6 +50,8 @@ class AngleCalibration {
         std::shared_ptr<FlatField> flat_field_,
         std::shared_ptr<MythenFileReader> mythen_file_reader_);
 
+    void plot_all_base_peaks(PlotHandle gp);
+
     /** @brief set the histogram bin width [degrees]
      * default '0.0036°'
      */
@@ -80,6 +82,18 @@ class AngleCalibration {
      * base_peak + base_peak_ROI] given in angles [degrees]
      * */
     double get_base_peak_ROI_width() const;
+
+    /// @brief get base peak angle
+    /// @return angle of base peak [degrees]
+    double get_base_peak_angle() const;
+
+    /// @brief set base peak angle
+    /// @param base_peak_angle_ angle of base peak [degrees]
+    void set_base_peak_angle(const double base_peak_angle_);
+
+    /// @brief set vector of acquisitions files for calibration or conversion
+    /// @param file_list
+    void set_calibration_files(const std::vector<std::string> &file_list);
 
     /// @brief  get detector specifications
     std::shared_ptr<MythenDetectorSpecifications>
@@ -149,28 +163,43 @@ class AngleCalibration {
     /**
      * @brief calibrates distance to module center and angle of module center
      * and normal (L and delta) for all modules
+     * @param detector_angles vector of monitor positions for acquisition files
      */
-    void calibrate_coupled_parameters();
+    void
+    calibrate_coupled_parameters(const std::vector<double> &detector_angles);
 
     /**
      * @brief calibrates distance to module center and angle of module center
      * and normal (L and delta) for a specific module
      * @param module_index index of module to be calibrated
+     * @param frames_width_base_peak_overlap frames with base peak overlap for
+     * the module
      */
-    void calibrate_coupled_parameters(const size_t module_index);
+    void calibrate_coupled_parameters(
+        const size_t module_index,
+        const std::vector<MythenFrame> &frames_width_base_peak_overlap);
 
     /**
      * @brief calibrates the angle between center of module and beam (phi) for
      * all modules
+     * @param detector_angles vector of monitor positions for acquisition files
      */
-    void calibrate_offset();
+    void calibrate_offset(const std::vector<double> &detector_angles);
 
     /**
      * @brief calibrates the angle between center of module and beam (phi) for a
      * specific module
      * @param module_index index of module to be calibrated
+     * @param frames_with_base_peak_overlap frames with base peak overlap module
+     * to be calibrated
+     * @param frames_with_base_peak_overlap_prev_module frames with base peak
+     * overlap prev module
      */
-    void calibrate_offset(const size_t module_index);
+    void calibrate_offset(
+        const size_t module_index,
+        const std::vector<MythenFrame> &frames_with_base_peak_overlap,
+        const std::vector<MythenFrame>
+            &frames_with_base_peak_overlap_prev_module);
 
     /**
      * @brief calibrates the BC (best computing) parameters for one module
@@ -185,34 +214,22 @@ class AngleCalibration {
      * @brief calculates the average angle of the base peak center over several
      * acquisitions for a given module index
      * @param module_index index of module to calculate base peak center for
+     * @param frames_with_base_peak_overlap frames with base peak overlap for
+     * the given module index
      * @return average angle of base peak center [degrees]
      */
-    double center_base_peak(const size_t module_index);
+    double center_base_peak(
+        const size_t module_index,
+        const std::vector<MythenFrame> &frames_with_base_peak_overlap);
 
     /** @brief check if base peak ROI is contained within module region
      * @param detector_angle: detector position (offset of first strip from
      * default detector position) [degrees]
-     * @param bounds_in_angle: boundary that is acceptable [degrees]- per
-     * default the base peak ROI width is used (adjustable for debugging) //TODO
-     * deprecated
      * @return true if [base_peak - base_peak_ROI, base_peak + base_peak_ROI]
      * is fully contained within the module region
      */
-    bool base_peak_is_in_module(
-        const size_t module_index, const double detector_angle,
-        std::optional<double> bounds_in_angles = std::nullopt) const;
-
-    /**
-     * @brief set angle of base peak (used for calibration)
-     * @param base_peak_angle_ base peak angle [degrees]
-     */
-    void set_base_peak_angle(const double base_peak_angle_);
-
-    /**
-     * @brief get angle of base peak
-     * @return base peak angle [degrees]
-     */
-    double get_base_peak_angle() const;
+    bool base_peak_is_in_module(const size_t module_index,
+                                const double detector_angle) const;
 
     /**
      * @brief check if a module only has bad channels
@@ -404,16 +421,23 @@ class AngleCalibration {
      * @brief redistributes photon counts to fixed angle width bins around base
      * peak for all acquisitions in file_list and calculates the similarity
      * between the found base peaks regions
+     * @param frames_with_base_peak_overlap vector of frames from acquisitions
+     * for which the base peak ROI is covered by the respective module region
      * @brief plot wrapper for gnuplot plot to visualize calibration process
      * (default nullptr)
      * @return similarity of peaks
      */
     double calculate_similarity_of_peaks_between_acquisitions(
-        const size_t module_index, PlotHandle gp = nullptr);
+        const size_t module_index,
+        const std::vector<MythenFrame> &frames_with_base_peak_overlap,
+        PlotHandle gp = nullptr);
 
-    double
-    calculate_similarity_of_peaks_between_modules(const size_t module_index,
-                                                  PlotHandle gp = nullptr);
+    double calculate_similarity_of_peaks_between_modules(
+        const size_t module_index,
+        const std::vector<MythenFrame> &frames_with_base_peak_overlap_module,
+        const std::vector<MythenFrame>
+            &frames_with_base_peak_overlap_prev_module,
+        PlotHandle gp = nullptr);
 
     /**
      * @brief compares multiple base peak ROIS from different acquisitions and
@@ -434,6 +458,8 @@ class AngleCalibration {
     /**
      * @brief optimizes module center distance L and angle center module normal
      * delta of BC parameters of given module based on chi similarity criterion
+     * @param frames_with_base_peak_overlap vector of frames from acquisitions
+     * for which the base peak ROI is covered by the respective module region
      * @param gp plot wrapper for gnuplot plot to visualize calibration process
      * (default nullptr)
      * @param delta_parameter1 parameter step for parameter module center
@@ -441,23 +467,29 @@ class AngleCalibration {
      * @param delta_parameter2 parameter step for parameter angle between center
      * of module and module normal (delta) (default '1.0e-6')
      */
-    void optimize_coupled_parameters(const size_t module_index,
-                                     PlotHandle gp = nullptr,
-                                     const double delta_parameter1 = 0.5,
-                                     const double delta_parameter2 = 1.0e-6);
+    void optimize_coupled_parameters(
+        const size_t module_index,
+        const std::vector<MythenFrame> &frames_with_base_peak_overlap,
+        PlotHandle gp = nullptr, const double delta_parameter1 = 0.5,
+        const double delta_parameter2 = 1.0e-6);
 
     /**
      * @brief optimizes angle between center of module and beam (\psi) of BC
      * parameters of given module based on chi similarity criterion and center
      * of base peak
+     * @param frames_with_base_peak_overlap vector of frames with base peak
+     * overlap for module
      * @param gp plot wrapper for gnuplot plot to visualize calibration process
      * (default nullptr)
      * @param delta_parameter parameter step for angle between center of module
      * and beam (default '0.005')
      */
-    void optimize_offset_parameter(const size_t module_index,
-                                   PlotHandle gp = nullptr,
-                                   double delta_parameter = 0.005);
+    void optimize_offset_parameter(
+        const size_t module_index,
+        const std::vector<MythenFrame> &frames_with_base_peak_overlap,
+        const std::vector<MythenFrame>
+            &frames_with_base_peak_overlap_prev_module,
+        PlotHandle gp = nullptr, double delta_parameter = 0.005);
 
     /**
      * @brief calculated the flatfield corrected photon counts and the error
@@ -508,11 +540,17 @@ class AngleCalibration {
                                const double center, const double conversion,
                                const double offset);
 
-    void plot_calibration_step_coupled_parameters(const size_t module_index,
-                                                  PlotHandle gp);
+    void plot_calibration_step_coupled_parameters(
+        const size_t module_index,
+        const std::vector<MythenFrame> &frames_with_base_peak_overlap,
+        PlotHandle gp);
 
-    void plot_calibration_step_offset_parameter(const size_t module_index,
-                                                PlotHandle gp);
+    void plot_calibration_step_offset_parameter(
+        const size_t module_index,
+        const std::vector<MythenFrame> &frames_with_base_peak_overlap_module,
+        const std::vector<MythenFrame>
+            &frames_with_base_peak_overlap_prev_module,
+        PlotHandle gp);
 
   private:
     DGParameters DGparameters{};
@@ -648,7 +686,10 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                 frame.incident_intensity, frame.exposure_time);
 
         double inverse_corrected_photon_counts_variance =
-            1.0 / corrected_photon_counts_variance;
+            corrected_photon_counts_variance <
+                    std::numeric_limits<double>::epsilon()
+                ? 0.0
+                : 1.0 / corrected_photon_counts_variance;
 
         double strip_width_angle =
             std::abs(right_strip_boundary_angle -
@@ -664,23 +705,17 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             std::pow(strip_width_angle / histogram_bin_width,
                      2); // Var(aX) = a^2 Var(X)
 
-        if (photon_counts_per_bin == 0.0) {
+        if (photon_counts_per_bin == 0.0 ||
+            inverse_photon_counts_variance_per_bin == 0.0) {
+
             bad_channels(global_strip_index) =
                 true; // mark channel as bad if no
-            //  photon counts after correction
-            // continue;
+            continue;
         }
 
         LOG(TLogLevel::logDEBUG1)
             << fmt::format("corrected photon count for strip {} of module {}",
                            strip_index, module_index);
-
-        /*
-        CorrectedPhotonCountsLogFile.append(
-            fmt::format("{}\n", photon_counts_per_bin));
-        CorrectedPhotonCountsErrorsLogFile.append(
-            fmt::format("{}\n", 1.0 / inverse_photon_counts_variance_per_bin));
-        */
 
         ssize_t left_bin_index_covered_by_strip{};
 
@@ -710,14 +745,6 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                 (right_strip_boundary_angle / histogram_bin_width) - 0.5);
             */
         }
-
-        /*
-        StripAngles.append(fmt::format("{}, {}\n", left_strip_boundary_angle,
-                                       right_strip_boundary_angle));
-        BInBoundariesLogFile.append(
-            fmt::format("{}, {}\n", left_bin_index_covered_by_strip,
-                        right_bin_index_covered_by_strip));
-        */
 
         size_t proper_bin_index =
             0; // the computed bin indices dont start at zero but are relative
@@ -761,9 +788,6 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
 
             double statistical_weight =
                 bin_coverage_factor * inverse_photon_counts_variance_per_bin;
-
-            // StatisticalWeightsLogFile1.append(
-            // fmt::format("{}, {}\n", bin_index, statistical_weight));
 
             fixed_angle_width_bins_photon_counts(proper_bin_index) +=
                 statistical_weight * photon_counts_per_bin;

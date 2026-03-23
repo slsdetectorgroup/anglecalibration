@@ -85,6 +85,9 @@ class MythenFileReader {
 
     virtual MythenFrame
     read_frame(const std::filesystem::path &file_name) = 0; // virtual function
+
+    virtual double read_detector_angle(
+        const std::filesystem::path &file_name) = 0; // virtual function
 };
 
 /**
@@ -166,6 +169,14 @@ class RawMythenFileReader : public MythenFileReader {
         read_detector_angle(acquisition_index, frame.detector_angle);
 
         return frame;
+    }
+
+    double
+    read_detector_angle(const std::filesystem::path &file_name) override {
+        size_t acquisition_index = get_acquisition_index(file_name);
+        double detector_angle{};
+        read_detector_angle(acquisition_index, detector_angle);
+        return detector_angle;
     }
 
   private:
@@ -254,6 +265,29 @@ class EpicsMythenFileReader : public HDF5FileReader, public MythenFileReader {
     ~EpicsMythenFileReader() {
         if (incident_intensities_file.is_open())
             incident_intensities_file.close();
+    }
+
+    /**
+     * @brief read the detector monitor position
+     * @return detector position [degrees]
+     */
+    double
+    read_detector_angle(const std::filesystem::path &file_name) override {
+        if (!std::filesystem::exists(file_name)) {
+            throw std::runtime_error(
+                fmt::format("File {} does not exist\n", file_name.string()));
+        }
+
+        open_file(file_name);
+
+        auto dataset_detector_angle =
+            get_dataset("/entry/instrument/NDAttributes/DetectorAngle");
+
+        double detector_angle{};
+        dataset_detector_angle.read_into_buffer(
+            reinterpret_cast<std::byte *>(&detector_angle));
+
+        return detector_angle;
     }
 
     /**

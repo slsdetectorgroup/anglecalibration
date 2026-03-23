@@ -150,8 +150,8 @@ void plot_module_in_angle_for_all_frames(
         const MythenFrame frame = mythenfilereader.read_frame(file);
 
         if constexpr (only_frames_in_basepeakregion) {
-            if (anglecalibration.base_peak_is_in_module(
-                    module_index, frame.detector_angle, base_peak_boundary)) {
+            if (anglecalibration.base_peak_is_in_module(module_index,
+                                                        frame.detector_angle)) {
 
                 auto fixed_angle_width_bins_photon_counts =
                     anglecalibration
