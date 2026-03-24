@@ -202,14 +202,8 @@ int main() {
     plotter.pause();
 
 #endif
-    /*
-    matplotlibcpp::plot(std::vector<double>{0, 1, 2},
-                        std::vector<double>{1, 2, 3});
-    matplotlibcpp::draw();
-    matplotlibcpp::pause(0.5);
-    */
 
-    anglecalibration.calibrate(filelist, base_peak_angle, 1);
+    anglecalibration.calibrate<true>(filelist, base_peak_angle, 1);
 
     /*
     #ifdef ANGCAL_PLOT

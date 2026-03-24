@@ -38,7 +38,7 @@ include(FetchContent)
 option(ANGCAL_PYTHON_BINDINGS "Build python bindings" OFF)
 option(ANGCAL_TESTS "Build tests" OFF)
 option(ANGCAL_DOCS "Build documentation" OFF)
-option(ANGCAL_PLOT "plot for visualization" OFF)
+option(ANGCAL_PLOT "enable if online plotting during calibration" OFF)
 option(ANGCAL_VERBOSE "print debug info" OFF)
 option(ANGCAL_INSTALL_PYTHONEXT "Install the python extension in the install tree under CMAKE_INSTALL_PREFIX/angle_calibration/" OFF)
 option(ASAN "Enable AddressSanitizer" OFF)
@@ -87,32 +87,29 @@ else()
     endif()
 endif()
 
-if(ANFCAL_PLOT OR ANGCAL_PYTHON_BINDINGS)
-    find_package(Python3 COMPONENTS Development NumPy REQUIRED)
 
-    set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
-    set(PYTHON_INCLUDE_DIR ${Python3_INCLUDE_DIRS})
-    set(PYTHON_LIBRARY ${Python3_LIBRARIES})
+find_package(Python3 COMPONENTS Development NumPy REQUIRED)
 
-    # TODO: need to ensure python version larger than 3.10 for pybind11, maybe add check here?
-    message(STATUS "Found Python3: ${Python3_EXECUTABLE}, include dirs: ${Python3_INCLUDE_DIRS}, libraries: ${Python3_LIBRARIES}")
+set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+set(PYTHON_INCLUDE_DIR ${Python3_INCLUDE_DIRS})
+set(PYTHON_LIBRARY ${Python3_LIBRARIES})
+
+# TODO: need to ensure python version larger than 3.10 for pybind11, maybe add check here?
+message(STATUS "Found Python3: ${Python3_EXECUTABLE}, include dirs: ${Python3_INCLUDE_DIRS}, libraries: ${Python3_LIBRARIES}")
+
+FetchContent_Declare(matplotlib_cpp
+    GIT_REPOSITORY https://github.com/lava/matplotlib-cpp
+    GIT_TAG master)
+FetchContent_MakeAvailable(matplotlib_cpp)
+
+if(TARGET matplotlib_cpp)
+    message(STATUS "Matplotlib_cpp target is available: matplotlib_cpp")
+else()
+    message(FATAL_ERROR "Matplotlib_cpp target was not found!")
 endif()
 
+target_compile_options(matplotlib_cpp INTERFACE -w) # suppress warnings from matplotlibcpp which we cannot fix and which cause a lot of noise
 
-if(ANGCAL_PLOT)
-    FetchContent_Declare(matplotlib_cpp
-        GIT_REPOSITORY https://github.com/lava/matplotlib-cpp
-        GIT_TAG master)
-    FetchContent_MakeAvailable(matplotlib_cpp)
-
-    if(TARGET matplotlib_cpp)
-        message(STATUS "Matplotlib_cpp target is available: matplotlib_cpp")
-    else()
-        message(FATAL_ERROR "Matplotlib_cpp target was not found!")
-    endif()
-
-    target_compile_options(matplotlib_cpp INTERFACE -w) # suppress warnings from matplotlibcpp which we cannot fix and which cause a lot of noise
-endif()
 
 add_library(compiler_flags INTERFACE) #INTERFACE 
 target_compile_features(compiler_flags INTERFACE cxx_std_17)
@@ -213,27 +210,21 @@ set(SourceFiles
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PlotHelper.cpp
 )
 
-#set_source_files_properties(
-   # ${CMAKE_CURRENT_SOURCE_DIR}/src/PlotHelper.cpp
-   # PROPERTIES
-   # COMPILE_OPTIONS "-Wno-deprecated-declarations"
-#) 
-
 add_library(angle_calibration STATIC ${SourceFiles})  
 
 target_include_directories(angle_calibration PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" 
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
-if(ANGCAL_PLOT)
- target_include_directories(angle_calibration SYSTEM PUBLIC 
-            $<BUILD_INTERFACE:${matplotlib_cpp_SOURCE_DIR}>
-        )
-    target_link_libraries(angle_calibration PUBLIC
-        Python3::Python
-        Python3::NumPy
-    )
-endif()
 
+target_include_directories(angle_calibration SYSTEM PUBLIC 
+    $<BUILD_INTERFACE:${matplotlib_cpp_SOURCE_DIR}>
+)
+
+# TODO should also need matplotlib
+target_link_libraries(angle_calibration PUBLIC
+    Python3::Python
+    Python3::NumPy
+)
 
 target_link_libraries(angle_calibration PUBLIC aare_core HDF5::HDF5 PRIVATE compiler_flags) 
 

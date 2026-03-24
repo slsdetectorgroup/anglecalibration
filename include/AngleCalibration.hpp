@@ -18,18 +18,11 @@
 #include "MythenDetectorSpecifications.hpp"
 #include "MythenFileReader.hpp"
 #include "Parameters.hpp"
+#include "PlotHelper.hpp"
 #include "aare/NDArray.hpp"
 #include "helpers/FileInterface.hpp"
 #include "helpers/LogFiles.hpp"
-
-#ifdef ANGCAL_PLOT
-// #include "plot_histogram.hpp"
-#include "PlotHelper.hpp"
-using PlotHandle =
-    std::shared_ptr<angcal::PlotCalibrationProcess>; // Or reference wrapper
-#else
-using PlotHandle = std::nullptr_t;
-#endif
+#include "helpers/custom_errors.hpp"
 
 using namespace aare;
 
@@ -154,12 +147,15 @@ class AngleCalibration {
 
     /**
      * @brief calibrates the BC (best computing) parameters for all modules
+     * @tparam visualize_calibration if true visualize calibration process
+     * (default: false)
      * @param file_list vector of file_names of acquisition files
      * @param base_peak_angle angle of the selcted base peak [degrees]
      * @param output_file optional, if provided the optimized BC parameters are
      * converted back to DG parameters and are appended to the file (given as
      * full file path)
      */
+    template <bool visualize_calibration = false>
     void
     calibrate(const std::vector<std::string> &file_list,
               const double base_peak_angle,
@@ -168,18 +164,24 @@ class AngleCalibration {
     /**
      * @brief calibrates distance to module center and angle of module center
      * and normal (L and delta) for all modules
+     * @tparam visualize_calibration if true visualize calibration process
+     * (default: false)
      * @param detector_angles vector of monitor positions for acquisition files
      */
+    template <bool visualize_calibration = false>
     void
     calibrate_coupled_parameters(const std::vector<double> &detector_angles);
 
     /**
      * @brief calibrates distance to module center and angle of module center
      * and normal (L and delta) for a specific module
+     * @tparam visualize_calibration if true visualize calibration process
+     * (default: false)
      * @param module_index index of module to be calibrated
      * @param frames_width_base_peak_overlap frames with base peak overlap for
      * the module
      */
+    template <bool visualize_calibration = false>
     void calibrate_coupled_parameters(
         const size_t module_index,
         const std::vector<MythenFrame> &frames_width_base_peak_overlap);
@@ -187,19 +189,25 @@ class AngleCalibration {
     /**
      * @brief calibrates the angle between center of module and beam (phi) for
      * all modules
+     * @tparam visualize_calibration if true visualize calibration process
+     * (default: false)
      * @param detector_angles vector of monitor positions for acquisition files
      */
+    template <bool visualize_calibration = false>
     void calibrate_offset(const std::vector<double> &detector_angles);
 
     /**
      * @brief calibrates the angle between center of module and beam (phi) for a
      * specific module
+     * @tparam visualize_calibration if true visualize calibration process
+     * (default: false)
      * @param module_index index of module to be calibrated
      * @param frames_with_base_peak_overlap frames with base peak overlap module
      * to be calibrated
      * @param frames_with_base_peak_overlap_prev_module frames with base peak
      * overlap prev module
      */
+    template <bool visualize_calibration = false>
     void calibrate_offset(
         const size_t module_index,
         const std::vector<MythenFrame> &frames_with_base_peak_overlap,
@@ -208,10 +216,13 @@ class AngleCalibration {
 
     /**
      * @brief calibrates the BC (best computing) parameters for one module
+     * @tparam visualize_calibration if true visualize calibration process
+     * (default: false)
      * @param file_list vector of file_names of acquisition files
      * @param base_peak_angle angle of the selcted base peak given in degrees
      * @param module_index index of module to be calibrated
      */
+    template <bool visualize_calibration = false>
     void calibrate(const std::vector<std::string> &file_list_,
                    const double base_peak_angle_, const size_t module_index);
 
@@ -428,21 +439,21 @@ class AngleCalibration {
      * between the found base peaks regions
      * @param frames_with_base_peak_overlap vector of frames from acquisitions
      * for which the base peak ROI is covered by the respective module region
-     * @brief plot wrapper for gnuplot plot to visualize calibration process
+     * @brief plot wrapper to visualize calibration process
      * (default nullptr)
      * @return similarity of peaks
      */
     double calculate_similarity_of_peaks_between_acquisitions(
         const size_t module_index,
         const std::vector<MythenFrame> &frames_with_base_peak_overlap,
-        PlotHandle plot = nullptr);
+        std::shared_ptr<PlotCalibrationProcess> plot = nullptr);
 
     double calculate_similarity_of_peaks_between_modules(
         const size_t module_index,
         const std::vector<MythenFrame> &frames_with_base_peak_overlap_module,
         const std::vector<MythenFrame>
             &frames_with_base_peak_overlap_prev_module,
-        PlotHandle gp = nullptr);
+        std::shared_ptr<PlotCalibrationProcess> plot = nullptr);
 
     /**
      * @brief compares multiple base peak ROIS from different acquisitions and
@@ -465,7 +476,7 @@ class AngleCalibration {
      * delta of BC parameters of given module based on chi similarity criterion
      * @param frames_with_base_peak_overlap vector of frames from acquisitions
      * for which the base peak ROI is covered by the respective module region
-     * @param gp plot wrapper for gnuplot plot to visualize calibration process
+     * @param plot plot wrapper to visualize calibration process
      * (default nullptr)
      * @param delta_parameter1 parameter step for parameter module center
      * distance L (default '0.5')
@@ -475,7 +486,8 @@ class AngleCalibration {
     void optimize_coupled_parameters(
         const size_t module_index,
         const std::vector<MythenFrame> &frames_with_base_peak_overlap,
-        PlotHandle gp = nullptr, const double delta_parameter1 = 0.5,
+        std::shared_ptr<PlotCalibrationProcess> plot = nullptr,
+        const double delta_parameter1 = 0.5,
         const double delta_parameter2 = 1.0e-6);
 
     /**
@@ -484,7 +496,7 @@ class AngleCalibration {
      * of base peak
      * @param frames_with_base_peak_overlap vector of frames with base peak
      * overlap for module
-     * @param gp plot wrapper for gnuplot plot to visualize calibration process
+     * @param plot plot wrapper to visualize calibration process
      * (default nullptr)
      * @param delta_parameter parameter step for angle between center of module
      * and beam (default '0.005')
@@ -494,7 +506,8 @@ class AngleCalibration {
         const std::vector<MythenFrame> &frames_with_base_peak_overlap,
         const std::vector<MythenFrame>
             &frames_with_base_peak_overlap_prev_module,
-        PlotHandle gp = nullptr, double delta_parameter = 0.005);
+        std::shared_ptr<PlotCalibrationProcess> plot = nullptr,
+        double delta_parameter = 0.005);
 
     /**
      * @brief calculated the flatfield corrected photon counts and the error
@@ -811,6 +824,354 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             sum_statistical_weights(proper_bin_index) += statistical_weight;
         }
     }
+}
+
+template <bool visualize_calibration>
+void AngleCalibration::calibrate_offset(
+    const std::vector<double> &detector_angles) {
+
+    for (size_t module_index = 1; module_index < mythen_detector->max_modules;
+         ++module_index) {
+
+        LOG(TLogLevel::logINFO)
+            << fmt::format("starting calibration for module {} ", module_index);
+
+        const auto t0 = std::chrono::steady_clock::now();
+
+        // skip if module is not connected
+        if (module_is_disconnected(module_index) or
+            module_is_disconnected(module_index - 1)) {
+            LOG(TLogLevel::logINFO)
+                << fmt::format("module {} or module {} is disconnected",
+                               module_index, module_index - 1);
+            continue;
+        }
+
+        std::vector<MythenFrame> frames_with_base_peak_overlap;
+        frames_with_base_peak_overlap.reserve(file_list.size());
+
+        double potential_change_in_diffraction_angle = base_peak_roi_width;
+        for (size_t i = 0; i < detector_angles.size(); ++i) {
+            if (base_peak_is_in_module(
+                    module_index, detector_angles[i] -
+                                      potential_change_in_diffraction_angle) ||
+                base_peak_is_in_module(
+                    module_index, detector_angles[i] +
+                                      potential_change_in_diffraction_angle) ||
+                base_peak_is_in_module(module_index, detector_angles[i])) {
+
+                frames_with_base_peak_overlap.push_back(
+                    mythen_file_reader->read_frame(file_list[i]));
+            }
+        }
+
+        std::vector<MythenFrame> frames_with_base_peak_overlap_prev_module;
+        frames_with_base_peak_overlap_prev_module.reserve(file_list.size());
+
+        for (size_t i = 0; i < detector_angles.size(); ++i) {
+            if (base_peak_is_in_module(
+                    module_index - 1,
+                    detector_angles[i] -
+                        potential_change_in_diffraction_angle) ||
+                base_peak_is_in_module(
+                    module_index - 1,
+                    detector_angles[i] +
+                        potential_change_in_diffraction_angle) ||
+                base_peak_is_in_module(module_index - 1, detector_angles[i])) {
+                frames_with_base_peak_overlap_prev_module.push_back(
+                    mythen_file_reader->read_frame(file_list[i]));
+            }
+        }
+
+        std::shared_ptr<PlotCalibrationProcess> plot = nullptr;
+        if constexpr (visualize_calibration) {
+            std::string plot_title =
+                fmt::format("Base Peaks between modules {} and {} ",
+                            module_index - 1, module_index);
+            plot = std::make_shared<PlotCalibrationProcess>(this, plot_title);
+        }
+
+        try {
+            optimize_offset_parameter(
+                module_index, frames_with_base_peak_overlap,
+                frames_with_base_peak_overlap_prev_module, plot, 1.0e-3);
+        } catch (const NoBasePeakOverLapError &e) {
+            LOG(angcal::TLogLevel::logINFO)
+                << e.what()
+                << fmt::format(" Skipping module {}.", module_index);
+            continue;
+        }
+
+        const auto t1 = std::chrono::steady_clock::now();
+        const auto elapsed_time =
+            std::chrono::duration_cast<std::chrono::seconds>(t1 - t0).count();
+        LOG(TLogLevel::logINFO)
+            << fmt::format("calibration for module {} took {} seconds",
+                           module_index, elapsed_time);
+    }
+}
+
+template <bool visualize_calibration>
+void AngleCalibration::calibrate_offset(
+    const size_t module_index,
+    const std::vector<MythenFrame> &frames_with_base_peak_overlap,
+    const std::vector<MythenFrame> &frames_with_base_peak_overlap_prev_module) {
+
+    if (module_index == 0) {
+        throw std::runtime_error(LOCATION +
+                                 "Module index is zero - offset of module 0 is "
+                                 "fixed to zero and cannot be optimized");
+    }
+
+    // skip if module is not connected
+    if (module_is_disconnected(module_index) or
+        module_is_disconnected(module_index - 1)) {
+        LOG(TLogLevel::logINFO)
+            << fmt::format("module {} or module {} is disconnected",
+                           module_index, module_index - 1);
+        return;
+    }
+
+    std::shared_ptr<PlotCalibrationProcess> plot = nullptr;
+    if constexpr (visualize_calibration) {
+        std::string plot_title =
+            fmt::format("Base Peaks between modules {} and {} ",
+                        module_index - 1, module_index);
+        plot = std::make_shared<PlotCalibrationProcess>(this, plot_title);
+    }
+
+    try {
+        optimize_offset_parameter(module_index, frames_with_base_peak_overlap,
+                                  frames_with_base_peak_overlap_prev_module,
+                                  plot, 1.0e-3);
+    } catch (const NoBasePeakOverLapError &e) {
+        LOG(angcal::TLogLevel::logINFO)
+            << e.what() << fmt::format(" Skipping module {}.", module_index);
+        return;
+    }
+
+    LOG(TLogLevel::logDEBUG)
+        << fmt::format("calibration for module {} finished", module_index);
+}
+
+template <bool visualize_calibration>
+void AngleCalibration::calibrate_coupled_parameters(
+    const std::vector<double> &detector_angles) {
+
+    for (size_t module_index = 0; module_index < mythen_detector->max_modules;
+         ++module_index) {
+
+        LOG(TLogLevel::logINFO)
+            << fmt::format("starting calibration for module {} ", module_index);
+
+        const auto t0 = std::chrono::steady_clock::now();
+
+        std::vector<MythenFrame> frames_with_base_peak_overlap;
+        frames_with_base_peak_overlap.reserve(file_list.size());
+
+        double potential_change_in_diffraction_angle = base_peak_roi_width;
+        for (size_t i = 0; i < detector_angles.size(); ++i) {
+            if (base_peak_is_in_module(
+                    module_index, detector_angles[i] -
+                                      potential_change_in_diffraction_angle) ||
+                base_peak_is_in_module(
+                    module_index, detector_angles[i] +
+                                      potential_change_in_diffraction_angle) ||
+                base_peak_is_in_module(module_index, detector_angles[i])) {
+
+                frames_with_base_peak_overlap.push_back(
+                    mythen_file_reader->read_frame(file_list[i]));
+            }
+        }
+
+        // skip if module is not connected
+        if (!module_is_disconnected(module_index)) {
+
+            std::shared_ptr<PlotCalibrationProcess> plot = nullptr;
+            if constexpr (visualize_calibration) {
+                std::string plot_title =
+                    fmt::format("Base Peaks for module {} ", module_index);
+                plot =
+                    std::make_shared<PlotCalibrationProcess>(this, plot_title);
+            }
+            try {
+                optimize_coupled_parameters(module_index,
+                                            frames_with_base_peak_overlap, plot,
+                                            0.5, 1.0e-6);
+            } catch (const NoBasePeakOverLapError &e) {
+                LOG(angcal::TLogLevel::logINFO)
+                    << e.what()
+                    << fmt::format(" Skipping module {}.", module_index);
+                continue;
+            }
+
+        } else {
+            LOG(TLogLevel::logINFO)
+                << fmt::format("module {} is disconnected", module_index);
+        }
+
+        const auto t1 = std::chrono::steady_clock::now();
+        const auto elapsed_time =
+            std::chrono::duration_cast<std::chrono::seconds>(t1 - t0).count();
+        LOG(TLogLevel::logINFO)
+            << fmt::format("calibration for module {} took {} seconds",
+                           module_index, elapsed_time);
+    }
+}
+
+template <bool visualize_calibration>
+void AngleCalibration::calibrate_coupled_parameters(
+    const size_t module_index,
+    const std::vector<MythenFrame> &frames_with_base_peak_overlap) {
+
+    // skip if module is not connected
+
+    LOG(angcal::TLogLevel::logINFO)
+        << "starting calibration for module " << module_index;
+
+    std::shared_ptr<PlotCalibrationProcess> plot = nullptr;
+    if constexpr (visualize_calibration) {
+        std::string plot_title =
+            fmt::format("Base Peaks for module {} ", module_index);
+        plot = std::make_shared<PlotCalibrationProcess>(this, plot_title);
+    }
+
+    try {
+        optimize_coupled_parameters(module_index, frames_with_base_peak_overlap,
+                                    plot, 0.5, 1.0e-6);
+    } catch (const NoBasePeakOverLapError &e) {
+        LOG(angcal::TLogLevel::logINFO)
+            << e.what() << fmt::format(" Skipping module {}.", module_index);
+        return;
+    }
+
+    LOG(TLogLevel::logDEBUG)
+        << fmt::format("calibration for module {} finished", module_index);
+}
+
+template <bool visualize_calibration>
+void AngleCalibration::calibrate(
+    const std::vector<std::string> &file_list_, const double base_peak_angle_,
+    std::optional<std::filesystem::path> output_file) {
+
+    file_list = file_list_;
+
+    base_peak_angle = base_peak_angle_;
+
+    std::vector<double> detector_angles;
+    detector_angles.reserve(file_list.size());
+    // iterate over all files to get detector angles
+    for (const auto &file : file_list) {
+        double detector_angle =
+            mythen_file_reader->read_detector_angle(file); // TODO: read angle
+        detector_angles.push_back(detector_angle);
+    }
+
+    std::ofstream file;
+    if (output_file.has_value()) {
+        file.open(output_file.value(), std::ios::out | std::ios::app);
+        if (file.tellp() == 0) {
+            file << "module,center,conversion,offset\n"; // only write
+                                                         // header if
+                                                         // file is empty
+        }
+    }
+
+    calibrate_coupled_parameters<visualize_calibration>(detector_angles);
+
+    if (output_file.has_value()) {
+        BCparameters.convert_to_DGParameters(DGparameters);
+        write_DG_parameters_to_file(output_file.value(), DGparameters);
+    }
+
+    calibrate_offset<visualize_calibration>(detector_angles);
+
+    if (output_file.has_value()) {
+        BCparameters.convert_to_DGParameters(DGparameters);
+        write_DG_parameters_to_file(output_file.value(), DGparameters);
+    }
+
+    if (output_file.has_value()) {
+        file.close();
+    }
+}
+
+template <bool visualize_calibration>
+void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
+                                 const double base_peak_angle_,
+                                 const size_t module_index) {
+
+    if (module_is_disconnected(module_index) ||
+        (module_index > 0 && module_is_disconnected(module_index - 1))) {
+        throw std::runtime_error(
+            LOCATION +
+            fmt::format("Module {} or module {} is disconnected - cannot "
+                        "calibrate module {}",
+                        module_index, module_index > 0 ? module_index - 1 : 0,
+                        module_index));
+    }
+    base_peak_angle = base_peak_angle_;
+    file_list = file_list_;
+
+    std::vector<MythenFrame> frames_with_base_peak_overlap;
+    frames_with_base_peak_overlap.reserve(file_list.size());
+
+    // iterate over all files to get detector angles
+    double potential_change_in_diffraction_angle = base_peak_roi_width;
+    for (const auto &file : file_list) {
+        double detector_angle =
+            mythen_file_reader->read_detector_angle(file); // TODO: read angle
+        if (base_peak_is_in_module(module_index,
+                                   detector_angle -
+                                       potential_change_in_diffraction_angle) ||
+            base_peak_is_in_module(module_index,
+                                   detector_angle +
+                                       potential_change_in_diffraction_angle) ||
+            base_peak_is_in_module(module_index, detector_angle)) {
+            frames_with_base_peak_overlap.push_back(
+                mythen_file_reader->read_frame(file));
+        }
+    }
+
+    const auto t0 = std::chrono::steady_clock::now();
+
+    calibrate_coupled_parameters<visualize_calibration>(
+        module_index, frames_with_base_peak_overlap);
+
+    if (module_index > 0) {
+        // iterate over all files to get detector angles
+        std::vector<MythenFrame> frames_with_base_peak_overlap_prev_module;
+        frames_with_base_peak_overlap_prev_module.reserve(file_list.size());
+
+        for (const auto &file : file_list) {
+            double detector_angle = mythen_file_reader->read_detector_angle(
+                file); // TODO: read angle
+            if (base_peak_is_in_module(
+                    module_index - 1,
+                    detector_angle - potential_change_in_diffraction_angle) ||
+                base_peak_is_in_module(
+                    module_index - 1,
+                    detector_angle + potential_change_in_diffraction_angle) ||
+                base_peak_is_in_module(module_index - 1, detector_angle)) {
+                frames_with_base_peak_overlap_prev_module.push_back(
+                    mythen_file_reader->read_frame(file));
+            }
+        }
+
+        calibrate_coupled_parameters<visualize_calibration>(
+            module_index - 1, frames_with_base_peak_overlap_prev_module);
+
+        calibrate_offset<visualize_calibration>(
+            module_index, frames_with_base_peak_overlap,
+            frames_with_base_peak_overlap_prev_module);
+    }
+
+    const auto t1 = std::chrono::steady_clock::now();
+    const auto elapsed_time =
+        std::chrono::duration_cast<std::chrono::seconds>(t1 - t0).count();
+    LOG(TLogLevel::logINFO)
+        << fmt::format("calibration for module {} took {} seconds",
+                       module_index, elapsed_time);
 }
 
 } // namespace angcal
