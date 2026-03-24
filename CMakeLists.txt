@@ -46,7 +46,6 @@ option(ANGCAL_FETCH_HDF5 "Use FetchContent to download hdf5-devel" OFF)
 option(ANGCAL_FETCH_AARE "Use FetchContent to download aare from github" ON)
 option(ANGCAL_FETCH_CATCH "Use FetchContent to download catch2" ON)
 option(ANGCAL_FETCH_PYBIND11 "Use FetchContent to download pybind11" ON)
-option(ANGCAL_FETCH_MATPLOTLIBCPP "Use FetchContent to download matplotlib-cpp" ON)
 option(ANGCAL_FETCH_BOOST "Use FetchContent to download boost-iostreams" OFF)
 
 
@@ -88,32 +87,32 @@ else()
     endif()
 endif()
 
+if(ANFCAL_PLOT OR ANGCAL_PYTHON_BINDINGS)
+    find_package(Python3 COMPONENTS Development NumPy REQUIRED)
+
+    set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+    set(PYTHON_INCLUDE_DIR ${Python3_INCLUDE_DIRS})
+    set(PYTHON_LIBRARY ${Python3_LIBRARIES})
+
+    # TODO: need to ensure python version larger than 3.10 for pybind11, maybe add check here?
+    message(STATUS "Found Python3: ${Python3_EXECUTABLE}, include dirs: ${Python3_INCLUDE_DIRS}, libraries: ${Python3_LIBRARIES}")
+endif()
+
+
 if(ANGCAL_PLOT)
-if(ANGCAL_FETCH_MATPLOTLIBCPP)
-    #set(POSITION_INDEPENDENT_CODE ON) #needed for matplot++ on linux
-    FetchContent_Declare(matplotplusplus
-        GIT_REPOSITORY https://github.com/alandefreitas/matplotplusplus
-        GIT_TAG v1.2.2)
-    FetchContent_MakeAvailable(matplotplusplus)
+    FetchContent_Declare(matplotlib_cpp
+        GIT_REPOSITORY https://github.com/lava/matplotlib-cpp
+        GIT_TAG master)
+    FetchContent_MakeAvailable(matplotlib_cpp)
 
-    # ensure the target is PIC
-    set_target_properties(matplot PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
-    set_target_properties(nodesoup PROPERTIES POSITION_INDEPENDENT_CODE ON) # needed for matplot++ on linux
-
-
-    message(STATUS "matplot++ found via FetchContent")
-    if(TARGET matplot)
-        message(STATUS "Matplot++ target is available: matplot")
+    if(TARGET matplotlib_cpp)
+        message(STATUS "Matplotlib_cpp target is available: matplotlib_cpp")
     else()
-        message(FATAL_ERROR "Matplot++ target was not found!")
+        message(FATAL_ERROR "Matplotlib_cpp target was not found!")
     endif()
-else()
-    find_package(Matplot++ REQUIRED)
-endif()
-endif()
 
-#set(POSITION_INDEPENDENT_CODE OFF) 
+    target_compile_options(matplotlib_cpp INTERFACE -w) # suppress warnings from matplotlibcpp which we cannot fix and which cause a lot of noise
+endif()
 
 add_library(compiler_flags INTERFACE) #INTERFACE 
 target_compile_features(compiler_flags INTERFACE cxx_std_17)
@@ -214,18 +213,29 @@ set(SourceFiles
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PlotHelper.cpp
 )
 
+#set_source_files_properties(
+   # ${CMAKE_CURRENT_SOURCE_DIR}/src/PlotHelper.cpp
+   # PROPERTIES
+   # COMPILE_OPTIONS "-Wno-deprecated-declarations"
+#) 
+
 add_library(angle_calibration STATIC ${SourceFiles})  
 
 target_include_directories(angle_calibration PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" 
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
-target_link_libraries(angle_calibration PUBLIC aare_core HDF5::HDF5 PRIVATE compiler_flags) 
-
-
 if(ANGCAL_PLOT)
-    message("linking target matplotlib")
-    target_link_libraries(angle_calibration PUBLIC matplot)
+ target_include_directories(angle_calibration SYSTEM PUBLIC 
+            $<BUILD_INTERFACE:${matplotlib_cpp_SOURCE_DIR}>
+        )
+    target_link_libraries(angle_calibration PUBLIC
+        Python3::Python
+        Python3::NumPy
+    )
 endif()
+
+
+target_link_libraries(angle_calibration PUBLIC aare_core HDF5::HDF5 PRIVATE compiler_flags) 
 
 get_property(allTargets DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY BUILDSYSTEM_TARGETS)
 message(STATUS "Available targets: ${allTargets}")

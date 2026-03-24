@@ -23,7 +23,7 @@ PlotHelper::PlotHelper(const std::shared_ptr<AngleCalibration> anglecalibration)
 
 PlotCalibrationProcess::PlotCalibrationProcess(
     const AngleCalibration *anglecalibration, const std::string &plot_title)
-    : m_anglecalibration(anglecalibration) {
+    : m_anglecalibration(anglecalibration), m_plot_title(plot_title) {
 
     bin_to_diffraction_angle_base_peak_ROI_only =
         [this](const ssize_t bin_index) {
@@ -32,39 +32,44 @@ PlotCalibrationProcess::PlotCalibrationProcess(
                     m_anglecalibration->get_base_peak_angle());
         };
 
-    m_fig = matplot::figure(true);
-    m_ax = m_fig->current_axes();
-
-    initializeplot(plot_title);
-}
-
-void PlotCalibrationProcess::initializeplot(const std::string &plot_title) {
-    m_ax->xlabel("Diffraction Angle [degree]");
-    m_ax->ylabel("Photon Counts");
-    m_ax->title(plot_title);
-    m_ax->hold(matplot::on); // keep previous curves
-    m_ax->line_width(2);
-    m_fig->size(800, 600);
-}
-
-void PlotCalibrationProcess::add_curve(
-    const NDView<double, 1> &photon_counts_base_peak_ROI) {
-    std::vector<double> bins(photon_counts_base_peak_ROI.size());
+    bins.resize(m_anglecalibration->get_base_peak_ROI_num_bins());
     std::generate(bins.begin(), bins.end(), [this, n = size_t{0}]() mutable {
         return bin_to_diffraction_angle_base_peak_ROI_only(n++);
     });
 
+    if (!Py_IsInitialized()) {
+        Py_Initialize();
+    }
+
+    matplotlibcpp::backend("TkAgg");
+    matplotlibcpp::figure_size(800, 600);
+    matplotlibcpp::ion(); // interactive mode on to update the plot after each
+                          // curve is added
+
+    initializeplot();
+}
+
+inline void PlotCalibrationProcess::initializeplot() {
+    matplotlibcpp::xlabel("Diffraction Angle [degree]");
+    matplotlibcpp::ylabel("Photon Counts");
+    matplotlibcpp::title(m_plot_title);
+}
+
+void PlotCalibrationProcess::add_curve(
+    const NDView<double, 1> &photon_counts_base_peak_ROI) {
+
     std::vector<double> counts(photon_counts_base_peak_ROI.size());
     counts.assign(photon_counts_base_peak_ROI.begin(),
                   photon_counts_base_peak_ROI.end()); // uff need std::span
-    m_ax->plot(bins, counts); // append line to the existing axes
+    matplotlibcpp::plot(bins,
+                        counts); // append line to the existing figure
 }
 
-void PlotCalibrationProcess::show() const {
-    m_ax->draw();
-    std::this_thread::sleep_for(
-        std::chrono::seconds(1)); // give the plot some time to render
-    m_ax->clear();                // clear the axes for the next plot
+void PlotCalibrationProcess::show() {
+    matplotlibcpp::draw();
+    matplotlibcpp::pause(0.5); // allow rendering
+    matplotlibcpp::cla();      // clear the figure for the next plot
+    initializeplot();
 }
 
 /*

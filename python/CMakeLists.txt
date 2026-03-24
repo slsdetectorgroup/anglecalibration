@@ -1,4 +1,3 @@
-find_package (Python 3.10 COMPONENTS Interpreter Development.Module REQUIRED)
 set(PYBIND11_FINDPYTHON ON) # Needed for RH8
 
 # Download or find pybind11 depending on configuration
@@ -18,8 +17,6 @@ pybind11_add_module(
     _angcal           # name of the module
     src/module.cpp  # source file
 )
-
-message("cmake binary directory: ${CMAKE_BINARY_DIR}")
 
 set_target_properties(_angcal PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/angcal 

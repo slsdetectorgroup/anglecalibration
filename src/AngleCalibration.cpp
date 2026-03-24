@@ -73,6 +73,11 @@ void AngleCalibration::set_calibration_files(
     file_list = file_list_;
 }
 
+const std::vector<std::string> &
+AngleCalibration::get_calibration_files() const {
+    return file_list;
+}
+
 std::shared_ptr<MythenDetectorSpecifications>
 AngleCalibration::get_detector_specifications() const {
     return mythen_detector;
@@ -1274,6 +1279,9 @@ void AngleCalibration::calibrate_offset(
         return;
     }
 #endif
+
+    LOG(TLogLevel::logDEBUG)
+        << fmt::format("calibration for module {} finished", module_index);
 }
 
 void AngleCalibration::calibrate_coupled_parameters(
@@ -1389,6 +1397,9 @@ void AngleCalibration::calibrate_coupled_parameters(
         return;
     }
 #endif
+
+    LOG(TLogLevel::logDEBUG)
+        << fmt::format("calibration for module {} finished", module_index);
 }
 
 void AngleCalibration::calibrate(

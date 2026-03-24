@@ -96,6 +96,10 @@ class AngleCalibration {
     /// @param file_list
     void set_calibration_files(const std::vector<std::string> &file_list);
 
+    /// @brief get vector of acquisition files for calibration or conversion
+    /// @return vector of file names
+    const std::vector<std::string> &get_calibration_files() const;
+
     /// @brief  get detector specifications
     std::shared_ptr<MythenDetectorSpecifications>
     get_detector_specifications() const;

@@ -1,6 +1,7 @@
 #pragma once
 #include "aare/NDView.hpp"
-#include "matplot/matplot.h"
+// #include "matplot/matplot.h"
+#include "matplotlibcpp.h"
 
 namespace angcal {
 
@@ -42,18 +43,20 @@ class PlotCalibrationProcess {
 
     ~PlotCalibrationProcess() = default;
 
-    void initializeplot(const std::string &plot_title);
+    inline void initializeplot();
 
     void add_curve(const aare::NDView<double, 1> &photon_counts_base_peak_ROI);
 
-    void show() const;
+    void close() { matplotlibcpp::close(); }
+
+    void show();
 
   private:
     const AngleCalibration *m_anglecalibration;
     std::function<double(const size_t)>
         bin_to_diffraction_angle_base_peak_ROI_only;
-    matplot::figure_handle m_fig;
-    matplot::axes_handle m_ax;
+    const std::string m_plot_title{};
+    std::vector<double> bins{};
 };
 
 } // namespace angcal
