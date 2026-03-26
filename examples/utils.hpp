@@ -1,10 +1,7 @@
 #pragma once
 #include "AngleCalibration.hpp"
-#include "logger.hpp"
-
-#ifdef ANGCAL_PLOT
 #include "PlotHelpers.hpp"
-#endif
+#include "logger.hpp"
 
 using namespace angcal;
 
@@ -30,18 +27,6 @@ get_detector_range(std::shared_ptr<MythenFileReader> mythen_file_reader,
             .detector_angle; // assuming frames are in order
 
     // Files are ordered by angle already
-    /*
-    std::vector<double> detector_angles(file_list.size());
-    int n = 0;
-    std::generate(detector_angles.begin(), detector_angles.end(),
-                  [&mythen_file_reader, &file_list, &n]() mutable {
-                      return mythen_file_reader->read_frame(file_list[n++])
-                          .detector_angle;
-                  });
-
-    auto [min, max] =
-        std::minmax_element(detector_angles.begin(), detector_angles.end());
-    */
 
     return std::make_pair(max_detector_angle, min_detector_angle);
 }
@@ -103,7 +88,6 @@ void get_module_angle_ranges(
     }
 }
 
-#ifdef ANGCAL_PLOT
 /**
  * @brief select base peak by plotting module 0 redistributed to fixed
  * angle-width bins for each frame in filelist with a detector angle between
@@ -115,10 +99,11 @@ void select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
                       const size_t module_index = 0) {
     PlotHelper plotter(anglecalibration);
 
-    std::shared_ptr<Gnuplot> gp = std::make_shared<Gnuplot>();
+    plotter.overwrite_plot();
 
     auto detector_angle_range = std::make_pair(
         6.0, 33.0); // TODO: is this absolute to beam source or relative?
+
     double left_module_strip_angle =
         anglecalibration->diffraction_angle_from_DG_parameters(module_index,
                                                                0.0, 0, -0.5);
@@ -132,32 +117,29 @@ void select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
     for (const auto &file : filelist) {
 
         LOG(TLogLevel::logDEBUG) << fmt::format("reading file {}", file);
-        auto frame = mythen_file_reader->read_frame(file);
+        double detector_angle = mythen_file_reader->read_detector_angle(file);
 
         // -5.0, 5.0 adjust for movement
-        if (frame.detector_angle + left_module_strip_angle - 5.0 >
+        if (detector_angle + left_module_strip_angle - 5.0 >
                 detector_angle_range.first &&
-            frame.detector_angle + left_module_strip_angle + 5.0 <
+            detector_angle + left_module_strip_angle + 5.0 <
                 detector_angle_range.second) {
 
             LOG(TLogLevel::logINFO)
                 << fmt::format("plotting file {} with detector angle {}", file,
-                               frame.detector_angle);
+                               detector_angle);
 
             // plot module
             auto module_redistributed_to_fixed_angle_bins =
-                anglecalibration
-                    ->redistribute_photon_counts_to_fixed_angle_width_bins(
-                        frame,
-                        module_index); // always plots diffraction pattern
-                                       // independant of detector location.
+                anglecalibration->convert(
+                    {file}, module_index); // always plots diffraction pattern
+                                           // independant of detector location.
 
-            plotter.plot_module_redistributed_to_fixed_angle_width_bins(
-                module_index, module_redistributed_to_fixed_angle_bins.view(),
-                frame.detector_angle, gp);
+            plotter.plot_diffraction_pattern(
+                detector_angle, module_redistributed_to_fixed_angle_bins.view(),
+                module_index);
 
             plotter.pause();
         }
     }
 }
-#endif

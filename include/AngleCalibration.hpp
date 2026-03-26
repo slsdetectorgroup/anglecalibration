@@ -18,7 +18,7 @@
 #include "MythenDetectorSpecifications.hpp"
 #include "MythenFileReader.hpp"
 #include "Parameters.hpp"
-#include "PlotHelper.hpp"
+#include "PlotCalibrationProcess.hpp"
 #include "aare/NDArray.hpp"
 #include "helpers/FileInterface.hpp"
 #include "helpers/LogFiles.hpp"
@@ -96,6 +96,12 @@ class AngleCalibration {
     /// @brief  get detector specifications
     std::shared_ptr<MythenDetectorSpecifications>
     get_detector_specifications() const;
+
+    /// @brief get file reader to read mythen acquisition files
+    /// @return shared pointer to MythenFileReader
+    const std::shared_ptr<MythenFileReader> get_file_reader() const {
+        return mythen_file_reader;
+    }
 
     /** @brief reads the historical Detector Group (DG) parameters from file and
      * transforms them to Best Computing parameters
@@ -288,31 +294,17 @@ class AngleCalibration {
      */
     NDArray<double, 1> convert(const std::vector<std::string> &file_list);
 
-    // TODO more useful for debugging
     /**
-     * @brief redistribute photon counts to fixed angle width bins for the
-     * specified module region
-     * @param frame: raw photons from acquisition
-     * @param module_index: index of module region to redistribute
-     * @return flatfield corrected and variance scaled photon counts in the
-     * module region redistributed to fixed angle width bins array covers the
-     * range [min_angle, max_angle]
+     * @brief Performs angular conversion e.g. calculates from raw photon counts
+     * the resulting diffraction pattern
+     * @param file_list vector of file_names of acquisition files
+     * @param module_index index of module
+     * @return flatfield corrected and variance scaled photon counts
+     * redistributed to fixed angle width bins given in the range [min_angle,
+     * max_angle]
      */
-    NDArray<double, 1> redistribute_photon_counts_to_fixed_angle_width_bins(
-        const MythenFrame &frame, const size_t module_index);
-
-    // TODO more useful for debugging
-    /**
-     * @brief redistribute photon counts to fixed angle width bins which are
-     * within base peak region
-     * @param module_index: index of module region to redistribute
-     * @return flatfield corrected and variance scaled photon counts in the base
-     * peak region redistributed to fixed angle width bins array only covers the
-     * base peak region
-     */
-    NDArray<double, 1>
-    redistributed_photon_counts_in_base_peak_ROI(const MythenFrame &frame,
-                                                 const size_t module_index);
+    NDArray<double, 1> convert(const std::vector<std::string> &file_list,
+                               const size_t module_index);
 
     /** @brief calculates diffraction angle from DG module parameters (used in
      * Beer's Law)
@@ -628,8 +620,7 @@ class AngleCalibration {
     /**
      * file reader to read mythen acquisition files
      */
-    std::shared_ptr<MythenFileReader>
-        mythen_file_reader{}; // TODO replace by FileInterface ptr
+    std::shared_ptr<MythenFileReader> mythen_file_reader{};
 };
 
 template <bool base_peak_ROI_only>
@@ -1128,6 +1119,11 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
                                    detector_angle +
                                        potential_change_in_diffraction_angle) ||
             base_peak_is_in_module(module_index, detector_angle)) {
+
+            LOG(TLogLevel::logDEBUG1)
+                << fmt::format("file {} with detector angle {} has base peak "
+                               "overlap with module {}",
+                               file, detector_angle, module_index);
             frames_with_base_peak_overlap.push_back(
                 mythen_file_reader->read_frame(file));
         }

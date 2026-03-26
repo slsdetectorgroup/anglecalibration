@@ -868,176 +868,6 @@ double AngleCalibration::center_base_peak(
 }
 
 /*
-void AngleCalibration::plot_calibration_step_offset_parameter(
-    const size_t module_index,
-    const std::vector<MythenFrame> &frames_with_base_peak_overlap_module,
-    const std::vector<MythenFrame> &frames_with_base_peak_overlap_prev_module,
-    [[maybe_unused]] PlotHandle plot) {
-
-    if (module_index == 0) {
-        throw std::runtime_error(LOCATION +
-                                 "Module index is zero - offset of module 0 is "
-                                 "fixed to zero and cannot be optimized");
-    }
-
-    ssize_t num_bins_in_ROI =
-        2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;
-
-    auto data_file_path =
-        std::filesystem::current_path().parent_path() / "build" / "data";
-    if (!std::filesystem::exists(data_file_path))
-        std::filesystem::create_directories(data_file_path);
-
-#ifdef ANGCAL_PLOT
-    if (plot) {
-        plot->clear();
-        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-#endif
-
-    for (const size_t mod_index : {module_index - 1, module_index}) {
-
-        const auto &frames_with_base_peak_overlap =
-            mod_index == module_index
-                ? frames_with_base_peak_overlap_module
-                : frames_with_base_peak_overlap_prev_module;
-
-        for (const auto &frame : frames_with_base_peak_overlap) {
-
-            if (base_peak_is_in_module(mod_index, frame.detector_angle)) {
-
-                NDArray<double, 1> fixed_angle_width_bins_photon_counts(
-                    std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-                NDArray<double, 1>
-                    fixed_angle_width_bins_photon_counts_variance(
-                        std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-
-                NDArray<double, 1> sum_statistical_weights(
-                    std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-
-                // calculates flatfield normalized photon counts and
-                // photon_count_variance for ROI around base_peak and
-                // redistributes to fixed angle width bins
-                redistribute_photon_counts_to_fixed_angle_width_bins<true>(
-                    mod_index, frame,
-                    fixed_angle_width_bins_photon_counts.view(),
-                    fixed_angle_width_bins_photon_counts_variance.view(),
-                    sum_statistical_weights.view());
-
-                for (ssize_t i = 0;
-                     i < fixed_angle_width_bins_photon_counts.size(); ++i) {
-                    fixed_angle_width_bins_photon_counts(i) =
-                        sum_statistical_weights(i) <
-                                std::numeric_limits<double>::epsilon()
-                            ? 0.0
-                            : fixed_angle_width_bins_photon_counts(i) /
-                                  sum_statistical_weights(i); // y_k
-                }
-
-#ifdef ANGCAL_PLOT
-                if (plot) {
-                    auto bin_to_diffraction_angle_base_peak_ROI_only =
-                        [this](const size_t bin_index) {
-                            return bin_index * this->histogram_bin_width -
-                                   this->base_peak_roi_width +
-                                   this->base_peak_angle;
-                        };
-
-                    std::string filename = fmt::format(
-                        "file_{}_{}_{}_{}.dat", mod_index, module_index,
-                        module_index - 1, frame.detector_angle);
-
-                    auto dataset_name = data_file_path / filename;
-
-                    plot->append_to_plot(
-                        fixed_angle_width_bins_photon_counts.view(),
-                        {0, 2 * static_cast<ssize_t>(base_peak_roi_width /
-                                                     histogram_bin_width) +
-                                1},
-                        bin_to_diffraction_angle_base_peak_ROI_only,
-                        dataset_name);
-                    // plot->pause();
-                }
-
-#endif
-            }
-        }
-    }
-#ifdef ANGCAL_PLOT
-    if (plot) {
-        plot->flush(); // make plot appear
-        // std::this_thread::sleep_for(
-        // std::chrono::milliseconds(10)); // let gnuplot update
-    }
-#endif
-}
-*/
-
-/*
-void AngleCalibration::plot_calibration_step_coupled_parameters(
-    const size_t module_index,
-    const std::vector<MythenFrame> &frames_with_base_peak_overlap,
-    [[maybe_unused]] PlotHandle plot) {
-
-    ssize_t num_bins_in_ROI =
-        2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;
-
-
-    #ifdef ANGCAL_PLOT
-        auto data_file_path =
-            std::filesystem::current_path().parent_path() / "build" / "data";
-        if (!std::filesystem::exists(data_file_path))
-            std::filesystem::create_directories(data_file_path);
-        if (plot) {
-            plot->clear();
-            // std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-    #endif
-
-
-    for (const auto &frame : frames_with_base_peak_overlap) {
-
-        // base peak angle is in module
-        if (base_peak_is_in_module(module_index, frame.detector_angle)) {
-
-            NDArray<double, 1> fixed_angle_width_bins_photon_counts(
-                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-            NDArray<double, 1>
-                inverse_fixed_angle_width_bins_photon_counts_variance(
-                    std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-
-            NDArray<double, 1> sum_statistical_weights(
-                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-
-            // calculates flatfield normalized photon counts and
-            // photon_count_variance for ROI around base_peak and
-            // redistributes to fixed angle width bins
-
-            redistribute_photon_counts_to_fixed_angle_width_bins<true>(
-                module_index, frame,
-                fixed_angle_width_bins_photon_counts.view(),
-                inverse_fixed_angle_width_bins_photon_counts_variance.view(),
-                sum_statistical_weights.view());
-
-            for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.size();
-                 ++i) {
-                fixed_angle_width_bins_photon_counts(i) =
-                    sum_statistical_weights(i) <
-                            std::numeric_limits<double>::epsilon()
-                        ? 0.0
-                        : fixed_angle_width_bins_photon_counts(i) /
-                              sum_statistical_weights(i); // y_k
-            }
-
-            if (plot) {
-                plot->add_curve(fixed_angle_width_bins_photon_counts.view());
-            }
-        }
-    }
-}
-*/
-
-/*
 void AngleCalibration::plot_all_base_peaks([[maybe_unused]] PlotHandle plot) {
     ssize_t num_bins_in_ROI =
         2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;
@@ -1220,11 +1050,12 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
 }
 
 NDArray<double, 1>
-AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
-    const MythenFrame &frame, const size_t module_index) {
+AngleCalibration::convert(const std::vector<std::string> &file_list_,
+                          const size_t module_index) {
+    ssize_t new_num_bins = num_fixed_angle_width_bins();
 
-    ssize_t new_num_bins = num_fixed_angle_width_bins(); // TODO: maybe only use
-                                                         // module region then
+    LOG(TLogLevel::logDEBUG)
+        << fmt::format("num_fixed_angle_width_bins: {}", new_num_bins);
 
     NDArray<double, 1> fixed_angle_width_bins_photon_counts =
         NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
@@ -1235,54 +1066,33 @@ AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     NDArray<double, 1> sum_statistical_weights =
         NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
 
-    redistribute_photon_counts_to_fixed_angle_width_bins<false>(
-        module_index, frame, fixed_angle_width_bins_photon_counts.view(),
-        fixed_angle_width_bins_photon_variance.view(),
-        sum_statistical_weights.view());
-
-    for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.size(); ++i) {
-        fixed_angle_width_bins_photon_counts(i) =
-            sum_statistical_weights(i) < std::numeric_limits<double>::epsilon()
-                ? 0.0
-                : fixed_angle_width_bins_photon_counts(i) /
-                      sum_statistical_weights(i); // y_k
-
-        fixed_angle_width_bins_photon_variance(i) =
-            sum_statistical_weights(i) < std::numeric_limits<double>::epsilon()
-                ? 0.0
-                : fixed_angle_width_bins_photon_variance(i) /
-                      std::pow(sum_statistical_weights(i), 2);
+    if (module_is_disconnected(module_index)) {
+        LOG(TLogLevel::logINFO)
+            << fmt::format("module {} is disconnected", module_index);
+        return fixed_angle_width_bins_photon_counts;
     }
 
-    return fixed_angle_width_bins_photon_counts;
-};
+    for (const auto &file : file_list_) {
 
-NDArray<double, 1>
-AngleCalibration::redistributed_photon_counts_in_base_peak_ROI(
-    const MythenFrame &frame, const size_t module_index) {
+        LOG(TLogLevel::logDEBUG1) << fmt::format(
+            "finished redistributing photon counts for file: {}", file);
 
-    NDArray<double, 1> fixed_angle_width_bins_photon_counts =
-        NDArray<double, 1>(std::array<ssize_t, 1>{get_base_peak_ROI_num_bins()},
-                           0.0);
+        MythenFrame frame = mythen_file_reader->read_frame(file);
 
-    NDArray<double, 1> fixed_angle_width_bins_photon_variance =
-        NDArray<double, 1>(std::array<ssize_t, 1>{get_base_peak_ROI_num_bins()},
-                           0.0);
+        redistribute_photon_counts_to_fixed_angle_width_bins<false>(
+            module_index, frame, fixed_angle_width_bins_photon_counts.view(),
+            fixed_angle_width_bins_photon_variance.view(),
+            sum_statistical_weights.view());
+    }
 
-    NDArray<double, 1> sum_statistical_weights = NDArray<double, 1>(
-        std::array<ssize_t, 1>{get_base_peak_ROI_num_bins()}, 0.0);
-
-    redistribute_photon_counts_to_fixed_angle_width_bins<true>(
-        module_index, frame, fixed_angle_width_bins_photon_counts.view(),
-        fixed_angle_width_bins_photon_variance.view(),
-        sum_statistical_weights.view());
-
+    // divide by statistial weight
     for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.size(); ++i) {
+
         fixed_angle_width_bins_photon_counts(i) =
             sum_statistical_weights(i) < std::numeric_limits<double>::epsilon()
                 ? 0.0
                 : fixed_angle_width_bins_photon_counts(i) /
-                      sum_statistical_weights(i); // y_k
+                      sum_statistical_weights(i);
 
         fixed_angle_width_bins_photon_variance(i) =
             sum_statistical_weights(i) < std::numeric_limits<double>::epsilon()

@@ -1,4 +1,5 @@
 #include "AngleCalibration.hpp"
+#include "PlotHelpers.hpp"
 #include "aare/File.hpp"
 #include "logger.hpp"
 #include "utils.hpp"
@@ -89,12 +90,7 @@ int main() {
 
     anglecalibration.read_bad_channels_from_file(bad_channels_filename);
 
-    /*
-    #ifdef ANGCAL_PLOT
-        plot_photon_counts(anglecalibration.get_bad_channels(),
-                           {0, mythen_detector_ptr->num_strips()}, "Bad
-    channels", std::nullopt); #endif
-    */
+    // plot("Bad Channels", anglecalibration.get_bad_channels());
 
     LOG(TLogLevel::logINFO) << "read bad channels";
 
@@ -119,16 +115,10 @@ int main() {
             anglecalibration.diffraction_angle_from_DG_parameters(23, 0.0, 1279,
                                                                   +0.5));
 
-    // get_module_angle_ranges(mythen_file_reader, filelist, anglecalibration,
-    // mythen_detector_ptr->max_modules());
-
     LOG(TLogLevel::logDEBUG) << "selecting base peak";
 
-#ifdef ANGCAL_PLOT
-    // select_base_peak(std::make_shared<AngleCalibration>(anglecalibration),
-    // mythen_file_reader, filelist, 0);
-    // LOG(TLogLevel::logDEBUG) << "done selecting base peak";
-#endif
+    select_base_peak(std::make_shared<AngleCalibration>(anglecalibration),
+                     mythen_file_reader, filelist, 0);
 
     // take a tabulated peak as base peak
     // or take a base peak for module 0 that is well inside the detector range
@@ -149,61 +139,26 @@ int main() {
 
     // anglecalibration.set_histogram_bin_width(0.01);
 
-    auto test_frame = file_path / (acquisition_fileprefix + "0173.h5");
+    // plot everything redistributed to fixed angle width bins
+    PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
+
+    auto test_frame_name = file_path / (acquisition_fileprefix + "0209.h5");
 
     // plot some stuff
-    MythenFrame frame = mythen_file_reader->read_frame(test_frame);
+    double test_frame_angle =
+        mythen_file_reader->read_detector_angle(test_frame_name);
 
-    // plot everything redistributed to fixed angle width bins
-
-#ifdef ANGCAL_PLOT
-    PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
-#endif
-
-/*
-#ifdef ANGCAL_PLOT
-
-    PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
-
-    auto new_fixed_angle_width_bins_photon_counts =
-        anglecalibration.convert({test_frame});
-
-    plotter.plot_redistributed_photon_counts(
-        new_fixed_angle_width_bins_photon_counts.view());
-
-    plotter.pause();
-#endif
-*/
-
-// plot one module for fixed angle width bins
-#ifdef ANGCAL_PLOT
-    // plot module
-
-    size_t module_index = 0;
-
+    // plot one module for fixed angle width bins
     auto module_redistributed_to_fixed_angle_bins =
-        anglecalibration.redistribute_photon_counts_to_fixed_angle_width_bins(
-            frame, module_index);
+        anglecalibration.convert({test_frame_name}, 1);
 
-    plotter.plot_module_redistributed_to_fixed_angle_width_bins(
-        module_index, module_redistributed_to_fixed_angle_bins.view(),
-        frame.detector_angle);
+    plotter.plot_diffraction_pattern(
+        test_frame_angle, module_redistributed_to_fixed_angle_bins.view(), 1);
 
-    plotter.pause();
-#endif
+    // plot base peak for one module
+    plotter.plot_base_peak(module_redistributed_to_fixed_angle_bins.view());
 
-// plot base peak for one module
-#ifdef ANGCAL_PLOT
-    auto base_peak_for_module =
-        anglecalibration.redistributed_photon_counts_in_base_peak_ROI(
-            frame, module_index);
-    plotter.plot_base_peak_region_of_interest(module_index,
-                                              base_peak_for_module.view());
-    plotter.pause();
-
-#endif
-
-    anglecalibration.calibrate<true>(filelist, base_peak_angle, 1);
+    // anglecalibration.calibrate<true>(filelist, base_peak_angle, 1);
 
     /*
     #ifdef ANGCAL_PLOT

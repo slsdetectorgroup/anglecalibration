@@ -1,4 +1,4 @@
-#include "PlotHelper.hpp"
+#include "PlotCalibrationProcess.hpp"
 #include "AngleCalibration.hpp"
 
 namespace angcal {
