@@ -1,10 +1,13 @@
 #pragma once
 #include "AngleCalibration.hpp"
 #include "matplotlibcpp.h"
+#include <atomic>
 #include <numeric>
+#include <thread>
 
 namespace angcal {
 
+/*
 template <typename T>
 void plot(const std::string &plot_title, const NDView<T, 1> y) {
 
@@ -27,6 +30,7 @@ void plot(const std::string &plot_title, const NDView<T, 1> y) {
 
     // matplotlibcpp::detail::_interpreter::kill();
 }
+*/
 
 class PlotHelper {
 
@@ -196,8 +200,17 @@ PlotHelper::plot_base_peak(const NDView<double, 1> photon_counts,
 
     matplotlibcpp::plot(bins, photon_counts_vec);
     matplotlibcpp::draw();
-    matplotlibcpp::pause(0.05);
-    pause();
+
+    std::atomic<bool> stop_interactive{false};
+    std::thread input_thread([&stop_interactive]() {
+        std::cout << "Press Enter to continue..." << std::endl;
+        std::cin.get();
+        stop_interactive = true;
+    });
+    while (!stop_interactive) {
+        matplotlibcpp::pause(0.05); // allow rendering
+    }
+    input_thread.detach();
 }
 
 // defined in hpp file otherwise random seg faults as singleton _interpreter of
@@ -251,12 +264,18 @@ inline void PlotHelper::plot_diffraction_pattern(
                              photon_counts.begin() + right_bin_boundary);
 
     matplotlibcpp::plot(bins, photon_counts_vec);
-
     matplotlibcpp::draw();
 
-    matplotlibcpp::pause(0.05);
-
-    pause();
+    std::atomic<bool> stop_interactive{false};
+    std::thread input_thread([&stop_interactive]() {
+        std::cout << "Press Enter to continue..." << std::endl;
+        std::cin.get();
+        stop_interactive = true;
+    });
+    while (!stop_interactive) {
+        matplotlibcpp::pause(0.05); // allow rendering
+    }
+    input_thread.detach();
 }
 
 } // namespace angcal

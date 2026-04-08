@@ -24,6 +24,7 @@ set_target_properties(_angcal PROPERTIES
 
 target_link_libraries(_angcal PRIVATE angle_calibration compiler_flags)
 
+target_compile_definitions(angle_calibration PUBLIC ANGCAL_PYTHON)
 
 # List of python files to be copied to the build directory
 set( PYTHON_FILES

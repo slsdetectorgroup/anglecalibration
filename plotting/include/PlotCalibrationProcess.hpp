@@ -1,7 +1,8 @@
 #pragma once
 #include "aare/NDView.hpp"
-// #include "matplot/matplot.h"
 #include "matplotlibcpp.h"
+#include <atomic>
+#include <thread>
 
 namespace angcal {
 
@@ -16,7 +17,9 @@ class PlotCalibrationProcess {
     ~PlotCalibrationProcess() = default;
 
     static void kill_python_interpreter() {
-        // matplotlibcpp::detail::_interpreter::kill();
+#ifndef ANGCAL_PYTHON
+        matplotlibcpp::detail::_interpreter::kill();
+#endif
     }
 
     inline void initializeplot() {
@@ -48,7 +51,20 @@ class PlotCalibrationProcess {
     void close() { matplotlibcpp::close(); }
 
     void show() {
+
         matplotlibcpp::draw();
+        if (first_plot) {
+            std::thread input_thread([this]() {
+                std::cout << "Press Enter to continue..." << std::endl;
+                std::cin.get();
+                stop_interactive = true;
+            });
+            while (!stop_interactive) {
+                matplotlibcpp::pause(0.05); // allow rendering
+            }
+            input_thread.detach();
+        }
+        first_plot = false;
         matplotlibcpp::pause(0.5); // allow rendering
         matplotlibcpp::cla();      // clear the figure for the next plot
         initializeplot();
@@ -60,6 +76,12 @@ class PlotCalibrationProcess {
         bin_to_diffraction_angle_base_peak_ROI_only;
     const std::string m_plot_title{};
     std::vector<double> bins{};
+
+    /// @brief if false, the next plot will overwrite the previous one
+    bool first_plot = true;
+
+    /// @brief flag to signal input thread to stop waiting
+    std::atomic<bool> stop_interactive{false};
 };
 
 } // namespace angcal
