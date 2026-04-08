@@ -3,7 +3,7 @@
 Installation
 ============
 
-To install the Angle Calibration you need to fetch it from GitHub and build it locally on your system. 
+To install the library you need to fetch it from GitHub and build it locally on your system. 
 
 
 .. code-block:: bash 
@@ -11,6 +11,14 @@ To install the Angle Calibration you need to fetch it from GitHub and build it l
     git clone https://github.com/slsdetectorgroup/anglecalibration.git
     cd angle_calibration
 
+To build the library locally following dependencies are required: 
+
+**Dependencies:**
+
+- cmake >= 3.14
+- C++17 compiler (gcc >= 8)
+- python >= 3.10
+- HDF5
 
 To build the library locally follow the instructions below: 
 
@@ -28,17 +36,7 @@ If you want to run an example calibration use:
 
     export ANGCAL_TEST_DATA=/path/to/your_data  
     #in build folder
-    ./run_example
-
-Use with online visualization: 
-------------------------------
-
-If you want to plot and visualize the calibration process build with the following option: 
-
-.. code-block:: bash 
-
-    #in build folder
-    cmake ../ -DANGCAL_PLOT=On
+    ./run_calibration
 
 
 Build and use in your C++ project

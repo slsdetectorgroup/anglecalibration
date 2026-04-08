@@ -11,7 +11,6 @@ Prerequisites
 - C++17 compiler (gcc >= 8)
 - python >= 3.10
 - HDF5
-- (boost-iostreams) 
 
 ### Developement Install
 
@@ -26,6 +25,22 @@ cmake ../
 
 #build (replace 4 with the number of threads you want to use)
 make -j4 
+```
+
+#### Build python binaries 
+
+To build the python module build with option ``-DANGCAL_PYTHON_BINDINGS=ON`` e.g. 
+
+```bash 
+cmake ../ -DANGCAL_PYTHON_BINDINGS=ON
+``` 
+
+**Note:** 
+
+Append the location of your module to your PYTHONPATH such that python can find it during import: 
+
+```bash 
+export PYTHONPATH=path_to_build_folder/build:$PYTHONPATH 
 ```
 
 ### Install to a custom location and use in your project
@@ -69,20 +84,10 @@ Run the example as follows:
 ```bash 
 export ANGCAL_TEST_DATA=/path/to/local/gitea.psi.ch/angcal/VariaMay2025 
 #in build folder
-./run_example
-
+./run_calibration
 ```
 
-If you want to add oline visualizations of the calibration compile with the option `ANGCAL_PLOT`
-Note this requires `boost-iostreams`. 
 
-```bash 
-cd build
-cmake ../ -DANGCAL_PLOT=On
-
-#build (replace 4 with the number of threads you want to use)
-make -j4
-```
 
 
 
