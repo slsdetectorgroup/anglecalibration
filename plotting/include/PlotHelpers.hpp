@@ -79,9 +79,19 @@ class PlotHelper {
         create_plot();
     }
 
+    /**
+     * @brief reuse plot for plotting multiple frames in one figure without
+     * overwriting the previous one
+     */
+    void reuse_plot() {
+        m_overwrite_plot = false;
+        m_reuse_plot = true;
+        create_plot();
+    }
+
     void create_plot() const {
         matplotlibcpp::figure();
-        matplotlibcpp::pause(0.05);
+        // matplotlibcpp::pause(0.05);
     }
 
     void initialize_axis(const std::string &plot_title) const {
@@ -90,11 +100,20 @@ class PlotHelper {
         matplotlibcpp::title(plot_title);
     }
 
-    /*
-    void plot_module_redistributed_to_fixed_angle_width_bins(
-        const std::filesystem::path &file_path,
-        std::optional<size_t> module_index = std::nullopt) const;
-    */
+    void show_plot() const {
+        matplotlibcpp::draw();
+
+        std::atomic<bool> stop_interactive{false};
+        std::thread input_thread([&stop_interactive]() {
+            std::cout << "Press Enter to continue..." << std::endl;
+            std::cin.get();
+            stop_interactive = true;
+        });
+        while (!stop_interactive) {
+            matplotlibcpp::pause(0.05); // allow rendering
+        }
+        input_thread.detach();
+    }
 
     /**  @brief plot diffraction pattern for given photon counts
      * @param motor_position The position of the motor for resulting
@@ -154,6 +173,8 @@ class PlotHelper {
         bin_to_diffraction_angle_base_peak_ROI_only{};
 
     bool m_overwrite_plot = false;
+
+    bool m_reuse_plot = false;
 };
 
 inline void
@@ -168,13 +189,14 @@ PlotHelper::plot_base_peak(const NDView<double, 1> photon_counts,
         plot_title = "Base Peak for all modules";
     }
 
-    if (!m_overwrite_plot) {
+    if (!m_reuse_plot && !m_overwrite_plot) {
         create_plot();
-    } else {
+    }
+
+    if (m_overwrite_plot) {
         matplotlibcpp::cla();
     }
 
-    // matplotlibcpp::figure_size(800, 600);
     initialize_axis(plot_title);
 
     std::vector<double> bins(m_anglecalibration->get_base_peak_ROI_num_bins());
@@ -199,18 +221,11 @@ PlotHelper::plot_base_peak(const NDView<double, 1> photon_counts,
                              photon_counts.begin() + right_boundary_bin);
 
     matplotlibcpp::plot(bins, photon_counts_vec);
-    matplotlibcpp::draw();
 
-    std::atomic<bool> stop_interactive{false};
-    std::thread input_thread([&stop_interactive]() {
-        std::cout << "Press Enter to continue..." << std::endl;
-        std::cin.get();
-        stop_interactive = true;
-    });
-    while (!stop_interactive) {
-        matplotlibcpp::pause(0.05); // allow rendering
+    if (!m_reuse_plot) {
+        std::cout << "showing plot for base peak" << std::endl;
+        show_plot();
     }
-    input_thread.detach();
 }
 
 // defined in hpp file otherwise random seg faults as singleton _interpreter of
@@ -234,9 +249,11 @@ inline void PlotHelper::plot_diffraction_pattern(
         plot_title = "Diffraction Pattern";
     }
 
-    if (!m_overwrite_plot) {
+    if (!m_overwrite_plot && !m_reuse_plot) {
         create_plot();
-    } else {
+    }
+
+    if (m_overwrite_plot) {
         matplotlibcpp::cla();
     }
 
@@ -264,18 +281,10 @@ inline void PlotHelper::plot_diffraction_pattern(
                              photon_counts.begin() + right_bin_boundary);
 
     matplotlibcpp::plot(bins, photon_counts_vec);
-    matplotlibcpp::draw();
 
-    std::atomic<bool> stop_interactive{false};
-    std::thread input_thread([&stop_interactive]() {
-        std::cout << "Press Enter to continue..." << std::endl;
-        std::cin.get();
-        stop_interactive = true;
-    });
-    while (!stop_interactive) {
-        matplotlibcpp::pause(0.05); // allow rendering
+    if (!m_reuse_plot) {
+        show_plot();
     }
-    input_thread.detach();
 }
 
 } // namespace angcal

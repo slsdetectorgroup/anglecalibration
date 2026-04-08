@@ -1,6 +1,7 @@
 #include "AngleCalibration.hpp"
 #include "PlotHelpers.hpp"
 #include "aare/File.hpp"
+#include "additional_plots.hpp"
 #include "logger.hpp"
 #include "utils.hpp"
 #include <filesystem>
@@ -118,7 +119,7 @@ int main() {
     LOG(TLogLevel::logDEBUG) << "selecting base peak";
 
     // select_base_peak(std::make_shared<AngleCalibration>(anglecalibration),
-    // mythen_file_reader, filelist, 0);
+    //                  mythen_file_reader, filelist, 0);
 
     // take a tabulated peak as base peak
     // or take a base peak for module 0 that is well inside the detector range
@@ -158,27 +159,28 @@ int main() {
     // plot base peak for one module
     plotter.plot_base_peak(module_redistributed_to_fixed_angle_bins.view());
 
-    anglecalibration.calibrate<true>(filelist, base_peak_angle, 1);
+    // anglecalibration.calibrate<true>(filelist, base_peak_angle, 1);
 
     /*
-    #ifdef ANGCAL_PLOT
-        anglecalibration.set_base_peak_angle(base_peak_angle);
-        anglecalibration.set_calibration_files(filelist);
-        anglecalibration.read_initial_calibration_from_file(output_filename);
-        std::string plot_title = fmt::format("Overlaping Base Peaks");
-        auto plot = std::make_shared<PlotCalibrationProcess>(plot_title);
+    anglecalibration.calibrate<false>(filelist, base_peak_angle);
 
-        anglecalibration.plot_all_base_peaks(plot);
-    #endif
-    */
-
-    // anglecalibration.calibrate<true>(filelist, base_peak_angle);
-
-    /*
     auto bcparameters = anglecalibration.get_BCparameters();
     auto dgparameters = anglecalibration.get_DGparameters();
     bcparameters.convert_to_DGParameters(dgparameters);
 
     anglecalibration.write_DG_parameters_to_file(output_filename, dgparameters);
+    */
+
+    /*
+    auto calibrated_angles_filename =
+        file_path / "angcal_Jul2025_P12_0p0105_new_calibrated.off";
+
+    anglecalibration.read_initial_calibration_from_file(
+        calibrated_angles_filename);
+
+    anglecalibration.set_base_peak_angle(22.068);
+
+    plot_all_base_peaks(std::make_shared<AngleCalibration>(anglecalibration),
+                        mythen_file_reader, filelist);
     */
 }
