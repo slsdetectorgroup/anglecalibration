@@ -66,7 +66,13 @@ else()
     list(APPEND CMAKE_PREFIX_PATH ${AARE_INSTALL_PATH}) 
     message(STATUS "looking for aare in: ${CMAKE_PREFIX_PATH}")
     find_package(aare REQUIRED) 
-    message(STATUS "found aare: ${AARE_INCLUDE_DIRS}")
+
+    if(TARGET aare_core)
+        message(STATUS "found aare_core target")
+    else()
+        message(FATAL_ERROR "aare_core target was not found!")
+    endif()
+    #message(STATUS "found aare: ${AARE_INCLUDE_DIRS}")
 
 endif()
 
@@ -232,6 +238,7 @@ if(ANGCAL_VERBOSE)
 else()
     target_compile_definitions(angle_calibration PUBLIC ANGCAL_LOG_LEVEL=angcal::logINFO)
 endif()
+
 
 set_target_properties(angle_calibration PROPERTIES
     PUBLIC_HEADER "${PUBLICHEADERS}" 

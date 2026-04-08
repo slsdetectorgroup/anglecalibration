@@ -117,8 +117,8 @@ int main() {
 
     LOG(TLogLevel::logDEBUG) << "selecting base peak";
 
-    select_base_peak(std::make_shared<AngleCalibration>(anglecalibration),
-                     mythen_file_reader, filelist, 0);
+    // select_base_peak(std::make_shared<AngleCalibration>(anglecalibration),
+    // mythen_file_reader, filelist, 0);
 
     // take a tabulated peak as base peak
     // or take a base peak for module 0 that is well inside the detector range
@@ -153,12 +153,12 @@ int main() {
         anglecalibration.convert({test_frame_name}, 1);
 
     plotter.plot_diffraction_pattern(
-        test_frame_angle, module_redistributed_to_fixed_angle_bins.view(), 1);
+        module_redistributed_to_fixed_angle_bins.view(), 1, test_frame_angle);
 
     // plot base peak for one module
     plotter.plot_base_peak(module_redistributed_to_fixed_angle_bins.view());
 
-    // anglecalibration.calibrate<true>(filelist, base_peak_angle, 1);
+    anglecalibration.calibrate<true>(filelist, base_peak_angle, 1);
 
     /*
     #ifdef ANGCAL_PLOT
@@ -172,9 +172,9 @@ int main() {
     #endif
     */
 
-    /*
-    anglecalibration.calibrate(filelist, base_peak_angle);
+    // anglecalibration.calibrate<true>(filelist, base_peak_angle);
 
+    /*
     auto bcparameters = anglecalibration.get_BCparameters();
     auto dgparameters = anglecalibration.get_DGparameters();
     bcparameters.convert_to_DGParameters(dgparameters);

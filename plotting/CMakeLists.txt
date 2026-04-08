@@ -35,9 +35,12 @@ endif()
 
 target_compile_options(matplotlib_cpp INTERFACE -w) # suppress warnings from matplotlibcpp which we cannot fix and which cause a lot of noise
 
+
+# need to copy the arrays - otherwise leads to segfaults - maybe because instructions are reordered and the original arrays are destroyed before the plotting is done?
+target_compile_definitions(angle_calibration PUBLIC WITHOUT_NUMPY)
+
 target_sources(angle_calibration PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PlotCalibrationProcess.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/PlotHelpers.cpp
 )
 
 target_include_directories(angle_calibration

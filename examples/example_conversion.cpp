@@ -59,12 +59,6 @@ int main() {
 
     LOG(TLogLevel::logINFO) << "read bad channels";
 
-#ifdef ANGCAL_PLOT
-    plot_photon_counts(anglecalibration.get_bad_channels(),
-                       {0, mythen_detector_ptr->num_strips()}, "Bad channels",
-                       std::nullopt);
-#endif
-
     std::vector<std::string> file_list(4);
     std::generate(file_list.begin(), file_list.end(),
                   [n = 60, &file_path]() mutable {
@@ -80,31 +74,8 @@ int main() {
     auto redistributed_photon_counts = anglecalibration.convert(
         file_list); // redistributes and applies pixel wise correction
 
-    LOG(TLogLevel::logDEBUG) << "redistributed photon counts shape: "
-                             << redistributed_photon_counts.shape()[0];
-
-    LOG(TLogLevel::logDEBUG) << "num fixed angle bins: "
-                             << anglecalibration.num_fixed_angle_width_bins();
-
-#ifdef ANGCAL_PLOT
-    MythenFrame frame =
-        mythen_file_reader->read_frame(file_path / "Fructose_0p2_60_0060.h5");
-
-    auto photon_counts = frame.photon_counts();
-
-    plot_photon_counts(frame.photon_counts(),
-                       {0, mythen_detector_ptr->num_strips()},
-                       "Raw Photon Counts", mythen_detector_ptr);
-#endif
-
     // plot
-#ifdef ANGCAL_PLOT
-
     PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
 
-    plotter.plot_redistributed_photon_counts(
-        redistributed_photon_counts.view());
-
-    plotter.pause();
-#endif
+    plotter.plot_diffraction_pattern(redistributed_photon_counts.view());
 }

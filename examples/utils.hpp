@@ -136,10 +136,8 @@ void select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
                                            // independant of detector location.
 
             plotter.plot_diffraction_pattern(
-                detector_angle, module_redistributed_to_fixed_angle_bins.view(),
-                module_index);
-
-            plotter.pause();
+                module_redistributed_to_fixed_angle_bins.view(), module_index,
+                detector_angle);
         }
     }
 }

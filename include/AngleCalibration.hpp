@@ -880,6 +880,7 @@ void AngleCalibration::calibrate_offset(
                 fmt::format("Base Peaks between modules {} and {} ",
                             module_index - 1, module_index);
             plot = std::make_shared<PlotCalibrationProcess>(this, plot_title);
+            plot->initializematplotlib();
         }
 
         try {
@@ -929,6 +930,7 @@ void AngleCalibration::calibrate_offset(
             fmt::format("Base Peaks between modules {} and {} ",
                         module_index - 1, module_index);
         plot = std::make_shared<PlotCalibrationProcess>(this, plot_title);
+        plot->initializematplotlib();
     }
 
     try {
@@ -984,6 +986,8 @@ void AngleCalibration::calibrate_coupled_parameters(
                     fmt::format("Base Peaks for module {} ", module_index);
                 plot =
                     std::make_shared<PlotCalibrationProcess>(this, plot_title);
+
+                plot->initializematplotlib();
             }
             try {
                 optimize_coupled_parameters(module_index,
@@ -1025,6 +1029,8 @@ void AngleCalibration::calibrate_coupled_parameters(
         std::string plot_title =
             fmt::format("Base Peaks for module {} ", module_index);
         plot = std::make_shared<PlotCalibrationProcess>(this, plot_title);
+
+        plot->initializematplotlib();
     }
 
     try {
@@ -1085,6 +1091,8 @@ void AngleCalibration::calibrate(
     if (output_file.has_value()) {
         file.close();
     }
+
+    PlotCalibrationProcess::kill_python_interpreter();
 }
 
 template <bool visualize_calibration>
@@ -1168,6 +1176,8 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
     LOG(TLogLevel::logINFO)
         << fmt::format("calibration for module {} took {} seconds",
                        module_index, elapsed_time);
+
+    PlotCalibrationProcess::kill_python_interpreter();
 }
 
 } // namespace angcal

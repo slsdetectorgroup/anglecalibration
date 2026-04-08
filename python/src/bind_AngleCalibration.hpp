@@ -42,6 +42,12 @@ void define_AngleCalibration_binding(py::module &m) {
                       e.g. [base_peak - base_peak_ROI_width, base_peak + base_peak_ROI_width] given in angles
                       default: '0.05°')")
 
+        .def_property_readonly("base_peak_ROI_num_bins",
+                               &AngleCalibration::get_base_peak_ROI_num_bins,
+                               R"(
+                             number of bins covered by base peak region of interest
+                             default: '101' bins)")
+
         .def_property_readonly(
             "num_fixed_angle_width_bins",
             &AngleCalibration::num_fixed_angle_width_bins,
@@ -169,6 +175,15 @@ void define_AngleCalibration_binding(py::module &m) {
             )")
 
         .def_property_readonly(
+            "MythenDetectorSpecifications",
+            [](AngleCalibration &self) {
+                return self.get_detector_specifications();
+            },
+            R"(
+            MythenDetectorSpecifications storing all mythen specific parameters
+            )")
+
+        .def_property_readonly(
             "BCparameters",
             [](AngleCalibration &self) { return self.get_BCparameters(); },
             R"(
@@ -203,14 +218,52 @@ void define_AngleCalibration_binding(py::module &m) {
             )")
 
         .def(
+            "diffraction_angle_from_DG_parameters",
+            [](AngleCalibration &self, const size_t module_index,
+               const double detector_angle, const size_t strip_index,
+               const double distance_to_strip) {
+                return self.diffraction_angle_from_DG_parameters(
+                    module_index, detector_angle, strip_index,
+                    distance_to_strip);
+            },
+            py::arg("module_index"), py::arg("detector_angle"),
+            py::arg("strip_index"), py::arg("distance_to_strip"),
+            R"(
+            calculates diffraction angle from DG parameters for given strip
+
+            Parameters
+            ----------
+            module_index : int
+                index of module
+            detector_angle : double
+                detector position, measured as the offset of the first strip from the default detector position [degrees]
+            strip_index : int
+                index of strip in module
+            distance_to_strip : double
+                distance to strip [given in strips]
+
+            Returns
+            -------
+            double
+                diffraction angle for given strip [degrees]
+            )")
+
+        .def(
             "calibrate",
             [](AngleCalibration &self,
                const std::vector<std::string> &file_list,
-               const double base_peak_angle, const size_t module_index) {
-                self.calibrate(file_list, base_peak_angle, module_index);
+               const double base_peak_angle, const size_t module_index,
+               const bool plot_calibration_process = false) {
+                if (plot_calibration_process) {
+                    self.calibrate<true>(file_list, base_peak_angle,
+                                         module_index);
+                } else {
+                    self.calibrate(file_list, base_peak_angle, module_index);
+                }
             },
             py::arg("file_list"), py::arg("base_peak_angle"),
             py::arg("module_index"),
+            py::arg("plot_calibration_process") = false,
             R"(
             calibrates BC parameters for respective module
 
@@ -220,6 +273,8 @@ void define_AngleCalibration_binding(py::module &m) {
                 Angle of base peak center [degree].
             module_index: int
                 Index of module
+            plot_calibration_process: bool, default: false
+                Whether to plot the calibration process 
             )")
 
         .def(
@@ -227,11 +282,18 @@ void define_AngleCalibration_binding(py::module &m) {
             [](AngleCalibration &self,
                const std::vector<std::string> &file_list,
                const double base_peak_angle,
-               std::optional<std::string> output_filename = std::nullopt) {
-                self.calibrate(file_list, base_peak_angle, output_filename);
+               std::optional<std::string> output_filename = std::nullopt,
+               const bool plot_calibration_process = false) {
+                if (plot_calibration_process) {
+                    self.calibrate<true>(file_list, base_peak_angle,
+                                         output_filename);
+                } else {
+                    self.calibrate(file_list, base_peak_angle, output_filename);
+                }
             },
             py::arg("file_list"), py::arg("base_peak_angle"),
             py::arg("output_filename"),
+            py::arg("plot_calibration_process") = false,
             R"(
             calibrates BC parameters for all modules
             
@@ -240,6 +302,9 @@ void define_AngleCalibration_binding(py::module &m) {
             base_peak_angle : double
                 angle of base peak center [degree]
             output_filename : str, optional 
+                if given, writes calibrated DG parameters to file with given name
+            plot_calibration_process: bool, default: false
+                Whether to plot the calibration process
             )")
 
         .def(
@@ -258,6 +323,31 @@ void define_AngleCalibration_binding(py::module &m) {
 
             file_list: list 
                 list of paths to acquisition files
+
+            Returns
+            -------
+            numpy.ndarray (,num_fixed_angle_width_bins)
+                photon counts redistributed to fixed angle width bins, flatfield corrected and variance scaled photon counts)")
+
+        .def(
+            "convert",
+            [](AngleCalibration &self,
+               const std::vector<std::string> &file_list,
+               const size_t module_index) {
+                auto result = new NDArray<double, 1>(
+                    self.convert(file_list, module_index));
+                return return_image_data(result);
+            },
+            py::arg("file_list"), py::arg("module_index"),
+            R"(
+            performs angular conversion for specific module e.g. calculates diffraction pattern from raw photon counts  
+
+            Parameters
+            ----------
+            file_list: list 
+                list of paths to acquisition files
+            module_index: int
+                index of module
 
             Returns
             -------

@@ -23,7 +23,9 @@ void plot(const std::string &plot_title, const NDView<T, 1> y) {
 
     matplotlibcpp::plot(bins, y_vec);
 
-    matplotlibcpp::show(false);
+    matplotlibcpp::show();
+
+    // matplotlibcpp::detail::_interpreter::kill();
 }
 
 class PlotHelper {
@@ -33,21 +35,56 @@ class PlotHelper {
      * @brief constructor for PlotHelper class
      * @param anglecalibration
      */
-    PlotHelper(std::shared_ptr<AngleCalibration> anglecalibration);
+    PlotHelper(std::shared_ptr<AngleCalibration> anglecalibration)
+        : m_anglecalibration(anglecalibration) {
+        bin_to_diffraction_angle = [this](const size_t bin_index) {
+            return bin_index * m_anglecalibration->get_histogram_bin_width() +
+                   m_anglecalibration->get_angular_range()
+                       .first; // m_min_angle;
+        };
 
-    ~PlotHelper();
+        bin_to_diffraction_angle_base_peak_ROI_only =
+            [this](const ssize_t bin_index) {
+                return (bin_index *
+                            m_anglecalibration->get_histogram_bin_width() -
+                        m_anglecalibration->get_base_peak_ROI_width() +
+                        m_anglecalibration->get_base_peak_angle());
+            };
+
+        // matplotlibcpp::backend("TkAgg");
+        matplotlibcpp::ion();
+    };
+
+    ~PlotHelper() {
+        // TODO: not good if used in local scope - should be a static function
+        // !!
+        matplotlibcpp::detail::_interpreter::kill();
+    }
 
     /// @brief pause the program until user input, e.g. before destroying all
     /// plots
-    static void pause();
+    static void pause() {
+        std::cout << "Press Enter to continue..." << std::endl;
+        std::cin.get();
+    }
 
     /// @brief overwrite plot for plotting multiple frames
     /// in one figure
-    void overwrite_plot();
+    void overwrite_plot() {
+        m_overwrite_plot = true;
+        create_plot();
+    }
 
-    void create_plot() const;
+    void create_plot() const {
+        matplotlibcpp::figure();
+        matplotlibcpp::pause(0.05);
+    }
 
-    void initialize_axis(const std::string &plot_title) const;
+    void initialize_axis(const std::string &plot_title) const {
+        matplotlibcpp::xlabel("Diffraction Angle [degree]");
+        matplotlibcpp::ylabel("Photon Counts");
+        matplotlibcpp::title(plot_title);
+    }
 
     /*
     void plot_module_redistributed_to_fixed_angle_width_bins(
@@ -63,8 +100,9 @@ class PlotHelper {
      * module region
      */
     void plot_diffraction_pattern(
-        const double motor_position, const NDView<double, 1> &photon_counts,
-        std::optional<size_t> module_index = std::nullopt) const;
+        const NDView<double, 1> &photon_counts,
+        std::optional<size_t> module_index = std::nullopt,
+        std::optional<double> motor_position = std::nullopt) const;
 
     /**
      * @brief plot base peak for given photon counts
@@ -113,5 +151,112 @@ class PlotHelper {
 
     bool m_overwrite_plot = false;
 };
+
+inline void
+PlotHelper::plot_base_peak(const NDView<double, 1> photon_counts,
+                           const std::optional<size_t> module_index) const {
+
+    std::string plot_title{};
+    if (module_index.has_value()) {
+        plot_title =
+            fmt::format("Base Peak for module {}", module_index.value());
+    } else {
+        plot_title = "Base Peak for all modules";
+    }
+
+    if (!m_overwrite_plot) {
+        create_plot();
+    } else {
+        matplotlibcpp::cla();
+    }
+
+    // matplotlibcpp::figure_size(800, 600);
+    initialize_axis(plot_title);
+
+    std::vector<double> bins(m_anglecalibration->get_base_peak_ROI_num_bins());
+
+    std::generate(bins.begin(), bins.end(), [this, n = size_t{0}]() mutable {
+        return bin_to_diffraction_angle_base_peak_ROI_only(n++);
+    });
+
+    size_t left_boundary_bin = (m_anglecalibration->get_base_peak_angle() -
+                                m_anglecalibration->get_base_peak_ROI_width() -
+                                m_anglecalibration->get_angular_range().first) /
+                               m_anglecalibration->get_histogram_bin_width();
+    size_t right_boundary_bin =
+        (m_anglecalibration->get_base_peak_angle() +
+         m_anglecalibration->get_base_peak_ROI_width() -
+         m_anglecalibration->get_angular_range().first) /
+            m_anglecalibration->get_histogram_bin_width() +
+        1;
+
+    std::vector<double> photon_counts_vec;
+    photon_counts_vec.assign(photon_counts.begin() + left_boundary_bin,
+                             photon_counts.begin() + right_boundary_bin);
+
+    matplotlibcpp::plot(bins, photon_counts_vec);
+    matplotlibcpp::draw();
+    matplotlibcpp::pause(0.05);
+    pause();
+}
+
+// defined in hpp file otherwise random seg faults as singleton _interpreter of
+// matplotlibcpp is not properly initialized - not sure why
+inline void PlotHelper::plot_diffraction_pattern(
+    const NDView<double, 1> &photon_counts, std::optional<size_t> module_index,
+    std::optional<double> motor_position) const {
+
+    std::string plot_title{};
+
+    if (module_index.has_value() && !motor_position.has_value()) {
+        throw std::invalid_argument(
+            "If module_index is given, motor_position must also be given for "
+            "plotting diffraction pattern of specific module region");
+    }
+
+    if (module_index.has_value()) {
+        plot_title = fmt::format("Diffraction Pattern for module {}",
+                                 module_index.value());
+    } else {
+        plot_title = "Diffraction Pattern";
+    }
+
+    if (!m_overwrite_plot) {
+        create_plot();
+    } else {
+        matplotlibcpp::cla();
+    }
+
+    initialize_axis(plot_title);
+
+    size_t left_bin_boundary = 0;
+    size_t right_bin_boundary = photon_counts.size();
+    if (module_index.has_value() &&
+        (photon_counts.size() ==
+         m_anglecalibration->num_fixed_angle_width_bins())) {
+        left_bin_boundary = left_module_boundary_as_fixed_angle_bin_index(
+            module_index.value(), motor_position.value());
+        right_bin_boundary = right_module_boundary_as_fixed_angle_bin_index(
+            module_index.value(), motor_position.value());
+    }
+
+    std::vector<double> bins(right_bin_boundary - left_bin_boundary);
+    std::generate(bins.begin(), bins.end(),
+                  [this, n = left_bin_boundary]() mutable {
+                      return bin_to_diffraction_angle(n++);
+                  });
+
+    std::vector<double> photon_counts_vec;
+    photon_counts_vec.assign(photon_counts.begin() + left_bin_boundary,
+                             photon_counts.begin() + right_bin_boundary);
+
+    matplotlibcpp::plot(bins, photon_counts_vec);
+
+    matplotlibcpp::draw();
+
+    matplotlibcpp::pause(0.05);
+
+    pause();
+}
 
 } // namespace angcal

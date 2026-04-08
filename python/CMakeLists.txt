@@ -28,6 +28,8 @@ target_link_libraries(_angcal PRIVATE angle_calibration compiler_flags)
 # List of python files to be copied to the build directory
 set( PYTHON_FILES
     angcal/__init__.py
+    angcal/PlotHelper.py
+    angcal/utils.py
 )
 
 # Copy the python files to the build directory

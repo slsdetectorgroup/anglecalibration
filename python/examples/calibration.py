@@ -1,5 +1,5 @@
 
-from angcal import MythenDetectorSpecifications, FlatField, AngleCalibration, EpicsMythenFileReader, MythenFrame
+from angcal import MythenDetectorSpecifications, FlatField, AngleCalibration, EpicsMythenFileReader, MythenFrame, PlotHelper, select_base_peak
 
 from pathlib import Path
 import os
@@ -12,7 +12,6 @@ def env_data_path():
         raise RuntimeError("Environment variable ANGCAL_TEST_DATA is not set or is empty")
 
     return Path(env_value)
-
 
 
 def plot(array : np.array, x=None): 
@@ -65,13 +64,31 @@ anglecalibration.scale_factor = scale_factor
 
 print("scale Factor: " ,anglecalibration.scale_factor)
 
+# click through frames to select base peak for calibration
+# select_base_peak(anglecalibration, mythenfilereader, file_list, module_index=0)
+
 anglecalibration.histogram_bin_width = 0.0036  # in degrees (dfeault value) 
 
 anglecalibration.base_peak_ROI_width = 0.18 # in degrees width of base peak ROI 
 
-base_peak_angle = 19.0678
+anglecalibration.base_peak_angle = 19.0678
 
-anglecalibration.calibrate(file_list, base_peak_angle, module_index = 1) 
+
+plotter = PlotHelper(anglecalibration)
+
+test_frame_name = str(env_data_path() / (file_prefix + "0209.h5"))
+
+test_frame_angle = mythenfilereader.read_detector_angle(test_frame_name)
+
+# plot one module for fixed angle width bins
+module_redistributed_to_fixed_angle_bins = anglecalibration.convert([test_frame_name], 1)
+
+plotter.plot_diffraction_pattern(module_redistributed_to_fixed_angle_bins.view(), 1, test_frame_angle)
+
+# plot base peak for one module
+plotter.plot_base_peak(module_redistributed_to_fixed_angle_bins.view())
+
+anglecalibration.calibrate(file_list, anglecalibration.base_peak_angle, module_index = 1, plot_calibration_process=True) 
 #anglecalibration.calibrate(file_list, base_peak_angle, output_filename=str(env_data_path() / "angcal_Jul2025_P12_0p0105_new_calibrated2.off"))
 
 print("calibration is done")

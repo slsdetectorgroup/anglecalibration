@@ -1,5 +1,6 @@
 
 from angcal import MythenDetectorSpecifications, FlatField, AngleCalibration, EpicsMythenFileReader, MythenFrame
+from angcal import PlotHelper
 
 from pathlib import Path
 import os
@@ -74,8 +75,6 @@ print("scale Factor: " ,anglecalibration.scale_factor)
 
 file_list = [str(data_path() / f"Fructose_0p2_60_006{i}.h5") for i in range(0,4)] 
 
-print("file_list: ", file_list)
-
 anglecalibration.histogram_bin_width = 0.0036  # in degrees (dfeault value) 
 
 anglecalibration.angular_range = (0.0, 90.5)  # in degrees 
@@ -86,21 +85,22 @@ redistributed_photon_counts = anglecalibration.convert(file_list)
 
 print("conversion is done")
 
-# plot converted data
-bin_indices = np.arange(0, redistributed_photon_counts.size,1)
-bin_to_diffraction_angle = lambda bin_index : bin_index * anglecalibration.histogram_bin_width + anglecalibration.angular_range[0]
+#plot the converted diffraction pattern
+plotter = PlotHelper(anglecalibration)
 
-bin_in_degrees = np.apply_along_axis(bin_to_diffraction_angle, 0, bin_indices)
+plotter.plot_diffraction_pattern(redistributed_photon_counts)
+
+### actual diffraction pattern for comparison 
+actual_diffraction_pattern = np.loadtxt(data_path() / "Fructose_0p2_60_m_Alice_WAXS.xye", dtype=np.double)
 
 # if angular range to big bins are initialized to zero 
 zero_channels = redistributed_photon_counts == 0.0
 
-### actual diffraction pattern for comparison 
+bin_indices = np.arange(0, redistributed_photon_counts.size,1)
+bin_to_diffraction_angle = plotter._bin_to_diffraction_angle
+bin_in_degrees = np.apply_along_axis(bin_to_diffraction_angle, 0, bin_indices)
 
-actual_diffraction_pattern = np.loadtxt(data_path() / "Fructose_0p2_60_m_Alice_WAXS.xye", dtype=np.double)
-
-#plot(actual_diffraction_pattern[:,1], actual_diffraction_pattern[:,0])
-
+plt.figure(figsize=(8, 6))
 
 plt.plot(actual_diffraction_pattern[:,0], actual_diffraction_pattern[:,1], label="actual diffraction pattern", color="orange")
 plt.plot(bin_in_degrees[~zero_channels],redistributed_photon_counts[~zero_channels], label="my conversion", color="blue")
@@ -110,18 +110,12 @@ plt.ylabel("Photon Counts")
 plt.legend()
 plt.show()
 
-print("actual diffraction pattern shape: ", actual_diffraction_pattern[:,1].shape)
-print("converted pattern shape: ", redistributed_photon_counts[~zero_channels].shape)
+# plot difference 
+difference = actual_diffraction_pattern[:-1,1] - redistributed_photon_counts[~zero_channels]
 
-size = redistributed_photon_counts[~zero_channels].size
-is_same = np.allclose(actual_diffraction_pattern[:size,1], redistributed_photon_counts[~zero_channels], atol=1e-6)
-
-print("result is correct: ", is_same)
-
-for i in range(0, redistributed_photon_counts[~zero_channels].size):
-    if not np.isclose(actual_diffraction_pattern[:,1][i], redistributed_photon_counts[~zero_channels][i], atol=1e-6):
-        print("mismatch at index ", i, ": actual: ", actual_diffraction_pattern[:,1][i], " converted: ", redistributed_photon_counts[~zero_channels][i])
-
-
+plt.plot(bin_in_degrees[~zero_channels], difference, label="difference (actual - converted)")
+plt.xlabel("Diffraction Angle (degrees)")
+plt.ylabel("Difference in Photon Counts")
+plt.show() 
 
 

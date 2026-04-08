@@ -57,6 +57,11 @@ void define_MythenFileReader_bindings(py::module &m) {
         .def("read_frame",
              [](RawMythenFileReader &self, const std::string &file_name) {
                  return self.read_frame(file_name);
+             })
+
+        .def("read_detector_angle",
+             [](RawMythenFileReader &self, const std::string &file_name) {
+                 return self.read_detector_angle(file_name);
              });
 
     py::class_<EpicsMythenFileReader, MythenFileReader,
@@ -70,5 +75,10 @@ void define_MythenFileReader_bindings(py::module &m) {
         .def("read_frame",
              [](EpicsMythenFileReader &self, const std::string &file_name) {
                  return self.read_frame(file_name);
+             })
+
+        .def("read_detector_angle",
+             [](EpicsMythenFileReader &self, const std::string &file_name) {
+                 return self.read_detector_angle(file_name);
              });
 }
