@@ -50,7 +50,7 @@ jobs:
         run: |
             mkdir build 
             cd build 
-            cmake ../ -DANGCAL_PYTHON_BINDINGS=ON -DANGCAL_DOCS=ON -DANGCAL_FETCH_AARE=ON
+            cmake ../ -DANGCAL_PYTHON_BINDINGS=ON -DANGCAL_DOCS=ON -DANGCAL_FETCH_AARE=ON -DOPENSSL_ROOT_DIR=$CONDA_PREFIX -DCMAKE_PREFIX_PATH=$CONDA_PREFIX -DCMAKE_BUILD_RPATH=$CONDA_PREFIX/lib
             make -j2 
             make docs
 
