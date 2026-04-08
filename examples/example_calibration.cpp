@@ -91,8 +91,6 @@ int main() {
 
     anglecalibration.read_bad_channels_from_file(bad_channels_filename);
 
-    // plot("Bad Channels", anglecalibration.get_bad_channels());
-
     LOG(TLogLevel::logINFO) << "read bad channels";
 
     std::vector<std::string> filelist(num_files); // 1501
@@ -125,7 +123,6 @@ int main() {
     // or take a base peak for module 0 that is well inside the detector range
     // and not at the module boundaries
 
-    // TODO: choosing the base peak is very hard - good average
     const double base_peak_angle = 19.0678; // 19.0648;
 
     anglecalibration.set_base_peak_angle(base_peak_angle);

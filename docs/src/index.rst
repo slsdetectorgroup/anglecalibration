@@ -23,6 +23,7 @@ Library for angle calibration of CPS Mythen detector.
 
     pyMythenDetectorSpecifications 
     pyAngleCalibration
+    pyParameters
 
 
 .. toctree:: 

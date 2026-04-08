@@ -316,13 +316,15 @@ void define_AngleCalibration_binding(py::module &m) {
             },
             py::arg("file_list"),
             R"(
-            performs angular conversion e.g. calculates diffraction pattern from raw photon counts
+            performs angular conversion e.g. calculates diffraction pattern from raw photon counts. If module_index is given calculates diffraction pattern for a specific module
 
             Parameters
             ----------
 
             file_list: list 
                 list of paths to acquisition files
+            module_index: int, optional
+                index of module
 
             Returns
             -------
@@ -338,21 +340,7 @@ void define_AngleCalibration_binding(py::module &m) {
                     self.convert(file_list, module_index));
                 return return_image_data(result);
             },
-            py::arg("file_list"), py::arg("module_index"),
-            R"(
-            performs angular conversion for specific module e.g. calculates diffraction pattern from raw photon counts  
-
-            Parameters
-            ----------
-            file_list: list 
-                list of paths to acquisition files
-            module_index: int
-                index of module
-
-            Returns
-            -------
-            numpy.ndarray (,num_fixed_angle_width_bins)
-                photon counts redistributed to fixed angle width bins, flatfield corrected and variance scaled photon counts)")
+            py::arg("file_list"), py::arg("module_index"))
 
         .def(
             "write_DG_parameters_to_file",

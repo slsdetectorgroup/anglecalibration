@@ -10,12 +10,23 @@ void define_Parameters_binding(py::module &m) {
     py::class_<Parameters>(m, "Parameters")
         .def(py::init<>())
 
-        .def("num_modules", &Parameters::num_modules, R"(
-            get number of modules)");
+        .def("num_modules", &Parameters::num_modules,
+             R"(
+
+            get number of modules
+            
+            )");
 
     py::class_<DGParameters, Parameters>(m, "DGParameters")
         .def(py::init<>())
-        .def(py::init<const ssize_t>(), py::arg("num_modules"))
+        .def(py::init<const ssize_t>(), py::arg("num_modules"), R"(
+             Constructor for DGParameters
+
+             Parameters
+            ----------
+            num_modules: int
+                number of modules to initialize parameters for
+             )")
 
         .def(
             "convert_to_BCParameters",
@@ -24,9 +35,12 @@ void define_Parameters_binding(py::module &m) {
             },
             py::arg("bcparameters"),
             R"(
+
             converts DG parameters to BC parameters and stores them in bcparameters
+
             Parameters
             ----------
+
             bcparameters: BCParameters
                 BCParameters object to store converted BC parameters
             )")
@@ -38,9 +52,12 @@ void define_Parameters_binding(py::module &m) {
             },
             py::arg("eeparameters"),
             R"(
+
             converts DG parameters to EE parameters and stores them in eeparameters
+
             Parameters
             ----------
+
             eeparameters: EEParameters
                 EEParameters object to store converted EE parameters
             )")
@@ -57,6 +74,7 @@ void define_Parameters_binding(py::module &m) {
     
                 Returns
                 -------
+
                 numpy.ndarray (,3)
                     parameters stored as numpy array with shape (num_modules, 3) where the columns correspond to the respective parameters (e.g. center, conversion, offset)
                 )");
@@ -64,7 +82,14 @@ void define_Parameters_binding(py::module &m) {
     py::class_<EEParameters, Parameters>(m, "EEParameters")
         .def(py::init<>())
 
-        .def(py::init<const ssize_t>(), py::arg("num_modules"))
+        .def(py::init<const ssize_t>(), py::arg("num_modules"), R"(
+             Constructor for EEParameters
+
+             Parameters
+            ----------
+            num_modules: int
+                number of modules to initialize parameters for
+             )")
 
         .def(
             "parameters",
@@ -78,6 +103,7 @@ void define_Parameters_binding(py::module &m) {
     
                 Returns
                 -------
+
                 numpy.ndarray (,3)
                     parameters stored as numpy array with shape (num_modules, 3) where the columns correspond to the respective parameters (e.g. normal_distances, module_center_distances, angles)
                 )");
@@ -85,7 +111,14 @@ void define_Parameters_binding(py::module &m) {
     py::class_<BCParameters, Parameters>(m, "BCParameters")
         .def(py::init<>())
 
-        .def(py::init<const ssize_t>(), py::arg("num_modules"))
+        .def(py::init<const ssize_t>(), py::arg("num_modules"), R"(
+             Constructor for BCParameters
+
+             Parameters
+            ----------
+            num_modules: int
+                number of modules to initialize parameters for
+             )")
 
         .def(
             "convert_to_DGParameters",
@@ -95,8 +128,10 @@ void define_Parameters_binding(py::module &m) {
             py::arg("dgparameters"),
             R"(
             converts BC parameters to DG parameters and stores them in dgparameters
+
             Parameters
             ----------
+
             dgparameters: DGParameters
                 DGParameters object to store converted DG parameters
             )")
@@ -109,8 +144,10 @@ void define_Parameters_binding(py::module &m) {
             py::arg("eeparameters"),
             R"(
             converts BC parameters to EE parameters and stores them in eeparameters
+
             Parameters
             ----------
+
             eeparameters: EEParameters
                 EEParameters object to store converted EE parameters
             )")
@@ -127,6 +164,7 @@ void define_Parameters_binding(py::module &m) {
     
                 Returns
                 -------
+
                 numpy.ndarray (,3)
                     parameters stored as numpy array with shape (num_modules, 3) where the columns correspond to the respective parameters (e.g. angle_center_module_normal, module_center_sample_distances, angle_center_beam)
                 )");
