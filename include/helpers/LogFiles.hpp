@@ -80,3 +80,9 @@ inline LogFile BadChannelsLogFile("BadChannels.log");
 inline LogFile SolidAngleCorrectionLogFile2("SolidAngleCorrection.log");
 
 inline LogFile CCEFile("CCE.log");
+
+inline LogFile IncidentIntensityLogFile("IncidentIntensity.log");
+
+inline LogFile StripWidthLogFile("StripWidth.log");
+
+inline LogFile CoverageLogFile("Coverage.log");

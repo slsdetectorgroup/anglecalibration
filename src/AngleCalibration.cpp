@@ -10,6 +10,7 @@
 
 namespace angcal {
 
+/*
 inline void handle_sigint(int) {
     LOG(TLogLevel::logINFO) << "\nSIGINT caught — shutting down...\n";
     std::exit(EXIT_SUCCESS);
@@ -17,6 +18,7 @@ inline void handle_sigint(int) {
 struct SignalHandler {
     SignalHandler() { std::signal(SIGINT, handle_sigint); }
 };
+*/
 
 AngleCalibration::AngleCalibration(
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
@@ -199,7 +201,6 @@ double AngleCalibration::elastic_correction(const double detector_angle) const {
                            mythen_detector->detector_vertical_axis_offset)));
 }
 
-// TODO: mmh maybe template these on parameter type - use case distinction
 double AngleCalibration::diffraction_angle_from_DG_parameters(
     const size_t module_index, const double detector_angle, size_t strip_index,
     const double distance_to_strip) const {
@@ -272,7 +273,6 @@ double AngleCalibration::diffraction_angle_from_EE_parameters(
            mythen_detector->sample_detector_offset;
 }
 
-// TODO maybe template these on parameter type
 double AngleCalibration::angular_strip_width_from_DG_parameters(
     const size_t module_index, const size_t local_strip_index) const {
 
@@ -656,7 +656,6 @@ double AngleCalibration::calculate_similarity_of_peaks_between_modules(
                             inverse_fixed_angle_width_bins_photon_counts_variance;
                     }
                     ++num_runs;
-                    // break; // TODO for now only take one acquisition
 
                     if (plot) {
                         plot->add_curve(
@@ -866,111 +865,6 @@ double AngleCalibration::center_base_peak(
 
     return average_peak_center / num_runs;
 }
-
-/*
-void AngleCalibration::plot_all_base_peaks([[maybe_unused]] PlotHandle plot) {
-    ssize_t num_bins_in_ROI =
-        2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) + 1;
-
-#ifdef ANGCAL_PLOT
-    auto data_file_path =
-        std::filesystem::current_path().parent_path() / "build" / "data";
-    if (!std::filesystem::exists(data_file_path))
-        std::filesystem::create_directories(data_file_path);
-    if (plot) {
-        plot->clear();
-        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-#endif
-
-    for (const auto &file : file_list) {
-
-        LOG(TLogLevel::logDEBUG1) << "file: " << file;
-
-        MythenFrame frame = mythen_file_reader->read_frame(file);
-
-        for (size_t module_index = 0;
-             module_index < mythen_detector->max_modules; ++module_index) {
-
-            if (module_is_disconnected(module_index)) {
-                continue;
-            }
-
-            // base peak angle is in module
-            if (base_peak_is_in_module(module_index, frame.detector_angle)) {
-
-                LOG(TLogLevel::logDEBUG1) << "file name: " << file;
-
-                LOG(TLogLevel::logDEBUG1)
-                    << "detector angle: " << frame.detector_angle;
-
-                NDArray<double, 1> fixed_angle_width_bins_photon_counts(
-                    std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-                NDArray<double, 1>
-                    inverse_fixed_angle_width_bins_photon_counts_variance(
-                        std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-
-                NDArray<double, 1> sum_statistical_weights(
-                    std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-
-                // calculates flatfield normalized photon counts and
-                // photon_count_variance for ROI around base_peak and
-                // redistributes to fixed angle width bins
-
-                redistribute_photon_counts_to_fixed_angle_width_bins<true>(
-                    module_index, frame,
-                    fixed_angle_width_bins_photon_counts.view(),
-                    inverse_fixed_angle_width_bins_photon_counts_variance
-                        .view(),
-                    sum_statistical_weights.view());
-
-                for (ssize_t i = 0;
-                     i < fixed_angle_width_bins_photon_counts.size(); ++i) {
-                    fixed_angle_width_bins_photon_counts(i) =
-                        sum_statistical_weights(i) <
-                                std::numeric_limits<double>::epsilon()
-                            ? 0.0
-                            : fixed_angle_width_bins_photon_counts(i) /
-                                  sum_statistical_weights(i); // y_k
-                }
-
-#ifdef ANGCAL_PLOT
-                if (plot) {
-                    auto bin_to_diffraction_angle_base_peak_ROI_only =
-                        [this](const size_t bin_index) {
-                            return bin_index * this->histogram_bin_width -
-                                   this->base_peak_roi_width +
-                                   this->base_peak_angle;
-                        };
-
-                    std::string filename =
-                        std::filesystem::path(file).stem().string() + ".dat";
-                    auto dataset_name = data_file_path / filename;
-
-                    plot->append_to_plot(
-                        fixed_angle_width_bins_photon_counts.view(),
-                        {0, 2 * static_cast<ssize_t>(base_peak_roi_width /
-                                                     histogram_bin_width) +
-                                1},
-                        bin_to_diffraction_angle_base_peak_ROI_only,
-                        dataset_name);
-                    // plot->pause();
-                }
-
-#endif
-            }
-        }
-    }
-
-#ifdef ANGCAL_PLOT
-    if (plot) {
-        plot->flush(); // make plot appear
-        // std::this_thread::sleep_for(
-        //     std::chrono::milliseconds(10)); // let gnuplot update
-    }
-#endif
-}
-*/
 
 NDArray<double, 1>
 AngleCalibration::convert(const std::vector<std::string> &file_list_) {

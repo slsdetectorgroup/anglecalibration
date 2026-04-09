@@ -5,9 +5,6 @@ AngleCalibration
 Class to perform angular conversion and to calibrate the mythen detector parameters used for conversion. For the calibration the "Best computing" BC parameters are used. However, as initial parameters or for conversion it expects the "historic detector group" DG parameters. 
 See :ref:`parametersets` for a more detailed description of the different detector parameters. 
 
-.. note:: 
-    The calibration process will automatically be visualized if you compiled with option ``ANGCAL_PLOT`` (:ref:`installation`). 
-
 ..
     TODO: maybe move detailed description to another page. 
 
@@ -24,9 +21,7 @@ _______________________________
     std::shared_ptr<FlatField> flat_field_ptr =
         std::make_shared<FlatField>(mythen_detector_ptr);
 
-    flat_field_ptr->read_flatfield_from_file("flatfield.raw"); 
-
-    flat_field_ptr->calculate_inverse_normalized_flatfield(); 
+    flat_field_ptr->read_normalized_flatfield_from_file("flatfield.raw"); 
 
     AngleCalibration anglecalibration(mythen_detector_ptr, flat_field_ptr);
 
@@ -36,10 +31,10 @@ _______________________________
     //dummy acquisitions
     std::vector<std::string> filelist{"file_01.hdf5", "file_02.hdf5", "file_03.hdf5"}; 
 
-    double base_peak_angle = -49.75; 
+    double base_peak_angle = 19.5; 
 
     //calibrate parameters for module 10
-    anglecalibration.calibrate(filelist, base_peak_angle, 10); 
+    anglecalibration.calibrate<true>(filelist, base_peak_angle, 10); // calibrate with visualization of the fit results
 
 API:
 ____

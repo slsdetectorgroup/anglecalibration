@@ -58,30 +58,6 @@ double FlatField::diffraction_angle_from_DG_parameters(
            mythen_detector->sample_detector_offset;
 }
 
-double FlatField::transverse_width_correction_factor(const size_t module_index,
-                                                     size_t strip_index) const {
-
-    // convert to EE parameters
-    const auto [normal_distance, module_center_distance, angle] =
-        DGparameters.convert_to_EEParameters(module_index);
-
-    strip_index =
-        std::signbit(normal_distance)
-            ? MythenDetectorSpecifications::strips_per_module - strip_index - 1
-            : strip_index;
-
-    const double distance_sample_pixel = std::sqrt(
-        std::pow(normal_distance, 2) +
-        std::pow(module_center_distance - mythen_detector->pitch * strip_index,
-                 2));
-
-    const double transverse_width_correction_factor =
-        (2 * std::atan(mythen_detector->transverse_width /
-                       (2 * distance_sample_pixel)));
-
-    return transverse_width_correction_factor;
-}
-
 double FlatField::solid_angle_correction(const size_t module_index,
                                          const size_t strip_index) const {
 
@@ -111,6 +87,31 @@ double FlatField::solid_angle_correction(const size_t module_index,
     return solid_angle;
 }
 
+/*
+double FlatField::transverse_width_correction_factor(const size_t module_index,
+                                                     size_t strip_index) const {
+
+    // convert to EE parameters
+    const auto [normal_distance, module_center_distance, angle] =
+        DGparameters.convert_to_EEParameters(module_index);
+
+    strip_index =
+        std::signbit(normal_distance)
+            ? MythenDetectorSpecifications::strips_per_module - strip_index - 1
+            : strip_index;
+
+    const double distance_sample_pixel = std::sqrt(
+        std::pow(normal_distance, 2) +
+        std::pow(module_center_distance - mythen_detector->pitch * strip_index,
+                 2));
+
+    const double transverse_width_correction_factor =
+        (2 * std::atan(mythen_detector->transverse_width /
+                       (2 * distance_sample_pixel)));
+
+    return transverse_width_correction_factor;
+}
+
 double FlatField::Antonio_solid_angle_correction_factor(
     const size_t module_index, const size_t strip_index) const {
 
@@ -131,8 +132,9 @@ double FlatField::Antonio_solid_angle_correction_factor(
 
     return solid_angle;
 }
+*/
 
-void FlatField::create_flatfield_from_filelist(
+void FlatField::create_normalized_flatfield_from_filelist(
     const std::vector<std::filesystem::path> &filelist,
     std::shared_ptr<MythenFileReader> file_reader) {
 
@@ -144,7 +146,7 @@ void FlatField::create_flatfield_from_filelist(
     NDArray<double, 1> sum_statistical_weights(
         std::array<ssize_t, 1>{mythen_detector->num_strips()}, 0.0);
 
-    uint32_t mighells_correction_constant = 1;
+    constexpr uint32_t mighells_correction_constant = 1;
 
     for (const auto &file : filelist) {
         auto frame = file_reader->read_frame(file);
@@ -160,6 +162,9 @@ void FlatField::create_flatfield_from_filelist(
                             "Cannot apply I0 correction",
                             file.string()));
         }
+
+        // IncidentIntensityLogFile.append(
+        // fmt::format("{}\n", incident_intensity));
 
         const double I0_correction_factor =
             scale_factor / static_cast<double>(incident_intensity);
@@ -196,15 +201,14 @@ void FlatField::create_flatfield_from_filelist(
             }
 
             // mighells correction
-            double photon_counts = frame.photon_counts(strip_index) +
-                                   std::min(mighells_correction_constant,
-                                            frame.photon_counts(strip_index));
-            double variance_photon_counts =
-                frame.photon_counts(strip_index) +
-                std::min(mighells_correction_constant,
-                         frame.photon_counts(strip_index));
+            double photon_counts = frame.photon_counts(strip_index) != 0
+                                       ? frame.photon_counts(strip_index) +
+                                             mighells_correction_constant
+                                       : 0.0;
 
-            if (photon_counts == 0) {
+            double variance_photon_counts = photon_counts; // poisson statistics
+
+            if (photon_counts <= std::numeric_limits<double>::epsilon()) {
                 bad_channels(strip_index) = true; // mark as bad channel
                 continue;                         // skip bad channels
             }
@@ -220,16 +224,18 @@ void FlatField::create_flatfield_from_filelist(
                  std::max(left_strip_boundary_angle, soft_window.first)) /
                 (right_strip_boundary_angle - left_strip_boundary_angle);
 
+            // StripWidthLogFile.append(
+            //  fmt::format("{}\n", right_strip_boundary_angle -
+            //  left_strip_boundary_angle));
+
+            // CoverageLogFile.append(fmt::format("{}\n",
+            // soft_window_coverage));
+
             LOG(TLogLevel::logDEBUG1)
                 << fmt::format("strip {}, soft_window_coverage {}", strip_index,
                                soft_window_coverage);
 
-            // weighted average for flatfield
-
-            double statistical_weight =
-                soft_window_coverage; /// variance_photon_counts;
-
-            flat_field(strip_index, 0) += photon_counts * statistical_weight;
+            flat_field(strip_index, 0) += photon_counts * soft_window_coverage;
             flat_field(strip_index, 1) += variance_photon_counts *
                                           soft_window_coverage *
                                           soft_window_coverage;
@@ -242,20 +248,16 @@ void FlatField::create_flatfield_from_filelist(
     for (ssize_t strip_index = 0; strip_index < mythen_detector->num_strips();
          ++strip_index) {
 
-        if (bad_channels(strip_index) ||
-            flat_field(strip_index, 1) <
-                std::numeric_limits<double>::epsilon()) {
+        if (bad_channels(strip_index) || flat_field(strip_index, 1) < 0.1
+            /*std::numeric_limits<double>::epsilon()*/) {
             flat_field(strip_index, 0) = 0; // bad channel
             flat_field(strip_index, 1) = 0; // bad channel
         } else {
 
             // solid angle correction
-            double solid_angle_correction_factor =
-                Antonio_solid_angle_correction_factor(
-                    strip_index /
-                        MythenDetectorSpecifications::strips_per_module,
-                    strip_index %
-                        MythenDetectorSpecifications::strips_per_module);
+            double solid_angle_correction_factor = solid_angle_correction(
+                strip_index / MythenDetectorSpecifications::strips_per_module,
+                strip_index % MythenDetectorSpecifications::strips_per_module);
 
             flat_field(strip_index, 0) *= solid_angle_correction_factor;
 

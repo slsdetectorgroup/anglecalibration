@@ -13,15 +13,35 @@ void define_FlatField_binding(py::module &m) {
 
     py::class_<FlatField, std::shared_ptr<FlatField>>(m, "FlatField")
         .def(py::init<std::shared_ptr<MythenDetectorSpecifications>>(),
-             py::arg("MythenDetectorSpecifications"))
+             py::arg("MythenDetectorSpecifications"), R"(
 
-        .def("create_flatfield_from_filelist",
-             [](FlatField &self,
-                const std::vector<std::filesystem::path> &file_list,
-                std::shared_ptr<MythenFileReader> mythen_file_reader) {
-                 self.create_flatfield_from_filelist(file_list,
-                                                     mythen_file_reader);
-             })
+             Parameters
+             ----------
+
+             MythenDetectorSpecifications: MythenDetectorSpecifications 
+                storing all mythen specific parameters
+             )")
+
+        .def(
+            "create_normalized_flatfield_from_filelist",
+            [](FlatField &self,
+               const std::vector<std::filesystem::path> &file_list,
+               std::shared_ptr<MythenFileReader> mythen_file_reader) {
+                self.create_normalized_flatfield_from_filelist(
+                    file_list, mythen_file_reader);
+            },
+            py::arg("file_list"), py::arg("mythen_file_reader"), R"(
+
+                Create normalized flatfield from list of files containing flatfield acquisitions
+
+                Parameters
+                ----------
+                
+                file_list: list of str
+                    list of paths to acquisition files containing flatfield acquisitions
+                mythen_file_reader: MythenFileReader
+                    file reader to read mythen acquisition files
+                )")
 
         /*
         .def("read_flatfield_from_file",
@@ -49,10 +69,20 @@ void define_FlatField_binding(py::module &m) {
                                       // iterate
                 self.set_normalized_flatfield(
                     temp_array); // second copy TODO im copying twice
-            })
+            },
+            R"(
+            numpy.ndarray of float, shape (n_channels, 2) : Each row corresponds to a strip/channel in the detector. The first column contains the normalized flatfield value for that strip, and the second column contains the standard deviation of the flatfield value for that strip.
+             )")
 
         .def_property("scale_factor", &FlatField::get_scale_factor,
-                      &FlatField::set_scale_factor)
+                      &FlatField::set_scale_factor, R"(
+                      float : scale factor to scale incident intensity to reasonable values (default 1.0)
+                      )")
+
+        .def_property("soft_window", &FlatField::get_soft_window,
+                      &FlatField::set_soft_window, R"(
+                      tuple of floats : bounds [degrees] to exclude strips with lower exposure (default (3.0, 34.0)).
+                      )")
 
         .def_property(
             "bad_channels",
@@ -76,18 +106,37 @@ void define_FlatField_binding(py::module &m) {
                     temp_array); // second copy TODO im copying twice
             },
             R"(
-            bad_channels : numpy.ndarray of bool, shape (n_channels,)
-                Expected size: number of channels/strips in the detector.
-                Each element is ``True`` if the channel is bad, otherwise ``False``.
+            numpy.ndarray of bool, shape (n_channels,) : Each element is ``True`` if the channel is bad, otherwise ``False``.
             )")
 
-        .def("read_module_parameters_from_file",
-             [](FlatField &self, const std::filesystem::path &filename) {
-                 self.read_module_parameters_from_file(filename);
-             })
+        .def(
+            "read_module_parameters_from_file",
+            [](FlatField &self, const std::filesystem::path &filename) {
+                self.read_module_parameters_from_file(filename);
+            },
+            R"(
+             read module parameters from file
+             (expects following format module [module_index] center [center] +- [error] conversion [conversion] +- [error] offset [offset] +- [error])
 
-        .def("read_bad_channels_from_file",
-             [](FlatField &self, const std::filesystem::path &filename) {
-                 self.read_bad_channels_from_file(filename);
-             });
+             Parameters
+             ----------
+             
+             filename: str
+                path to file containing module parameters
+                )")
+
+        .def(
+            "read_bad_channels_from_file",
+            [](FlatField &self, const std::filesystem::path &filename) {
+                self.read_bad_channels_from_file(filename);
+            },
+            R"(
+             read bad channels from file 
+
+             Parameters
+             ----------
+             
+             filename: str
+                path to file containing bad channels
+                )");
 }
