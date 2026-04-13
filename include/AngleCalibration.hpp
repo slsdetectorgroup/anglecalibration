@@ -751,7 +751,7 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                 (right_strip_boundary_angle / histogram_bin_width));
 
             /*
-            // weird Antonio stuff
+            // Antonio stuff
             left_bin_index_covered_by_strip = std::floor(
                 (left_strip_boundary_angle / histogram_bin_width) + 0.5);
             right_bin_index_covered_by_strip = std::ceil(

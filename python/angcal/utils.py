@@ -30,7 +30,6 @@ def select_base_peak(anglecalibration,
     
     for file in filelist:
 
-        print("reading file {}".format(file))
         detector_angle = mythen_file_reader.read_detector_angle(file)
 
         # -5.0, 5.0 adjust for movement

@@ -105,7 +105,9 @@ class PlotHelper {
 
         std::atomic<bool> stop_interactive{false};
         std::thread input_thread([&stop_interactive]() {
-            std::cout << "Press Enter to continue..." << std::endl;
+            std::cout << "Place plot window to intended location and press "
+                         "Enter to continue..."
+                      << std::endl;
             std::cin.get();
             stop_interactive = true;
         });

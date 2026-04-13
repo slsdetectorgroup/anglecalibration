@@ -60,7 +60,6 @@ class PlotHelper:
             input("Press Enter to continue...")
         else:
             if self._overwrite_plot:
-                print("clearing axis for next plot")
                 axis.clear()
 
             axis.plot(bins, photon_counts[left_bin_boundary:right_bin_boundary])

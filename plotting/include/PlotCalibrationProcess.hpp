@@ -55,7 +55,9 @@ class PlotCalibrationProcess {
         matplotlibcpp::draw();
         if (first_plot) {
             std::thread input_thread([this]() {
-                std::cout << "Press Enter to continue..." << std::endl;
+                std::cout << "Place plot window to intended location and press "
+                             "Enter to continue..."
+                          << std::endl;
                 std::cin.get();
                 stop_interactive = true;
             });

@@ -73,7 +73,6 @@ anglecalibration.base_peak_ROI_width = 0.18 # in degrees width of base peak ROI
 
 anglecalibration.base_peak_angle = 19.0678
 
-
 plotter = PlotHelper(anglecalibration)
 
 test_frame_name = str(env_data_path() / (file_prefix + "0209.h5"))
