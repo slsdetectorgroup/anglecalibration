@@ -66,8 +66,8 @@ class FlatField {
      * @param strip_index local strip index of module e.g. 0-1279
      * @return correction factor for solid angle of strips
      */
-    double solid_angle_correction(const size_t module_index,
-                                  const size_t strip_index) const;
+    double solid_angle_correction_factor(const size_t module_index,
+                                         const size_t strip_index) const;
 
     /*
     double

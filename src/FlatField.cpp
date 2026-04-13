@@ -58,7 +58,8 @@ double FlatField::diffraction_angle_from_DG_parameters(
            mythen_detector->sample_detector_offset;
 }
 
-double FlatField::solid_angle_correction(const size_t module_index,
+double
+FlatField::solid_angle_correction_factor(const size_t module_index,
                                          const size_t strip_index) const {
 
     // convert to EE parameters
@@ -81,10 +82,11 @@ double FlatField::solid_angle_correction(const size_t module_index,
     double solid_angle =
         projection_strip_area / std::pow(distance_sample_pixel, 2);
 
-    // scale solid angle to unit
-    solid_angle /= mythen_detector->average_solid_angle;
+    // take inverse for corfrection factor and scale to unit
+    double solid_angle_correction =
+        mythen_detector->average_solid_angle / solid_angle;
 
-    return solid_angle;
+    return solid_angle_correction;
 }
 
 /*
@@ -128,9 +130,10 @@ double FlatField::Antonio_solid_angle_correction_factor(
         M_PI / 180.0 * angular_strip_width * transwidth_correction_factor;
 
     // scale solid angle to unit
-    solid_angle /= mythen_detector->average_solid_angle;
+    double solid_angle_correction =
+        mythen_detector->average_solid_angle / solid_angle;
 
-    return solid_angle;
+    return solid_angle_correction;
 }
 */
 
@@ -147,6 +150,8 @@ void FlatField::create_normalized_flatfield_from_filelist(
         std::array<ssize_t, 1>{mythen_detector->num_strips()}, 0.0);
 
     constexpr uint32_t mighells_correction_constant = 1;
+
+    size_t file_index = 0;
 
     for (const auto &file : filelist) {
         auto frame = file_reader->read_frame(file);
@@ -174,7 +179,6 @@ void FlatField::create_normalized_flatfield_from_filelist(
 
         for (ssize_t strip_index = 0;
              strip_index < mythen_detector->num_strips(); ++strip_index) {
-
             if (bad_channels(strip_index)) {
                 continue; // skip bad channels
             }
@@ -209,8 +213,8 @@ void FlatField::create_normalized_flatfield_from_filelist(
             double variance_photon_counts = photon_counts; // poisson statistics
 
             if (photon_counts <= std::numeric_limits<double>::epsilon()) {
-                bad_channels(strip_index) = true; // mark as bad channel
-                continue;                         // skip bad channels
+                // bad_channels(strip_index) = true; // mark as bad channel
+                continue; // skip bad channels
             }
 
             // incident intensity correction
@@ -240,6 +244,7 @@ void FlatField::create_normalized_flatfield_from_filelist(
                                           soft_window_coverage *
                                           soft_window_coverage;
         }
+        ++file_index;
     }
 
     double sum_good_strips = 0.0; // for normalization
@@ -248,22 +253,23 @@ void FlatField::create_normalized_flatfield_from_filelist(
     for (ssize_t strip_index = 0; strip_index < mythen_detector->num_strips();
          ++strip_index) {
 
-        if (bad_channels(strip_index) || flat_field(strip_index, 1) < 0.1
-            /*std::numeric_limits<double>::epsilon()*/) {
+        if (bad_channels(strip_index) ||
+            flat_field(strip_index, 1) <
+                std::numeric_limits<double>::epsilon()) {
             flat_field(strip_index, 0) = 0; // bad channel
             flat_field(strip_index, 1) = 0; // bad channel
         } else {
 
             // solid angle correction
-            double solid_angle_correction_factor = solid_angle_correction(
+            double solid_angle_correction = solid_angle_correction_factor(
                 strip_index / MythenDetectorSpecifications::strips_per_module,
                 strip_index % MythenDetectorSpecifications::strips_per_module);
 
-            flat_field(strip_index, 0) *= solid_angle_correction_factor;
+            flat_field(strip_index, 0) *= solid_angle_correction;
 
             flat_field(strip_index, 1) *=
-                solid_angle_correction_factor *
-                solid_angle_correction_factor; // error propagation
+                solid_angle_correction *
+                solid_angle_correction; // error propagation
 
             flat_field(strip_index, 1) =
                 std::sqrt(flat_field(strip_index, 1)); // store std

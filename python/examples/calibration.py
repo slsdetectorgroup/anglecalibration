@@ -67,7 +67,7 @@ print("scale Factor: " ,anglecalibration.scale_factor)
 # click through frames to select base peak for calibration
 # select_base_peak(anglecalibration, mythenfilereader, file_list, module_index=0)
 
-anglecalibration.histogram_bin_width = 0.0036  # in degrees (dfeault value) 
+anglecalibration.histogram_bin_width = 0.0036  # in degrees (default value) 
 
 anglecalibration.base_peak_ROI_width = 0.18 # in degrees width of base peak ROI 
 

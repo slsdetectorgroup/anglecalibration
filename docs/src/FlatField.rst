@@ -1,5 +1,5 @@
-FlatField
-========== 
+Normalized FlatField
+=====================
 
 The ``FlatField`` class is responsible for storing the flatfield correction factors. It provides methods to read and create normalized flatfields. 
 
