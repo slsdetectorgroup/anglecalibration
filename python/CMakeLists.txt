@@ -42,7 +42,7 @@ if(ANGCAL_INSTALL_PYTHONEXT)
     install(
         TARGETS _angcal
         EXPORT "${TARGETS_EXPORT_NAME}"
-        LIBRARY DESTINATION angle_calibration
+        LIBRARY DESTINATION angcal
         COMPONENT python
     )
     

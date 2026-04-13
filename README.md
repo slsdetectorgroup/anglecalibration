@@ -6,13 +6,13 @@ More details about the method, installation and the C++ and Python API can be fo
 
 ## Build and install
 
-Prerequisites
+### Developement Install
+
+**Prerequisites:**
 - cmake >= 3.14
 - C++17 compiler (gcc >= 8)
 - python >= 3.10
 - HDF5
-
-### Developement Install
 
 ```bash
 git clone https://github.com/slsdetectorgroup/anglecalibration.git
@@ -63,6 +63,36 @@ make install
 
 #Now configure your project
  cmake .. -DCMAKE_PREFIX_PATH=/where/to/put/angcal
+```
+
+### Build Wheel 
+
+If you only want to use the python extension you can use ``python build``. 
+
+We recommend using a specific python environment. 
+
+**Prerequisites:** 
+
+- cmake >= 3.14
+- C++17 compiler (gcc >= 8)
+- python >= 3.10
+- HDF5
+- build (https://pypi.org/project/build/)
+
+
+```bash 
+git clone https://github.com/slsdetectorgroup/anglecalibration.git
+cd angle_calibration 
+
+#build wheel
+python -m build 
+
+pip install dist/angcal-{version}-cp{python-version}-cp{python-version}-linux_x86_64.whl
+```
+Import in your python project 
+
+```python 
+import angcal
 ```
 
 ## Example Usage
