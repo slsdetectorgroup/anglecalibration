@@ -25,6 +25,7 @@ Library for angle calibration of CPS Mythen detector.
     pyFlatField
     pyAngleCalibration
     pyParameters
+    pyPlotHelper
 
 
 .. toctree:: 
@@ -37,6 +38,7 @@ Library for angle calibration of CPS Mythen detector.
     FlatField
     AngleCalibration
     Parameters
+    PlotHelper
     
 
     

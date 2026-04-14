@@ -3,8 +3,6 @@
 #include "PlotHelpers.hpp"
 #include "logger.hpp"
 
-using namespace angcal;
-
 inline auto data_path() {
     if (const char *env_p = std::getenv("ANGCAL_TEST_DATA")) {
         return std::filesystem::path(env_p);
@@ -13,6 +11,8 @@ inline auto data_path() {
             "Path to test data: $ANGCAL_TEST_DATA not set");
     }
 }
+
+namespace angcal {
 
 std::pair<double, double>
 get_detector_range(std::shared_ptr<MythenFileReader> mythen_file_reader,
@@ -89,9 +89,15 @@ void get_module_angle_ranges(
 }
 
 /**
- * @brief select base peak by plotting module 0 redistributed to fixed
- * angle-width bins for each frame in filelist with a detector angle between
- * 6° and 33°
+ * @brief select base peak by performing angular conversion for a specific
+ * module and clicking through frames where module is within range of [6°, 33°]
+ * @param anglecalibration shared pointer to AngleCalibration class for
+ * accessing calibration specific parameters and functions
+ * @param mythen_file_reader shared pointer to MythenFileReader for reading
+ * mythen acquisition files
+ * @param filelist vector of acquisition files to select base peak from
+ * @param module_index optional module index if only one module contributed to
+ * diffraction pattern, default is 0.
  */
 void select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
                       std::shared_ptr<MythenFileReader> mythen_file_reader,
@@ -141,3 +147,5 @@ void select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
         }
     }
 }
+
+} // namespace angcal

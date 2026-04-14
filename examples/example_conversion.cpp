@@ -9,6 +9,8 @@
  *  export ANGCAL_TEST_DATA=/home/mazzol_a/Documents/AngularConversionTestData
  */
 
+using namespace angcal;
+
 int main() {
 
     // define test files names

@@ -6,6 +6,15 @@ class PlotHelper:
     """ Helper class for plotting diffraction patterns. """
     
     def __init__(self, anglecalibration): 
+        """
+        Create a plotting helper.
+
+        Parameters
+        ----------
+        anglecalibration : angcal.AngleCalibration
+            Calibrated angle-calibration object used to compute plot axes and limits.
+        """
+
         # maybe add freeze 
         self._anglecalibration = anglecalibration
         self._left_module_boundary_as_bin_index = lambda module_index, detector_angle : int((self._anglecalibration.diffraction_angle_from_DG_parameters( module_index, detector_angle, 0, -0.5) -  self._anglecalibration.angular_range[0]) // self._anglecalibration.histogram_bin_width)
@@ -26,8 +35,19 @@ class PlotHelper:
         self._overwrite_plot = value
         
     def plot_diffraction_pattern(self, photon_counts : np.ndarray, module_index=None, motor_position=None, axis=None): 
-        """plot diffraction pattern, if module_index is given, only plot the part of the diffraction pattern that corresponds to the module, otherwise plot the whole diffraction pattern."""
+        """
+        Plot diffraction pattern.
 
+        Parameters
+        ----------
+        photon_counts : numpy.ndarray
+            1D photon-count array.
+        module_index : int, optional
+            Module index to restrict the plotted range.
+        motor_position : float, optional
+            Detector motor position in degrees.
+        """
+       
         if(module_index is not None and motor_position is None):
             raise ValueError("if module_index is given, motor_position must also be given to determine the correct module region to plot.")
 
@@ -70,8 +90,16 @@ class PlotHelper:
                 input("Press Enter to continue...")
             
     def plot_base_peak(self, photon_counts : np.ndarray, module_index=None, axis=None): 
+        """
+        Plot the base-peak ROI.
 
-        """plot base peak"""
+        Parameters
+        ----------
+        photon_counts : numpy.ndarray
+            1D photon-count array.
+        module_index : int, optional
+            Module index for title/selection.
+        """
         
         plot_title = f"Base Peak for module {module_index}" if module_index is not None else "Base Peak"
 
