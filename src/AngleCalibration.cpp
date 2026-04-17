@@ -489,11 +489,16 @@ AngleCalibration::flatfield_correction(const double photon_counts,
 
 std::pair<double, double> AngleCalibration::transverse_width_correction(
     const double photon_counts, const double photon_counts_error,
-    const size_t module_index, const size_t strip_index) const {
+    const size_t module_index, size_t strip_index) const {
 
     // convert to EE parameters
     const auto [normal_distance, module_center_distance, angle] =
         BCparameters.convert_to_EEParameters(module_index);
+
+    strip_index =
+        std::signbit(normal_distance)
+            ? MythenDetectorSpecifications::strips_per_module - 1 - strip_index
+            : strip_index;
 
     const double distance_sample_pixel = std::sqrt(
         std::pow(normal_distance, 2) +

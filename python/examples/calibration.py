@@ -87,8 +87,8 @@ plotter.plot_diffraction_pattern(module_redistributed_to_fixed_angle_bins.view()
 # plot base peak for one module
 plotter.plot_base_peak(module_redistributed_to_fixed_angle_bins.view())
 
-anglecalibration.calibrate(file_list, anglecalibration.base_peak_angle, module_index = 1, plot_calibration_process=True) 
-#anglecalibration.calibrate(file_list, base_peak_angle, output_filename=str(env_data_path() / "angcal_Jul2025_P12_0p0105_new_calibrated2.off"))
+anglecalibration.calibrate(file_list, anglecalibration.base_peak_angle, module_index = 17, plot_calibration_process=True) 
+#anglecalibration.calibrate(file_list, anglecalibration.base_peak_angle, output_filename=str(env_data_path() / "angcal_Jul2025_P12_0p0105_new_calibrated3.off"))
 
 print("calibration is done")
 

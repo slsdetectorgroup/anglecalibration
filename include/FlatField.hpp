@@ -61,13 +61,12 @@ class FlatField {
     std::pair<double, double> get_soft_window() const;
 
     /**
-     * @brief correction factor for solid angle of strips
+     * @brief calculates solid angle of strip
      * @param module_index index of module
      * @param strip_index local strip index of module e.g. 0-1279
-     * @return correction factor for solid angle of strips
+     * @return solid angle of strip
      */
-    double solid_angle_correction_factor(const size_t module_index,
-                                         const size_t strip_index) const;
+    double solid_angle(const size_t module_index, size_t strip_index) const;
 
     /*
     double
@@ -143,6 +142,19 @@ class FlatField {
 
     NDView<double, 2> get_normalized_flatfield_view() const;
 
+    /**
+     * @brief calculates diffraction angle from DG module parameters (used in
+     * Beer's Law)
+     * @param detector_angle detector position [degrees]
+     * @param strip_index local strip index of module e.g. 0-1279
+     * @param distance_to_strip distance to strip (if 0.0 calculates diffraction
+     * angle at center of strip) [given in strips]
+     * @return diffraction angle [degrees]
+     */
+    double diffraction_angle_from_DG_parameters(
+        const size_t module_index, const double detector_angle,
+        size_t strip_index, const double distance_to_strip) const;
+
   private:
     /**
      * @brief elastic correction to diffraction angle
@@ -150,17 +162,6 @@ class FlatField {
      * @return elastic correction to diffraction angle [degrees]
      */
     double elastic_correction(const double detector_angle) const;
-
-    /**
-     * @brief calculates diffraction angle from DG module parameters (used in
-     * Beer's Law)
-     * @param detector_angle detector position [degrees]
-     * @param strip_index local strip index of module e.g. 0-1279
-     * @param distance_to_strip distance to strip [given in strips]
-     */
-    double diffraction_angle_from_DG_parameters(
-        const size_t module_index, const double detector_angle,
-        size_t strip_index, const double distance_to_strip) const;
 
   private:
     /// @brief scale_factor is used to scale incident intensity to ~ one

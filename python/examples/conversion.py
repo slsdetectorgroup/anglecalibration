@@ -19,23 +19,6 @@ def env_data_path():
     return Path(env_value)
 
 
-
-def plot(array : np.array, x=None): 
-    if x is not None:
-        plt.plot(x, array)
-    else:
-        plt.plot(np.arange(0, array.size,1), array)
-    plt.show()
-
-def plot_excluding_channels(array: np.array, channels_to_exclude: np.array, x = None):
-    good_channels = np.logical_not(channels_to_exclude)
-    if x is not None:
-        plt.plot(x[good_channels], array[good_channels])
-    else:
-        plt.plot(np.arange(0, array.size,1)[good_channels], array[good_channels])
-    plt.show()
-
-
 # setup mythen detector specifications - stores all relevant parameters of the detector setup
 mythendetectorspecifications = MythenDetectorSpecifications() 
 
@@ -57,10 +40,6 @@ anglecalibration = AngleCalibration(mythendetectorspecifications, flatfield, myt
 anglecalibration.read_initial_calibration_from_file(str(data_path() / "Angcal_2E_Feb2023_P29.off"))
 
 anglecalibration.read_bad_channels_from_file(str(data_path() / "bc2023_003_RING.chans"))
-
-#bad_channels = anglecalibration.bad_channels
-
-#plot(bad_channels)
 
 #set scale factor to get reasonable scales 
 frame = mythenfilereader.read_frame(str(data_path() / "Fructose_0p2_60_0060.h5"))
@@ -90,32 +69,5 @@ plotter = PlotHelper(anglecalibration)
 
 plotter.plot_diffraction_pattern(redistributed_photon_counts)
 
-### actual diffraction pattern for comparison 
-actual_diffraction_pattern = np.loadtxt(data_path() / "Fructose_0p2_60_m_Alice_WAXS.xye", dtype=np.double)
-
-# if angular range to big bins are initialized to zero 
-zero_channels = redistributed_photon_counts == 0.0
-
-bin_indices = np.arange(0, redistributed_photon_counts.size,1)
-bin_to_diffraction_angle = plotter._bin_to_diffraction_angle
-bin_in_degrees = np.apply_along_axis(bin_to_diffraction_angle, 0, bin_indices)
-
-plt.figure(figsize=(8, 6))
-
-plt.plot(actual_diffraction_pattern[:,0], actual_diffraction_pattern[:,1], label="actual diffraction pattern", color="orange")
-plt.plot(bin_in_degrees[~zero_channels],redistributed_photon_counts[~zero_channels], label="my conversion", color="blue")
-
-plt.xlabel("Diffraction Angle (degrees)")
-plt.ylabel("Photon Counts")
-plt.legend()
-plt.show()
-
-# plot difference 
-difference = actual_diffraction_pattern[:-1,1] - redistributed_photon_counts[~zero_channels]
-
-plt.plot(bin_in_degrees[~zero_channels], difference, label="difference (actual - converted)")
-plt.xlabel("Diffraction Angle (degrees)")
-plt.ylabel("Difference in Photon Counts")
-plt.show() 
 
 

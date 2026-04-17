@@ -310,7 +310,8 @@ class AngleCalibration {
      * Beer's Law)
      * @param detector_angle detector position [degrees]
      * @param strip_index local strip index of module e.g. 0-1279
-     * @param distance_to_strip distance to strip [given in strips]
+     * @param distance_to_strip distance to strip (if 0.0 calculates diffraction
+     * angle at center of strip) [given in strips]
      * @return diffraction angle [degrees]
      */
     double diffraction_angle_from_DG_parameters(
@@ -321,7 +322,8 @@ class AngleCalibration {
      * parameters (used in Beer's Law)
      * @param detector_angle detector position [degrees]
      * @param strip_index local strip index of module e.g. 0-1279
-     * @param distance_to_strip distance to strip [given in strips]
+     * @param distance_to_strip distance to strip (if 0.0 calculates diffraction
+     * angle at center of strip) [given in strips]
      * @return diffraction angle [degrees]
      */
     double diffraction_angle_from_BC_parameters(
@@ -332,7 +334,8 @@ class AngleCalibration {
      * Beer's Law)
      * @param detector_angle detector position [degrees]
      * @param strip_index local strip index of module
-     * @param distance_to_strip distance to strip [given in strips]
+     * @param distance_to_strip distance to strip (if 0.0 calculates diffraction
+     * angle at center of strip) [given in strips]
      * @return diffraction angle [degrees]
      */
     double diffraction_angle_from_EE_parameters(
@@ -896,9 +899,10 @@ void AngleCalibration::calibrate_offset(
 
         const auto t1 = std::chrono::steady_clock::now();
         const auto elapsed_time =
-            std::chrono::duration_cast<std::chrono::seconds>(t1 - t0).count();
+            std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0)
+                .count();
         LOG(TLogLevel::logINFO)
-            << fmt::format("calibration for module {} took {} seconds",
+            << fmt::format("calibration for module {} took {} milliseconds",
                            module_index, elapsed_time);
     }
 }
@@ -1007,9 +1011,10 @@ void AngleCalibration::calibrate_coupled_parameters(
 
         const auto t1 = std::chrono::steady_clock::now();
         const auto elapsed_time =
-            std::chrono::duration_cast<std::chrono::seconds>(t1 - t0).count();
+            std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0)
+                .count();
         LOG(TLogLevel::logINFO)
-            << fmt::format("calibration for module {} took {} seconds",
+            << fmt::format("calibration for module {} took {} milliseconds",
                            module_index, elapsed_time);
     }
 }
@@ -1172,9 +1177,9 @@ void AngleCalibration::calibrate(const std::vector<std::string> &file_list_,
 
     const auto t1 = std::chrono::steady_clock::now();
     const auto elapsed_time =
-        std::chrono::duration_cast<std::chrono::seconds>(t1 - t0).count();
+        std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
     LOG(TLogLevel::logINFO)
-        << fmt::format("calibration for module {} took {} seconds",
+        << fmt::format("calibration for module {} took {} milliseconds",
                        module_index, elapsed_time);
 
     PlotCalibrationProcess::kill_python_interpreter();

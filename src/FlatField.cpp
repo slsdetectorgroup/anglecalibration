@@ -46,7 +46,7 @@ double FlatField::diffraction_angle_from_DG_parameters(
 
     strip_index =
         std::signbit(conversion)
-            ? MythenDetectorSpecifications::strips_per_module - strip_index - 1
+            ? MythenDetectorSpecifications::strips_per_module - 1 - strip_index
             : strip_index; // TODO: are the values sored in reserve?
 
     return offset +
@@ -58,13 +58,17 @@ double FlatField::diffraction_angle_from_DG_parameters(
            mythen_detector->sample_detector_offset;
 }
 
-double
-FlatField::solid_angle_correction_factor(const size_t module_index,
-                                         const size_t strip_index) const {
+double FlatField::solid_angle(const size_t module_index,
+                              size_t strip_index) const {
 
     // convert to EE parameters
     const auto [normal_distance, module_center_distance, angle] =
         DGparameters.convert_to_EEParameters(module_index);
+
+    strip_index =
+        std::signbit(normal_distance)
+            ? MythenDetectorSpecifications::strips_per_module - 1 - strip_index
+            : strip_index;
 
     const double distance_sample_pixel = std::sqrt(
         std::pow(normal_distance, 2) +
@@ -74,19 +78,12 @@ FlatField::solid_angle_correction_factor(const size_t module_index,
     // orthogonal projection of strip area onto plane normal to beam
     double projection_strip_area =
         mythen_detector->pitch * mythen_detector->transverse_width *
-        normal_distance /
+        std::abs(normal_distance) /
         distance_sample_pixel; // normal_distance/distance_sample_pixel is
                                // the cosine of the angle between the strip
                                // normal and the diffracted beam
 
-    double solid_angle =
-        projection_strip_area / std::pow(distance_sample_pixel, 2);
-
-    // take inverse for corfrection factor and scale to unit
-    double solid_angle_correction =
-        mythen_detector->average_solid_angle / solid_angle;
-
-    return solid_angle_correction;
+    return projection_strip_area / std::pow(distance_sample_pixel, 2);
 }
 
 /*
@@ -261,9 +258,12 @@ void FlatField::create_normalized_flatfield_from_filelist(
         } else {
 
             // solid angle correction
-            double solid_angle_correction = solid_angle_correction_factor(
+            double solid_angle_ = solid_angle(
                 strip_index / MythenDetectorSpecifications::strips_per_module,
                 strip_index % MythenDetectorSpecifications::strips_per_module);
+
+            double solid_angle_correction =
+                mythen_detector->average_solid_angle / solid_angle_;
 
             flat_field(strip_index, 0) *= solid_angle_correction;
 

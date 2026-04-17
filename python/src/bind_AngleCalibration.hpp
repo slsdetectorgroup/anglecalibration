@@ -240,7 +240,7 @@ void define_AngleCalibration_binding(py::module &m) {
             strip_index : int
                 index of strip in module
             distance_to_strip : double
-                distance to strip [given in strips]
+                distance to strip (if 0.0 calculates diffraction angle at center of strip) [given in strips]
 
             Returns
             -------
