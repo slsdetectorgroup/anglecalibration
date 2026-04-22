@@ -10,6 +10,8 @@ def env_data_path():
     env_value = os.environ.get("ANGCAL_TEST_DATA")
     if not env_value:
         raise RuntimeError("Environment variable ANGCAL_TEST_DATA is not set or is empty")
+    
+    print("Environment variable ANGCAL_TEST_DATA: ", env_value)
 
     return Path(env_value)
 
@@ -30,6 +32,8 @@ def plot_excluding_channels(array: np.array, channels_to_exclude: np.array, x = 
     plt.show()
 
 
+my_path = env_data_path()
+
 # setup mythen detector specifications - stores all relevant parameters of the detector setup
 mythendetectorspecifications = MythenDetectorSpecifications() 
 
@@ -40,7 +44,7 @@ mythendetectorspecifications.offset = 0.0 # additional offset to sample detector
 # setup flatfield 
 flatfield = FlatField(mythendetectorspecifications)
 
-flatfield.normalized_flatfield = np.loadtxt(env_data_path() / "Flatfield_EkeV22p0_T11000eV_up_TESTFF1_clean_Jun2025_open_WS.raw", dtype=np.double, usecols=[1,2])
+flatfield.normalized_flatfield = np.loadtxt(my_path / "Flatfield_EkeV22p0_T11000eV_up_TESTFF1_clean_Jun2025_open_WS.raw", dtype=np.double, usecols=[1,2])
 
 # setup mythen data file reader to read EPICS mythen hdf5 files
 mythenfilereader = EpicsMythenFileReader()
@@ -48,14 +52,13 @@ mythenfilereader = EpicsMythenFileReader()
 # setup angle calibration - has everything to do conversion and calibration 
 anglecalibration = AngleCalibration(mythendetectorspecifications, flatfield, mythenfilereader)
 
-anglecalibration.read_initial_calibration_from_file(str(env_data_path() / "angcal_Jul2025_P12_0p0105.off"))
+anglecalibration.read_initial_calibration_from_file(str(my_path / "angcal_Jul2025_P12_0p0105.off"))
 
-anglecalibration.read_bad_channels_from_file(str(env_data_path() / "bc2025_001_RING.chans"))
+anglecalibration.read_bad_channels_from_file(str(my_path / "bc2025_001_RING.chans"))
 
 file_prefix = "ang1up_22keV_MIX_0p5mm_48M_a_"
 num_files = 1501
-file_list = [str(env_data_path() / file_prefix)+f"{i:04d}.h5" for i in range(0,num_files)] 
-
+file_list = [str(my_path / file_prefix)+f"{i:04d}.h5" for i in range(0,num_files)] 
 #set scale factor to get reasonable scales 
 first_frame = mythenfilereader.read_frame(file_list[0])
 scale_factor = first_frame.incident_intensity
@@ -75,7 +78,7 @@ anglecalibration.base_peak_angle = 19.0678
 
 plotter = PlotHelper(anglecalibration)
 
-test_frame_name = str(env_data_path() / (file_prefix + "0209.h5"))
+test_frame_name = str(my_path / (file_prefix + "0209.h5"))
 
 test_frame_angle = mythenfilereader.read_detector_angle(test_frame_name)
 
