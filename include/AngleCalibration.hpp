@@ -290,7 +290,8 @@ class AngleCalibration {
      * @param file_list vector of file_names of acquisition files
      * @return flatfield corrected and variance scaled photon counts
      * redistributed to fixed angle width bins given in the range [min_angle,
-     * max_angle]
+     * max_angle] (values of -1.0 denote bins with insufficient coverage or
+     * which are denoted by a bad channel)
      */
     NDArray<double, 1> convert(const std::vector<std::string> &file_list);
 
@@ -301,7 +302,8 @@ class AngleCalibration {
      * @param module_index index of module
      * @return flatfield corrected and variance scaled photon counts
      * redistributed to fixed angle width bins given in the range [min_angle,
-     * max_angle]
+     * max_angle] (values of -1.0 denote bins with insufficient coverage or
+     * which are denoted by a bad channel)
      */
     NDArray<double, 1> convert(const std::vector<std::string> &file_list,
                                const size_t module_index);

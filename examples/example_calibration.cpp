@@ -156,7 +156,7 @@ int main() {
     // plot base peak for one module
     plotter.plot_base_peak(module_redistributed_to_fixed_angle_bins.view());
 
-    // anglecalibration.calibrate<true>(filelist, base_peak_angle, 1);
+    anglecalibration.calibrate<true>(filelist, base_peak_angle, 1);
 
     /*
     anglecalibration.calibrate<false>(filelist, base_peak_angle);

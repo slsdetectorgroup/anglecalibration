@@ -177,6 +177,8 @@ class FlatField {
     /// @brief normalized flatfield stored as 2D array of shape (num_strips, 2)
     /// where the two values are normalized flatfield value and standard
     /// deviation
+    /// value sof -1.0 denote strips which are not covered by any flatfield
+    /// acquisition or are marked as bad.
     NDArray<double, 2> flat_field;
 
     /// @brief boolean array of size of total number of strips/channels in

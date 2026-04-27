@@ -329,7 +329,7 @@ void define_AngleCalibration_binding(py::module &m) {
             Returns
             -------
             numpy.ndarray (,num_fixed_angle_width_bins)
-                photon counts redistributed to fixed angle width bins, flatfield corrected and variance scaled photon counts)")
+                photon counts redistributed to fixed angle width bins, flatfield corrected and variance scaled photon counts, values of -1.0 denote bins with insufficient coverage or which are denoted by a bad channel)")
 
         .def(
             "convert",

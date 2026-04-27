@@ -122,6 +122,7 @@ void define_FlatField_binding(py::module &m) {
             },
             R"(
             numpy.ndarray of float, shape (n_channels, 2) : Each row corresponds to a strip/channel in the detector. The first column contains the normalized flatfield value for that strip, and the second column contains the standard deviation of the flatfield value for that strip.
+            Values of -1.0 denote strips with insufficient coverage (e.g. due to the soft window) or strips denotes by a bad channel. 
              )")
 
         .def_property("scale_factor", &FlatField::get_scale_factor,

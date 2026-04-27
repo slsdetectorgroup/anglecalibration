@@ -605,10 +605,10 @@ double AngleCalibration::calculate_similarity_of_peaks_between_modules(
                 if (base_peak_is_in_module(mod_index, frame.detector_angle)) {
 
                     NDArray<double, 1> fixed_angle_width_bins_photon_counts(
-                        std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+                        std::array<ssize_t, 1>{num_bins_in_ROI}, -1.0);
                     NDArray<double, 1>
                         fixed_angle_width_bins_photon_counts_variance(
-                            std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+                            std::array<ssize_t, 1>{num_bins_in_ROI}, -1.0);
 
                     NDArray<double, 1> sum_statistical_weights(
                         std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
@@ -627,6 +627,11 @@ double AngleCalibration::calculate_similarity_of_peaks_between_modules(
                     // normalize statistical weights
                     for (ssize_t i = 0;
                          i < fixed_angle_width_bins_photon_counts.size(); ++i) {
+
+                        if (fixed_angle_width_bins_photon_counts[i] == -1.0) {
+                            continue;
+                        }
+
                         fixed_angle_width_bins_photon_counts(i) =
                             sum_statistical_weights(i) <
                                     std::numeric_limits<double>::epsilon()
