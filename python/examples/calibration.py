@@ -59,6 +59,7 @@ anglecalibration.read_bad_channels_from_file(str(my_path / "bc2025_001_RING.chan
 file_prefix = "ang1up_22keV_MIX_0p5mm_48M_a_"
 num_files = 1501
 file_list = [str(my_path / file_prefix)+f"{i:04d}.h5" for i in range(0,num_files)] 
+
 #set scale factor to get reasonable scales 
 first_frame = mythenfilereader.read_frame(file_list[0])
 scale_factor = first_frame.incident_intensity

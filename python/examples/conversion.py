@@ -43,6 +43,8 @@ anglecalibration.read_initial_calibration_from_file(str(my_path / "Angcal_2E_Feb
 
 anglecalibration.read_bad_channels_from_file(str(my_path / "bc2023_003_RING.chans"))
 
+plt.plot(anglecalibration.bad_channels) 
+
 #set scale factor to get reasonable scales 
 frame = mythenfilereader.read_frame(str(my_path / "Fructose_0p2_60_0060.h5"))
 

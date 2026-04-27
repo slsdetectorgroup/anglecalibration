@@ -805,6 +805,14 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             double statistical_weight =
                 bin_coverage_factor * inverse_photon_counts_variance_per_bin;
 
+            // set to zero if actually covered by beam
+            if (fixed_angle_width_bins_photon_counts(proper_bin_index) ==
+                -1.0) {
+                fixed_angle_width_bins_photon_counts(proper_bin_index) = 0.0;
+                fixed_angle_width_bins_photon_counts_variance(
+                    proper_bin_index) = 0.0;
+            }
+
             fixed_angle_width_bins_photon_counts(proper_bin_index) +=
                 statistical_weight * photon_counts_per_bin;
 
