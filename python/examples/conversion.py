@@ -71,7 +71,7 @@ print("conversion is done")
 #plot the converted diffraction pattern
 plotter = PlotHelper(anglecalibration)
 
-plotter.plot_diffraction_pattern(redistributed_photon_counts)
+plotter.plot_diffraction_pattern(redistributed_photon_counts[:,0].view())
 
 
 

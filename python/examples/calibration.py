@@ -86,10 +86,10 @@ test_frame_angle = mythenfilereader.read_detector_angle(test_frame_name)
 # plot one module for fixed angle width bins
 module_redistributed_to_fixed_angle_bins = anglecalibration.convert([test_frame_name], 1)
 
-plotter.plot_diffraction_pattern(module_redistributed_to_fixed_angle_bins.view(), 1, test_frame_angle)
+plotter.plot_diffraction_pattern(module_redistributed_to_fixed_angle_bins[:,0].view(), 1, test_frame_angle)
 
 # plot base peak for one module
-plotter.plot_base_peak(module_redistributed_to_fixed_angle_bins.view())
+plotter.plot_base_peak(module_redistributed_to_fixed_angle_bins[:,0].view())
 
 anglecalibration.calibrate(file_list, anglecalibration.base_peak_angle, module_index = 17, plot_calibration_process=True) 
 #anglecalibration.calibrate(file_list, anglecalibration.base_peak_angle, output_filename=str(env_data_path() / "angcal_Jul2025_P12_0p0105_new_calibrated3.off"))

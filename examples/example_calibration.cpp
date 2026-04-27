@@ -114,10 +114,16 @@ int main() {
             anglecalibration.diffraction_angle_from_DG_parameters(23, 0.0, 1279,
                                                                   +0.5));
 
+    auto first_frame = mythen_file_reader->read_frame(filelist[0]);
+    LOG(TLogLevel::logINFO)
+        << fmt::format("incident intensity of first frame: {}",
+                       first_frame.incident_intensity);
+    anglecalibration.set_scale_factor(first_frame.incident_intensity);
+
     LOG(TLogLevel::logDEBUG) << "selecting base peak";
 
     // select_base_peak(std::make_shared<AngleCalibration>(anglecalibration),
-    //                  mythen_file_reader, filelist, 0);
+    // mythen_file_reader, filelist, 0);
 
     // take a tabulated peak as base peak
     // or take a base peak for module 0 that is well inside the detector range
@@ -128,12 +134,6 @@ int main() {
     anglecalibration.set_base_peak_angle(base_peak_angle);
 
     anglecalibration.set_base_peak_ROI_width(0.18);
-
-    auto first_frame = mythen_file_reader->read_frame(filelist[0]);
-    LOG(TLogLevel::logINFO)
-        << fmt::format("incident intensity of first frame: {}",
-                       first_frame.incident_intensity);
-    anglecalibration.set_scale_factor(first_frame.incident_intensity);
 
     // anglecalibration.set_histogram_bin_width(0.01);
 

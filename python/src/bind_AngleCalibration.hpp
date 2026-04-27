@@ -311,7 +311,7 @@ void define_AngleCalibration_binding(py::module &m) {
             "convert",
             [](AngleCalibration &self,
                const std::vector<std::string> &file_list) {
-                auto result = new NDArray<double, 1>(self.convert(file_list));
+                auto result = new NDArray<double, 2>(self.convert(file_list));
                 return return_image_data(result);
             },
             py::arg("file_list"),
@@ -328,15 +328,15 @@ void define_AngleCalibration_binding(py::module &m) {
 
             Returns
             -------
-            numpy.ndarray (,num_fixed_angle_width_bins)
-                photon counts redistributed to fixed angle width bins, flatfield corrected and variance scaled photon counts, values of -1.0 denote bins with insufficient coverage or which are denoted by a bad channel)")
+            numpy.ndarray (num_fixed_angle_width_bins, 2)
+                first dimension photon counts redistributed to fixed angle width bins second dimension respective variance , values of -1.0 denote bins with insufficient coverage or which are denoted by a bad channel)")
 
         .def(
             "convert",
             [](AngleCalibration &self,
                const std::vector<std::string> &file_list,
                const size_t module_index) {
-                auto result = new NDArray<double, 1>(
+                auto result = new NDArray<double, 2>(
                     self.convert(file_list, module_index));
                 return return_image_data(result);
             },

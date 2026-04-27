@@ -291,9 +291,11 @@ class AngleCalibration {
      * @return flatfield corrected and variance scaled photon counts
      * redistributed to fixed angle width bins given in the range [min_angle,
      * max_angle] (values of -1.0 denote bins with insufficient coverage or
-     * which are denoted by a bad channel)
+     * which are denoted by a bad channel) (first dimension corresponds to
+     * redistributed photon counts, second dimension corresponds to variance of
+     * redistributed photon counts)
      */
-    NDArray<double, 1> convert(const std::vector<std::string> &file_list);
+    NDArray<double, 2> convert(const std::vector<std::string> &file_list);
 
     /**
      * @brief Performs angular conversion e.g. calculates from raw photon counts
@@ -303,9 +305,11 @@ class AngleCalibration {
      * @return flatfield corrected and variance scaled photon counts
      * redistributed to fixed angle width bins given in the range [min_angle,
      * max_angle] (values of -1.0 denote bins with insufficient coverage or
-     * which are denoted by a bad channel)
+     * which are denoted by a bad channel) (first dimension corresponds to
+     * redistributed photon counts, second dimension corresponds to variance of
+     * redistributed photon counts)
      */
-    NDArray<double, 1> convert(const std::vector<std::string> &file_list,
+    NDArray<double, 2> convert(const std::vector<std::string> &file_list,
                                const size_t module_index);
 
     /** @brief calculates diffraction angle from DG module parameters (used in
@@ -417,17 +421,13 @@ class AngleCalibration {
      * @param frame data from acquisition (storing detector position and photon
      * counts)
      * @param fixed_angle_width_bin_photon_counts stores redistributed photon
-     * counts for fixed angle width bin scaled by variance and flatfield
-     * corrected
-     * @param inverse_fixed_angle_width_bins_photon_counts_variance stores
-     * inverse variance
+     * counts for fixed angle width bin and the corresponding variance
      * @param sum_statistical_weights sum of statistical weights to normalize
      */
     template <bool base_peak_ROI_only = false>
     void redistribute_photon_counts_to_fixed_angle_width_bins(
         const size_t module_index, const MythenFrame &frame,
-        NDView<double, 1> fixed_angle_width_bins_photon_counts,
-        NDView<double, 1> inverse_fixed_angle_width_bins_photon_counts_variance,
+        NDView<double, 2> fixed_angle_width_bins_photon_counts,
         NDView<double, 1> sum_statistical_weights);
 
     /**
@@ -631,8 +631,7 @@ class AngleCalibration {
 template <bool base_peak_ROI_only>
 void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     const size_t module_index, const MythenFrame &frame,
-    NDView<double, 1> fixed_angle_width_bins_photon_counts,
-    NDView<double, 1> fixed_angle_width_bins_photon_counts_variance,
+    NDView<double, 2> fixed_angle_width_bins_photon_counts,
     NDView<double, 1> sum_statistical_weights) {
 
     ssize_t number_of_bins{}; // number of bins using fixed angle width bins
@@ -812,18 +811,17 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
                 bin_coverage_factor * inverse_photon_counts_variance_per_bin;
 
             // set to zero if actually covered by beam
-            if (fixed_angle_width_bins_photon_counts(proper_bin_index) ==
+            if (fixed_angle_width_bins_photon_counts(proper_bin_index, 0) ==
                 -1.0) {
-                fixed_angle_width_bins_photon_counts(proper_bin_index) = 0.0;
-                fixed_angle_width_bins_photon_counts_variance(
-                    proper_bin_index) = 0.0;
+                fixed_angle_width_bins_photon_counts(proper_bin_index, 0) = 0.0;
+                fixed_angle_width_bins_photon_counts(proper_bin_index, 1) = 0.0;
             }
 
-            fixed_angle_width_bins_photon_counts(proper_bin_index) +=
+            fixed_angle_width_bins_photon_counts(proper_bin_index, 0) +=
                 statistical_weight * photon_counts_per_bin;
 
             // TODO: need to fix !!!
-            fixed_angle_width_bins_photon_counts_variance(proper_bin_index) +=
+            fixed_angle_width_bins_photon_counts(proper_bin_index, 1) +=
                 inverse_photon_counts_variance_per_bin *
                 std::pow(bin_coverage_factor,
                          2); // variance * statistical_weight^2 = variance⁻2 *

@@ -44,7 +44,7 @@ def select_base_peak(anglecalibration,
                     [file], module_index) # always plots diffraction pattern independant of detector location.
 
             plotter.plot_diffraction_pattern(
-                module_redistributed_to_fixed_angle_bins.view(), module_index,
+                module_redistributed_to_fixed_angle_bins[:,0].view(), module_index,
                 detector_angle, axis=axis)
     
     

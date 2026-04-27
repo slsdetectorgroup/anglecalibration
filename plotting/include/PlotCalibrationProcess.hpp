@@ -39,10 +39,14 @@ class PlotCalibrationProcess {
         initializeplot();
     }
 
-    void add_curve(const aare::NDView<double, 1> &photon_counts_base_peak_ROI) {
-        std::vector<double> counts(photon_counts_base_peak_ROI.size());
-        counts.assign(photon_counts_base_peak_ROI.begin(),
-                      photon_counts_base_peak_ROI.end()); // uff need std::span
+    void add_curve(const aare::NDView<double, 2> &photon_counts_base_peak_ROI) {
+        std::vector<double> counts(photon_counts_base_peak_ROI.shape(0));
+        // counts.assign(photon_counts_base_peak_ROI.begin(),
+        //  photon_counts_base_peak_ROI.end()); // uff need std::span
+
+        for (size_t i = 0; i < counts.size(); ++i) {
+            counts[i] = photon_counts_base_peak_ROI(i, 0);
+        }
 
         matplotlibcpp::plot(bins,
                             counts); // append line to the existing figure

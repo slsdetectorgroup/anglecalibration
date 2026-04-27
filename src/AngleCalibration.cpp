@@ -604,11 +604,8 @@ double AngleCalibration::calculate_similarity_of_peaks_between_modules(
 
                 if (base_peak_is_in_module(mod_index, frame.detector_angle)) {
 
-                    NDArray<double, 1> fixed_angle_width_bins_photon_counts(
-                        std::array<ssize_t, 1>{num_bins_in_ROI}, -1.0);
-                    NDArray<double, 1>
-                        fixed_angle_width_bins_photon_counts_variance(
-                            std::array<ssize_t, 1>{num_bins_in_ROI}, -1.0);
+                    NDArray<double, 2> fixed_angle_width_bins_photon_counts(
+                        std::array<ssize_t, 2>{num_bins_in_ROI, 2}, -1.0);
 
                     NDArray<double, 1> sum_statistical_weights(
                         std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
@@ -619,52 +616,51 @@ double AngleCalibration::calculate_similarity_of_peaks_between_modules(
                     redistribute_photon_counts_to_fixed_angle_width_bins<true>(
                         mod_index, frame,
                         fixed_angle_width_bins_photon_counts.view(),
-                        fixed_angle_width_bins_photon_counts_variance.view(),
                         sum_statistical_weights.view());
 
                     // S_index = sum_i^num_runs
                     // photon_count^index*photon_variance
                     // normalize statistical weights
                     for (ssize_t i = 0;
-                         i < fixed_angle_width_bins_photon_counts.size(); ++i) {
-
-                        if (fixed_angle_width_bins_photon_counts[i] == -1.0) {
+                         i < fixed_angle_width_bins_photon_counts.shape(0);
+                         ++i) {
+                        if (fixed_angle_width_bins_photon_counts(i, 0) ==
+                            -1.0) {
                             continue;
                         }
 
-                        fixed_angle_width_bins_photon_counts(i) =
+                        fixed_angle_width_bins_photon_counts(i, 0) =
                             sum_statistical_weights(i) <
                                     std::numeric_limits<double>::epsilon()
                                 ? 0.0
-                                : fixed_angle_width_bins_photon_counts(i) /
+                                : fixed_angle_width_bins_photon_counts(i, 0) /
                                       sum_statistical_weights(i); // y_k
 
-                        fixed_angle_width_bins_photon_counts_variance(i) =
+                        fixed_angle_width_bins_photon_counts(i, 1) =
                             sum_statistical_weights(i) <
                                     std::numeric_limits<double>::epsilon()
                                 ? 0.0
-                                : fixed_angle_width_bins_photon_counts_variance(
-                                      i) /
+                                : fixed_angle_width_bins_photon_counts(i, 1) /
                                       std::pow(sum_statistical_weights(i),
                                                2); // y_k
 
-                        double inverse_fixed_angle_width_bins_photon_counts_variance =
-                            fixed_angle_width_bins_photon_counts_variance(i) <
-                                    std::numeric_limits<double>::epsilon()
-                                ? 0.0
-                                : 1. /
-                                      fixed_angle_width_bins_photon_counts_variance(
-                                          i);
+                        double
+                            inverse_fixed_angle_width_bins_photon_counts_variance =
+                                fixed_angle_width_bins_photon_counts(i, 1) <
+                                        std::numeric_limits<double>::epsilon()
+                                    ? 0.0
+                                    : 1. / fixed_angle_width_bins_photon_counts(
+                                               i, 1);
                         S0(i) +=
                             inverse_fixed_angle_width_bins_photon_counts_variance;
 
                         S1(i) +=
-                            fixed_angle_width_bins_photon_counts(i) *
+                            fixed_angle_width_bins_photon_counts(i, 0) *
                             inverse_fixed_angle_width_bins_photon_counts_variance;
 
                         S2(i) +=
-                            fixed_angle_width_bins_photon_counts(i) *
-                            fixed_angle_width_bins_photon_counts(i) *
+                            fixed_angle_width_bins_photon_counts(i, 0) *
+                            fixed_angle_width_bins_photon_counts(i, 0) *
                             inverse_fixed_angle_width_bins_photon_counts_variance;
                     }
                     ++num_runs;
@@ -728,10 +724,8 @@ double AngleCalibration::calculate_similarity_of_peaks_between_acquisitions(
             LOG(TLogLevel::logDEBUG1)
                 << fmt::format("detector angle: {}", frame.detector_angle);
 
-            NDArray<double, 1> fixed_angle_width_bins_photon_counts(
-                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-            NDArray<double, 1> fixed_angle_width_bins_photon_counts_variance(
-                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+            NDArray<double, 2> fixed_angle_width_bins_photon_counts(
+                std::array<ssize_t, 2>{num_bins_in_ROI, 2}, -1.0);
 
             NDArray<double, 1> sum_statistical_weights(
                 std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
@@ -742,43 +736,53 @@ double AngleCalibration::calculate_similarity_of_peaks_between_acquisitions(
             redistribute_photon_counts_to_fixed_angle_width_bins<true>(
                 module_index, frame,
                 fixed_angle_width_bins_photon_counts.view(),
-                fixed_angle_width_bins_photon_counts_variance.view(),
                 sum_statistical_weights.view());
 
             // S_index = sum_i^num_runs
             // photon_count^index*photon_variance
             // normalize statistical weights
-            for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.size();
-                 ++i) {
+            for (ssize_t i = 0;
+                 i < fixed_angle_width_bins_photon_counts.shape(0); ++i) {
 
-                fixed_angle_width_bins_photon_counts(i) =
-                    sum_statistical_weights(i) <
-                            std::numeric_limits<double>::epsilon()
-                        ? 0.0
-                        : fixed_angle_width_bins_photon_counts(i) /
-                              sum_statistical_weights(i); // y_k
+                if (fixed_angle_width_bins_photon_counts(i, 0) == -1.0) {
+                    continue;
+                } else {
 
-                fixed_angle_width_bins_photon_counts_variance(i) =
-                    sum_statistical_weights(i) <
-                            std::numeric_limits<double>::epsilon()
-                        ? 0.0
-                        : fixed_angle_width_bins_photon_counts_variance(i) /
-                              std::pow(sum_statistical_weights(i), 2); // y_k
+                    fixed_angle_width_bins_photon_counts(i, 0) =
+                        sum_statistical_weights(i) <
+                                std::numeric_limits<double>::epsilon()
+                            ? 0.0
+                            : fixed_angle_width_bins_photon_counts(i, 0) /
+                                  sum_statistical_weights(i); // y_k
 
-                double inverse_fixed_angle_width_bins_photon_counts_variance =
-                    fixed_angle_width_bins_photon_counts_variance(i) <
-                            std::numeric_limits<double>::epsilon()
-                        ? 0.0
-                        : 1. / fixed_angle_width_bins_photon_counts_variance(i);
+                    fixed_angle_width_bins_photon_counts(i, 1) =
+                        sum_statistical_weights(i) <
+                                std::numeric_limits<double>::epsilon()
+                            ? 0.0
+                            : fixed_angle_width_bins_photon_counts(i, 1) /
+                                  std::pow(sum_statistical_weights(i),
+                                           2); // y_k
 
-                S0(i) += inverse_fixed_angle_width_bins_photon_counts_variance;
+                    double
+                        inverse_fixed_angle_width_bins_photon_counts_variance =
+                            fixed_angle_width_bins_photon_counts(i, 1) <
+                                    std::numeric_limits<double>::epsilon()
+                                ? 0.0
+                                : 1. / fixed_angle_width_bins_photon_counts(i,
+                                                                            1);
 
-                S1(i) += fixed_angle_width_bins_photon_counts(i) *
-                         inverse_fixed_angle_width_bins_photon_counts_variance;
+                    S0(i) +=
+                        inverse_fixed_angle_width_bins_photon_counts_variance;
 
-                S2(i) += fixed_angle_width_bins_photon_counts(i) *
-                         fixed_angle_width_bins_photon_counts(i) *
-                         inverse_fixed_angle_width_bins_photon_counts_variance;
+                    S1(i) +=
+                        fixed_angle_width_bins_photon_counts(i, 0) *
+                        inverse_fixed_angle_width_bins_photon_counts_variance;
+
+                    S2(i) +=
+                        fixed_angle_width_bins_photon_counts(i, 0) *
+                        fixed_angle_width_bins_photon_counts(i, 0) *
+                        inverse_fixed_angle_width_bins_photon_counts_variance;
+                }
             }
             if (plot) {
                 plot->add_curve(fixed_angle_width_bins_photon_counts.view());
@@ -833,10 +837,8 @@ double AngleCalibration::center_base_peak(
         // base peak angle is in module
         if (base_peak_is_in_module(module_index, frame.detector_angle)) {
 
-            NDArray<double, 1> fixed_angle_width_bins_photon_counts(
-                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-            NDArray<double, 1> fixed_angle_width_bins_photon_counts_variance(
-                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+            NDArray<double, 2> fixed_angle_width_bins_photon_counts(
+                std::array<ssize_t, 2>{num_bins_in_ROI, 2}, -1.0);
 
             NDArray<double, 1> sum_statistical_weights(
                 std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
@@ -847,20 +849,24 @@ double AngleCalibration::center_base_peak(
             redistribute_photon_counts_to_fixed_angle_width_bins<true>(
                 module_index, frame,
                 fixed_angle_width_bins_photon_counts.view(),
-                fixed_angle_width_bins_photon_counts_variance.view(),
                 sum_statistical_weights.view());
 
-            for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.size();
-                 ++i) {
-                fixed_angle_width_bins_photon_counts(i) =
-                    sum_statistical_weights(i) <
-                            std::numeric_limits<double>::epsilon()
-                        ? 0.0
-                        : fixed_angle_width_bins_photon_counts(i) /
-                              sum_statistical_weights(i); // y_k
-                sum_intensities_in_ROI +=
-                    fixed_angle_width_bins_photon_counts(i);
-                weighted_sum += i * fixed_angle_width_bins_photon_counts(i);
+            for (ssize_t i = 0;
+                 i < fixed_angle_width_bins_photon_counts.shape(0); ++i) {
+                if (fixed_angle_width_bins_photon_counts(i, 0) == -1.0) {
+                    continue;
+                } else {
+                    fixed_angle_width_bins_photon_counts(i, 0) =
+                        sum_statistical_weights(i) <
+                                std::numeric_limits<double>::epsilon()
+                            ? 0.0
+                            : fixed_angle_width_bins_photon_counts(i, 0) /
+                                  sum_statistical_weights(i); // y_k
+                    sum_intensities_in_ROI +=
+                        fixed_angle_width_bins_photon_counts(i, 0);
+                    weighted_sum +=
+                        i * fixed_angle_width_bins_photon_counts(i, 0);
+                }
             }
 
             // centerof mass - peak center converted to angles
@@ -878,7 +884,7 @@ double AngleCalibration::center_base_peak(
     return average_peak_center / num_runs;
 }
 
-NDArray<double, 1>
+NDArray<double, 2>
 AngleCalibration::convert(const std::vector<std::string> &file_list_) {
 
     ssize_t new_num_bins = num_fixed_angle_width_bins();
@@ -886,11 +892,13 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
     LOG(TLogLevel::logDEBUG)
         << fmt::format("num_fixed_angle_width_bins: {}", new_num_bins);
 
-    NDArray<double, 1> fixed_angle_width_bins_photon_counts =
-        NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, -1.0);
+    NDArray<double, 2> fixed_angle_width_bins_photon_counts =
+        NDArray<double, 2>(
+            std::array<ssize_t, 2>{new_num_bins, 2},
+            -1.0); // first dimension photon counts, second dimension variance
 
-    NDArray<double, 1> fixed_angle_width_bins_photon_variance =
-        NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, -1.0);
+    // NDArray<double, 1> fixed_angle_width_bins_photon_variance =
+    // NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, -1.0);
 
     NDArray<double, 1> sum_statistical_weights =
         NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
@@ -915,7 +923,6 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
             redistribute_photon_counts_to_fixed_angle_width_bins<false>(
                 module_index, frame,
                 fixed_angle_width_bins_photon_counts.view(),
-                fixed_angle_width_bins_photon_variance.view(),
                 sum_statistical_weights.view());
         }
 
@@ -928,7 +935,8 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
            "normalizing by statistical weight";
 
     // divide by statistial weight
-    for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.size(); ++i) {
+    for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.shape(0);
+         ++i) {
 
         /*
         RedistributedPhotonCountsLogFile.append(
@@ -939,19 +947,19 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
             fmt::format("{}\n", sum_statistical_weights(i)));
         */
 
-        if (fixed_angle_width_bins_photon_counts(i) > -1.0) {
-            fixed_angle_width_bins_photon_counts(i) =
+        if (fixed_angle_width_bins_photon_counts(i, 0) > -1.0) {
+            fixed_angle_width_bins_photon_counts(i, 0) =
                 sum_statistical_weights(i) <
                         std::numeric_limits<double>::epsilon()
                     ? 0.0
-                    : fixed_angle_width_bins_photon_counts(i) /
+                    : fixed_angle_width_bins_photon_counts(i, 0) /
                           sum_statistical_weights(i);
 
-            fixed_angle_width_bins_photon_variance(i) =
+            fixed_angle_width_bins_photon_counts(i, 1) =
                 sum_statistical_weights(i) <
                         std::numeric_limits<double>::epsilon()
                     ? 0.0
-                    : fixed_angle_width_bins_photon_variance(i) /
+                    : fixed_angle_width_bins_photon_counts(i, 1) /
                           std::pow(sum_statistical_weights(i), 2);
         }
     }
@@ -959,7 +967,7 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
     return fixed_angle_width_bins_photon_counts;
 }
 
-NDArray<double, 1>
+NDArray<double, 2>
 AngleCalibration::convert(const std::vector<std::string> &file_list_,
                           const size_t module_index) {
     ssize_t new_num_bins = num_fixed_angle_width_bins();
@@ -967,11 +975,10 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_,
     LOG(TLogLevel::logDEBUG)
         << fmt::format("num_fixed_angle_width_bins: {}", new_num_bins);
 
-    NDArray<double, 1> fixed_angle_width_bins_photon_counts =
-        NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, -1.0);
-
-    NDArray<double, 1> fixed_angle_width_bins_photon_variance =
-        NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, -1.0);
+    NDArray<double, 2> fixed_angle_width_bins_photon_counts =
+        NDArray<double, 2>(
+            std::array<ssize_t, 2>{new_num_bins, 2},
+            -1.0); // first dimension photon counts, second dimension variance
 
     NDArray<double, 1> sum_statistical_weights =
         NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
@@ -991,26 +998,26 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_,
 
         redistribute_photon_counts_to_fixed_angle_width_bins<false>(
             module_index, frame, fixed_angle_width_bins_photon_counts.view(),
-            fixed_angle_width_bins_photon_variance.view(),
             sum_statistical_weights.view());
     }
 
     // divide by statistial weight
-    for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.size(); ++i) {
+    for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.shape(0);
+         ++i) {
 
-        if (fixed_angle_width_bins_photon_counts(i) > -1.0) {
-            fixed_angle_width_bins_photon_counts(i) =
+        if (fixed_angle_width_bins_photon_counts(i, 0) > -1.0) {
+            fixed_angle_width_bins_photon_counts(i, 0) =
                 sum_statistical_weights(i) <
                         std::numeric_limits<double>::epsilon()
                     ? 0.0
-                    : fixed_angle_width_bins_photon_counts(i) /
+                    : fixed_angle_width_bins_photon_counts(i, 0) /
                           sum_statistical_weights(i);
 
-            fixed_angle_width_bins_photon_variance(i) =
+            fixed_angle_width_bins_photon_counts(i, 1) =
                 sum_statistical_weights(i) <
                         std::numeric_limits<double>::epsilon()
                     ? 0.0
-                    : fixed_angle_width_bins_photon_variance(i) /
+                    : fixed_angle_width_bins_photon_counts(i, 1) /
                           std::pow(sum_statistical_weights(i), 2);
         }
     }

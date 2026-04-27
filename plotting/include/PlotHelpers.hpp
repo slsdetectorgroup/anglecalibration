@@ -125,7 +125,7 @@ class PlotHelper {
      * module region
      */
     void plot_diffraction_pattern(
-        const NDView<double, 1> &photon_counts,
+        const NDView<double, 2> &photon_counts,
         std::optional<size_t> module_index = std::nullopt,
         std::optional<double> motor_position = std::nullopt) const;
 
@@ -136,29 +136,31 @@ class PlotHelper {
      * to diffraction pattern
      */
     void plot_base_peak(
-        const NDView<double, 1> photon_counts,
+        const NDView<double, 2> photon_counts,
         const std::optional<size_t> module_index = std::nullopt) const;
 
   private:
     inline size_t left_module_boundary_as_fixed_angle_bin_index(
         const size_t module_index, const double detector_angle) const {
 
-        return (m_anglecalibration->diffraction_angle_from_DG_parameters(
-                    module_index, detector_angle, 0, -0.5) -
-                m_anglecalibration->get_angular_range().first) /
-               m_anglecalibration->get_histogram_bin_width();
+        return static_cast<size_t>(
+            (m_anglecalibration->diffraction_angle_from_DG_parameters(
+                 module_index, detector_angle, 0, -0.5) -
+             m_anglecalibration->get_angular_range().first) /
+            m_anglecalibration->get_histogram_bin_width());
     }
 
     inline size_t right_module_boundary_as_fixed_angle_bin_index(
         const size_t module_index, const double detector_angle) const {
 
-        return (m_anglecalibration->diffraction_angle_from_DG_parameters(
-                    module_index, detector_angle,
-                    m_anglecalibration->get_detector_specifications()
-                        ->strips_per_module,
-                    +0.5) -
-                m_anglecalibration->get_angular_range().first) /
-               m_anglecalibration->get_histogram_bin_width();
+        return static_cast<size_t>(
+            (m_anglecalibration->diffraction_angle_from_DG_parameters(
+                 module_index, detector_angle,
+                 m_anglecalibration->get_detector_specifications()
+                     ->strips_per_module,
+                 +0.5) -
+             m_anglecalibration->get_angular_range().first) /
+            m_anglecalibration->get_histogram_bin_width());
     }
 
   private:
@@ -180,7 +182,7 @@ class PlotHelper {
 };
 
 inline void
-PlotHelper::plot_base_peak(const NDView<double, 1> photon_counts,
+PlotHelper::plot_base_peak(const NDView<double, 2> photon_counts,
                            const std::optional<size_t> module_index) const {
 
     std::string plot_title{};
@@ -218,9 +220,11 @@ PlotHelper::plot_base_peak(const NDView<double, 1> photon_counts,
             m_anglecalibration->get_histogram_bin_width() +
         1;
 
-    std::vector<double> photon_counts_vec;
-    photon_counts_vec.assign(photon_counts.begin() + left_boundary_bin,
-                             photon_counts.begin() + right_boundary_bin);
+    std::vector<double> photon_counts_vec(right_boundary_bin -
+                                          left_boundary_bin);
+    for (size_t i = left_boundary_bin; i < right_boundary_bin; ++i) {
+        photon_counts_vec[i - left_boundary_bin] = photon_counts(i, 0);
+    }
 
     matplotlibcpp::plot(bins, photon_counts_vec);
 
@@ -233,7 +237,7 @@ PlotHelper::plot_base_peak(const NDView<double, 1> photon_counts,
 // defined in hpp file otherwise random seg faults as singleton _interpreter of
 // matplotlibcpp is not properly initialized - not sure why
 inline void PlotHelper::plot_diffraction_pattern(
-    const NDView<double, 1> &photon_counts, std::optional<size_t> module_index,
+    const NDView<double, 2> &photon_counts, std::optional<size_t> module_index,
     std::optional<double> motor_position) const {
 
     std::string plot_title{};
@@ -262,9 +266,9 @@ inline void PlotHelper::plot_diffraction_pattern(
     initialize_axis(plot_title);
 
     size_t left_bin_boundary = 0;
-    size_t right_bin_boundary = photon_counts.size();
+    size_t right_bin_boundary = photon_counts.shape(0);
     if (module_index.has_value() &&
-        (photon_counts.size() ==
+        (photon_counts.shape(0) ==
          m_anglecalibration->num_fixed_angle_width_bins())) {
         left_bin_boundary = left_module_boundary_as_fixed_angle_bin_index(
             module_index.value(), motor_position.value());
@@ -278,9 +282,16 @@ inline void PlotHelper::plot_diffraction_pattern(
                       return bin_to_diffraction_angle(n++);
                   });
 
-    std::vector<double> photon_counts_vec;
-    photon_counts_vec.assign(photon_counts.begin() + left_bin_boundary,
-                             photon_counts.begin() + right_bin_boundary);
+    std::vector<double> photon_counts_vec(right_bin_boundary -
+                                          left_bin_boundary);
+
+    for (size_t i = left_bin_boundary; i < right_bin_boundary; ++i) {
+        photon_counts_vec[i - left_bin_boundary] =
+            photon_counts(i, 0); // TODO: better utility for slicing in NDView
+    }
+
+    // photon_counts_vec.assign(photon_counts.begin() + left_bin_boundary,
+    //  photon_counts.begin() + right_bin_boundary);
 
     matplotlibcpp::plot(bins, photon_counts_vec);
 
