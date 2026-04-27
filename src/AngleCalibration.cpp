@@ -525,7 +525,7 @@ std::pair<double, double> AngleCalibration::photon_count_correction(
     const double exposure_time) const {
 
     if (photon_counts < std::numeric_limits<double>::epsilon()) {
-        return std::pair<double, double>{0.0, 0.0}; // sanity check
+        return std::pair(0.0, 0.0); // sanity check
     }
 
     // mighells statistics
@@ -555,9 +555,11 @@ std::pair<double, double> AngleCalibration::photon_count_correction(
 
     auto [flatfield_normalized_photon_counts,
           flatfield_normalized_photon_counts_variance] =
-        flatfield_correction(transverse_width_corrected_photon_counts,
-                             transverse_width_corrected_photon_counts_variance,
-                             global_strip_index);
+        flatfield_correction(
+            transverse_width_corrected_photon_counts,
+            transverse_width_corrected_photon_counts_variance,
+            global_strip_index); // make sure to include bad chanenls of
+                                 // flatfield into bad channel list
 
     return std::pair<double, double>{
         flatfield_normalized_photon_counts,

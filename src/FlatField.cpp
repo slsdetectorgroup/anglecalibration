@@ -141,7 +141,7 @@ void FlatField::create_normalized_flatfield_from_filelist(
     flat_field = NDArray<double, 2>(
         std::array<ssize_t, 2>{
             static_cast<ssize_t>(mythen_detector->num_strips()), 2},
-        0.0);
+        -1.0);
 
     NDArray<double, 1> sum_statistical_weights(
         std::array<ssize_t, 1>{mythen_detector->num_strips()}, 0.0);
@@ -211,6 +211,8 @@ void FlatField::create_normalized_flatfield_from_filelist(
 
             if (photon_counts <= std::numeric_limits<double>::epsilon()) {
                 // bad_channels(strip_index) = true; // mark as bad channel
+                flat_field(strip_index, 0) = 0.0;
+                flat_field(strip_index, 1) = 0.0;
                 continue; // skip bad channels
             }
 
@@ -236,6 +238,12 @@ void FlatField::create_normalized_flatfield_from_filelist(
                 << fmt::format("strip {}, soft_window_coverage {}", strip_index,
                                soft_window_coverage);
 
+            if (flat_field(strip_index, 0) == -1.0) {
+                flat_field(strip_index, 0) =
+                    0.0; // initialize to zero if not set yet
+                flat_field(strip_index, 1) =
+                    0.0; // initialize to zero if not set yet
+            }
             flat_field(strip_index, 0) += photon_counts * soft_window_coverage;
             flat_field(strip_index, 1) += variance_photon_counts *
                                           soft_window_coverage *
@@ -251,10 +259,9 @@ void FlatField::create_normalized_flatfield_from_filelist(
          ++strip_index) {
 
         if (bad_channels(strip_index) ||
-            flat_field(strip_index, 1) <
+            flat_field(strip_index, 0) <
                 std::numeric_limits<double>::epsilon()) {
-            flat_field(strip_index, 0) = 0; // bad channel
-            flat_field(strip_index, 1) = 0; // bad channel
+            continue;
         } else {
 
             // solid angle correction
@@ -291,8 +298,10 @@ void FlatField::create_normalized_flatfield_from_filelist(
         "normalization factor for flatfield: {}", normalization_factor);
     for (ssize_t strip_index = 0; strip_index < mythen_detector->num_strips();
          ++strip_index) {
-        flat_field(strip_index, 0) /= normalization_factor;
-        flat_field(strip_index, 1) /= normalization_factor;
+        if (flat_field(strip_index, 0) != -1.0) {
+            flat_field(strip_index, 0) /= normalization_factor;
+            flat_field(strip_index, 1) /= normalization_factor;
+        }
     }
 }
 

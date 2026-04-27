@@ -721,13 +721,17 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             std::pow(strip_width_angle / histogram_bin_width,
                      2); // Var(aX) = a^2 Var(X)
 
-        if (photon_counts_per_bin == 0.0 ||
-            inverse_photon_counts_variance_per_bin == 0.0) {
+        /*
+        if (photon_counts_per_bin < std::numeric_limits<double>::epsilon() ||
+            inverse_photon_counts_variance_per_bin <
+                std::numeric_limits<double>::epsilon()) {
 
-            bad_channels(global_strip_index) =
-                true; // mark channel as bad if no
-            continue;
+            // bad_channels(global_strip_index) =
+            // true; // mark channel as bad if no
+
+            // continue;
         }
+        */
 
         LOG(TLogLevel::logDEBUG1)
             << fmt::format("corrected photon count for strip {} of module {}",
