@@ -73,8 +73,6 @@ inline LogFile
 
 inline LogFile StatisticalWeightsLogFile("StatisticalWeights.log");
 
-inline LogFile StatisticalWeightsLogFile1("StatisticalWeights1.log");
-
 inline LogFile BadChannelsLogFile("BadChannels.log");
 
 inline LogFile SolidAngleCorrectionLogFile2("SolidAngleCorrection.log");
@@ -86,3 +84,9 @@ inline LogFile IncidentIntensityLogFile("IncidentIntensity.log");
 inline LogFile StripWidthLogFile("StripWidth.log");
 
 inline LogFile CoverageLogFile("Coverage.log");
+
+// inline LogFile ExposureVarianceLogFile("ExposureVariance.log");
+
+inline LogFile PhotonCountsVarianceLogFile("PhotonCountsVariance.log");
+
+inline LogFile SumLogFile("Sum.log");

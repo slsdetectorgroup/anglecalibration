@@ -43,8 +43,6 @@ anglecalibration.read_initial_calibration_from_file(str(my_path / "Angcal_2E_Feb
 
 anglecalibration.read_bad_channels_from_file(str(my_path / "bc2023_003_RING.chans"))
 
-plt.plot(anglecalibration.bad_channels) 
-
 #set scale factor to get reasonable scales 
 frame = mythenfilereader.read_frame(str(my_path / "Fructose_0p2_60_0060.h5"))
 
@@ -68,10 +66,21 @@ redistributed_photon_counts = anglecalibration.convert(file_list)
 
 print("conversion is done")
 
+print("num fixed angle width bins: ", anglecalibration.num_fixed_angle_width_bins)
+
 #plot the converted diffraction pattern
 plotter = PlotHelper(anglecalibration)
 
 plotter.plot_diffraction_pattern(redistributed_photon_counts[:,0].view())
+
+bin_angles = np.arange(anglecalibration.angular_range[0], anglecalibration.angular_range[1], anglecalibration.histogram_bin_width)
+
+covered = redistributed_photon_counts[:,0] != -1.0 # bins with a value of -1 are bad channels or not covered bins 
+
+stacked_array = np.column_stack((bin_angles[covered], redistributed_photon_counts[covered]))
+
+np.savetxt(my_path / "converted.dat", stacked_array)
+
 
 
 

@@ -303,30 +303,36 @@ double AngleCalibration::angular_strip_width_from_EE_parameters(
                         local_strip_index, 0.5));
 }
 
-double AngleCalibration::chi_similarity_criterion(const NDView<double, 1> S0,
-                                                  const NDView<double, 1> S1,
-                                                  const NDView<double, 1> S2,
-                                                  const size_t num_runs) const {
+double AngleCalibration::chi_similarity_criterion(
+    const NDView<double, 2> weighted_sums,
+    const NDView<size_t, 1> num_contributing_photons) const {
 
     double similarity_criterion = 0;
 
+    /*
     if (num_runs == 0) {
         throw std::runtime_error(
             LOCATION +
             "Number of runs is zero - cannot calculate similarity criterion!");
     }
-    for (ssize_t bin_index = 0; bin_index < S0.size(); ++bin_index) {
+    */
+    for (ssize_t bin_index = 0; bin_index < weighted_sums.shape(0);
+         ++bin_index) {
 
         double weighted_average =
-            S0(bin_index) < std::numeric_limits<double>::epsilon()
+            weighted_sums(bin_index, 0) < std::numeric_limits<double>::epsilon()
                 ? 0.0
-                : 1. / S0(bin_index);
+                : 1. / weighted_sums(bin_index, 0);
 
-        double goodness_of_fit = std::sqrt(
-            (S2(bin_index) - S1(bin_index) * S1(bin_index) * weighted_average) /
-            num_runs); // calculates chi value for optimal
-                       // parameter a over all runs chi_bin = (a-
-                       // photon_count)*photon_variance
+        double goodness_of_fit =
+            num_contributing_photons(bin_index) == 1
+                ? 0.0
+                : (weighted_sums(bin_index, 2) -
+                   weighted_sums(bin_index, 1) * weighted_sums(bin_index, 1) *
+                       weighted_average) /
+                      (num_contributing_photons(bin_index) -
+                       1); // calculates chi value for optimal
+                           // parameter a over all runs chi_bin
 
         similarity_criterion +=
             goodness_of_fit * weighted_average; // scale by variance
@@ -345,7 +351,7 @@ bool AngleCalibration::base_peak_is_in_module(
     double right_module_boundary_angle = diffraction_angle_from_BC_parameters(
         module_index, detector_angle, mythen_detector->strips_per_module - 1);
 
-    LOG(TLogLevel::logDEBUG1) << fmt::format(
+    LOG(TLogLevel::logDEBUG2) << fmt::format(
         "module_boundaries_in_angle for module {} [{}, {}]\n", module_index,
         left_module_boundary_angle, right_module_boundary_angle);
 
@@ -566,253 +572,6 @@ std::pair<double, double> AngleCalibration::photon_count_correction(
         flatfield_normalized_photon_counts_variance};
 }
 
-double AngleCalibration::calculate_similarity_of_peaks_between_modules(
-    const size_t module_index,
-    const std::vector<MythenFrame> &frames_with_base_peak_overlap_module,
-    const std::vector<MythenFrame> &frames_with_base_peak_overlap_prev_module,
-    std::shared_ptr<PlotCalibrationProcess> plot) {
-
-    if (module_index == 0) {
-        throw std::runtime_error(LOCATION +
-                                 "Module index is zero - offset of module 0 is "
-                                 "fixed to zero and cannot be optimized");
-    }
-
-    ssize_t num_bins_in_ROI = get_base_peak_ROI_num_bins();
-
-    // used to calculate chi similarity criterion between peaks of different
-    // modules S_index = sum_i^num_modules
-    // photon_count^index*photon_variance
-    NDArray<double, 1> S2(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-    NDArray<double, 1> S1(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-    NDArray<double, 1> S0(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-
-    size_t num_modules_with_base_peak_overlap = 2;
-
-    size_t num_runs{};
-
-    for (const size_t mod_index : {module_index - 1, module_index}) {
-
-        const auto &frames_with_base_peak_overlap =
-            mod_index == module_index
-                ? frames_with_base_peak_overlap_module
-                : frames_with_base_peak_overlap_prev_module;
-
-        if (!module_is_disconnected(mod_index)) {
-
-            for (const auto &frame : frames_with_base_peak_overlap) {
-
-                if (base_peak_is_in_module(mod_index, frame.detector_angle)) {
-
-                    NDArray<double, 2> fixed_angle_width_bins_photon_counts(
-                        std::array<ssize_t, 2>{num_bins_in_ROI, 2}, -1.0);
-
-                    NDArray<double, 1> sum_statistical_weights(
-                        std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-
-                    // calculates flatfield normalized photon counts and
-                    // photon_count_variance for ROI around base_peak and
-                    // redistributes to fixed angle width bins
-                    redistribute_photon_counts_to_fixed_angle_width_bins<true>(
-                        mod_index, frame,
-                        fixed_angle_width_bins_photon_counts.view(),
-                        sum_statistical_weights.view());
-
-                    // S_index = sum_i^num_runs
-                    // photon_count^index*photon_variance
-                    // normalize statistical weights
-                    for (ssize_t i = 0;
-                         i < fixed_angle_width_bins_photon_counts.shape(0);
-                         ++i) {
-                        if (fixed_angle_width_bins_photon_counts(i, 0) ==
-                            -1.0) {
-                            continue;
-                        }
-
-                        fixed_angle_width_bins_photon_counts(i, 0) =
-                            sum_statistical_weights(i) <
-                                    std::numeric_limits<double>::epsilon()
-                                ? 0.0
-                                : fixed_angle_width_bins_photon_counts(i, 0) /
-                                      sum_statistical_weights(i); // y_k
-
-                        fixed_angle_width_bins_photon_counts(i, 1) =
-                            sum_statistical_weights(i) <
-                                    std::numeric_limits<double>::epsilon()
-                                ? 0.0
-                                : fixed_angle_width_bins_photon_counts(i, 1) /
-                                      std::pow(sum_statistical_weights(i),
-                                               2); // y_k
-
-                        double
-                            inverse_fixed_angle_width_bins_photon_counts_variance =
-                                fixed_angle_width_bins_photon_counts(i, 1) <
-                                        std::numeric_limits<double>::epsilon()
-                                    ? 0.0
-                                    : 1. / fixed_angle_width_bins_photon_counts(
-                                               i, 1);
-                        S0(i) +=
-                            inverse_fixed_angle_width_bins_photon_counts_variance;
-
-                        S1(i) +=
-                            fixed_angle_width_bins_photon_counts(i, 0) *
-                            inverse_fixed_angle_width_bins_photon_counts_variance;
-
-                        S2(i) +=
-                            fixed_angle_width_bins_photon_counts(i, 0) *
-                            fixed_angle_width_bins_photon_counts(i, 0) *
-                            inverse_fixed_angle_width_bins_photon_counts_variance;
-                    }
-                    ++num_runs;
-
-                    if (plot) {
-                        plot->add_curve(
-                            fixed_angle_width_bins_photon_counts.view());
-                    }
-                }
-            }
-            if (num_runs == 0) {
-                --num_modules_with_base_peak_overlap;
-                throw NoBasePeakOverLapError();
-            }
-        } else {
-            --num_modules_with_base_peak_overlap;
-            LOG(TLogLevel::logINFO) << fmt::format(
-                "Module {} is disconnected - skipping module", module_index);
-        }
-    }
-
-    if (num_modules_with_base_peak_overlap != 2) {
-        throw std::runtime_error(
-            LOCATION + "Base peak does not overlap with both modules - cannot "
-                       "calculate similarity of peaks between modules");
-    }
-
-    double similarity_of_peaks = chi_similarity_criterion(
-        S0.view(), S1.view(), S2.view(), num_modules_with_base_peak_overlap);
-
-    if (std::isnan(similarity_of_peaks) || std::isinf(similarity_of_peaks)) {
-        throw std::runtime_error(LOCATION +
-                                 "Similarity of peaks is NaN or "
-                                 "infinity - something went wrong in "
-                                 "calculation of similarity of peaks");
-    }
-
-    return similarity_of_peaks;
-}
-
-double AngleCalibration::calculate_similarity_of_peaks_between_acquisitions(
-    const size_t module_index,
-    const std::vector<MythenFrame> &frames_with_base_peak_overlap,
-    std::shared_ptr<PlotCalibrationProcess> plot) {
-
-    ssize_t num_bins_in_ROI = get_base_peak_ROI_num_bins();
-    // used to calculate chi similarity criterion between peaks of different
-    // acquisition S_index = sum_i^num_runs
-    // photon_count^index*photon_variance
-    NDArray<double, 1> S2(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-    NDArray<double, 1> S1(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-    NDArray<double, 1> S0(std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-
-    size_t num_runs = 0;
-    size_t file_number = 0;
-    for (const auto &frame : frames_with_base_peak_overlap) {
-
-        // base peak angle is in module
-        if (base_peak_is_in_module(module_index, frame.detector_angle)) {
-
-            LOG(TLogLevel::logDEBUG1)
-                << fmt::format("detector angle: {}", frame.detector_angle);
-
-            NDArray<double, 2> fixed_angle_width_bins_photon_counts(
-                std::array<ssize_t, 2>{num_bins_in_ROI, 2}, -1.0);
-
-            NDArray<double, 1> sum_statistical_weights(
-                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
-
-            // calculates flatfield normalized photon counts and
-            // photon_count_variance for ROI around base_peak and
-            // redistributes to fixed angle width bins
-            redistribute_photon_counts_to_fixed_angle_width_bins<true>(
-                module_index, frame,
-                fixed_angle_width_bins_photon_counts.view(),
-                sum_statistical_weights.view());
-
-            // S_index = sum_i^num_runs
-            // photon_count^index*photon_variance
-            // normalize statistical weights
-            for (ssize_t i = 0;
-                 i < fixed_angle_width_bins_photon_counts.shape(0); ++i) {
-
-                if (fixed_angle_width_bins_photon_counts(i, 0) == -1.0) {
-                    continue;
-                } else {
-
-                    fixed_angle_width_bins_photon_counts(i, 0) =
-                        sum_statistical_weights(i) <
-                                std::numeric_limits<double>::epsilon()
-                            ? 0.0
-                            : fixed_angle_width_bins_photon_counts(i, 0) /
-                                  sum_statistical_weights(i); // y_k
-
-                    fixed_angle_width_bins_photon_counts(i, 1) =
-                        sum_statistical_weights(i) <
-                                std::numeric_limits<double>::epsilon()
-                            ? 0.0
-                            : fixed_angle_width_bins_photon_counts(i, 1) /
-                                  std::pow(sum_statistical_weights(i),
-                                           2); // y_k
-
-                    double
-                        inverse_fixed_angle_width_bins_photon_counts_variance =
-                            fixed_angle_width_bins_photon_counts(i, 1) <
-                                    std::numeric_limits<double>::epsilon()
-                                ? 0.0
-                                : 1. / fixed_angle_width_bins_photon_counts(i,
-                                                                            1);
-
-                    S0(i) +=
-                        inverse_fixed_angle_width_bins_photon_counts_variance;
-
-                    S1(i) +=
-                        fixed_angle_width_bins_photon_counts(i, 0) *
-                        inverse_fixed_angle_width_bins_photon_counts_variance;
-
-                    S2(i) +=
-                        fixed_angle_width_bins_photon_counts(i, 0) *
-                        fixed_angle_width_bins_photon_counts(i, 0) *
-                        inverse_fixed_angle_width_bins_photon_counts_variance;
-                }
-            }
-            if (plot) {
-                plot->add_curve(fixed_angle_width_bins_photon_counts.view());
-            }
-            ++num_runs;
-        }
-
-        ++file_number;
-    }
-
-    if (num_runs == 0) {
-        throw NoBasePeakOverLapError();
-    }
-
-    double similarity_of_peaks =
-        num_runs == 0 ? std::numeric_limits<double>::infinity()
-                      : chi_similarity_criterion(S0.view(), S1.view(),
-                                                 S2.view(), num_runs);
-    LOG(TLogLevel::logDEBUG1) << "similarity_of_peaks: " << similarity_of_peaks;
-
-    if (std::isnan(similarity_of_peaks) || std::isinf(similarity_of_peaks)) {
-        throw std::runtime_error(LOCATION +
-                                 "Similarity of peaks is NaN or "
-                                 "infinity - something went wrong in "
-                                 "calculation of similarity of peaks");
-    }
-
-    return similarity_of_peaks;
-}
-
 double AngleCalibration::center_base_peak(
     const size_t module_index,
     const std::vector<MythenFrame> &frames_with_base_peak_overlap) {
@@ -837,35 +596,37 @@ double AngleCalibration::center_base_peak(
         // base peak angle is in module
         if (base_peak_is_in_module(module_index, frame.detector_angle)) {
 
-            NDArray<double, 2> fixed_angle_width_bins_photon_counts(
-                std::array<ssize_t, 2>{num_bins_in_ROI, 2}, -1.0);
+            NDArray<double, 2> weighted_sums(
+                std::array<ssize_t, 2>{num_bins_in_ROI, 3},
+                -1.0); // // weighted moments of order 0-2 for each bin
 
-            NDArray<double, 1> sum_statistical_weights(
-                std::array<ssize_t, 1>{num_bins_in_ROI}, 0.0);
+            NDArray<size_t, 1> num_contributing_photons(
+                std::array<ssize_t, 1>{num_bins_in_ROI},
+                0); // number of contributing photons for each bin
 
             // calculates flatfield normalized photon counts and
             // photon_count_variance for ROI around base_peak and
             // redistributes to fixed angle width bins
             redistribute_photon_counts_to_fixed_angle_width_bins<true>(
-                module_index, frame,
-                fixed_angle_width_bins_photon_counts.view(),
-                sum_statistical_weights.view());
+                module_index, frame, weighted_sums.view(),
+                num_contributing_photons.view());
 
-            for (ssize_t i = 0;
-                 i < fixed_angle_width_bins_photon_counts.shape(0); ++i) {
-                if (fixed_angle_width_bins_photon_counts(i, 0) == -1.0) {
+            for (ssize_t i = 0; i < weighted_sums.shape(0); ++i) {
+                if (weighted_sums(i, 0) == -1.0) {
                     continue;
                 } else {
-                    fixed_angle_width_bins_photon_counts(i, 0) =
-                        sum_statistical_weights(i) <
-                                std::numeric_limits<double>::epsilon()
-                            ? 0.0
-                            : fixed_angle_width_bins_photon_counts(i, 0) /
-                                  sum_statistical_weights(i); // y_k
+                    double
+                        photon_counts_redistributed_to_fixed_angle_width_bin =
+                            weighted_sums(i, 0) <
+                                    std::numeric_limits<double>::epsilon()
+                                ? 0.0
+                                : weighted_sums(i, 1) /
+                                      weighted_sums(i, 0); // y_k
                     sum_intensities_in_ROI +=
-                        fixed_angle_width_bins_photon_counts(i, 0);
+                        photon_counts_redistributed_to_fixed_angle_width_bin;
                     weighted_sum +=
-                        i * fixed_angle_width_bins_photon_counts(i, 0);
+                        i *
+                        photon_counts_redistributed_to_fixed_angle_width_bin;
                 }
             }
 
@@ -884,6 +645,56 @@ double AngleCalibration::center_base_peak(
     return average_peak_center / num_runs;
 }
 
+NDArray<double, 2> AngleCalibration::computeErrorandMean(
+    const NDView<double, 2> weighted_sums,
+    const NDView<size_t, 1> num_contributing_photons) const {
+
+    const ssize_t new_num_bins = num_fixed_angle_width_bins();
+
+    NDArray<double, 2> fixed_angle_width_bins_photon_counts(
+        std::array<ssize_t, 2>{new_num_bins, 2},
+        -1.0); // first dimension photon counts, second dimension error
+
+    // divide by statistial weight
+    for (ssize_t i = 0; i < weighted_sums.shape(0); ++i) {
+
+        /*
+        RedistributedPhotonCountsLogFile.append(
+            fmt::format("{}\n",
+        weighted_sums(i)));
+
+        StatisticalWeightsLogFile.append(
+            fmt::format("{}\n", weighted_sums(i, 0)));
+
+        SumLogFile.append(fmt::format("{}\n", weighted_sums(i, 1)));
+        */
+
+        if (weighted_sums(i, 1) > -1.0) {
+            fixed_angle_width_bins_photon_counts(i, 0) =
+                weighted_sums(i, 0) < std::numeric_limits<double>::epsilon()
+                    ? 0.0
+                    : weighted_sums(i, 1) /
+                          weighted_sums(i, 0); // weighted mean
+
+            double inverse_weights = 1. / weighted_sums(i, 0);
+
+            double goodness_of_fit =
+                num_contributing_photons(i) == 1
+                    ? 0.0
+                    : (weighted_sums(i, 2) - weighted_sums(i, 1) *
+                                                 weighted_sums(i, 1) *
+                                                 inverse_weights) /
+                          (num_contributing_photons(i) -
+                           1); // calculates chi value for optimal
+
+            fixed_angle_width_bins_photon_counts(i, 1) = std::sqrt(
+                goodness_of_fit * inverse_weights); // scale by variance
+        }
+    }
+
+    return fixed_angle_width_bins_photon_counts;
+}
+
 NDArray<double, 2>
 AngleCalibration::convert(const std::vector<std::string> &file_list_) {
 
@@ -892,27 +703,19 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
     LOG(TLogLevel::logDEBUG)
         << fmt::format("num_fixed_angle_width_bins: {}", new_num_bins);
 
-    NDArray<double, 2> fixed_angle_width_bins_photon_counts =
-        NDArray<double, 2>(
-            std::array<ssize_t, 2>{new_num_bins, 2},
-            -1.0); // first dimension photon counts, second dimension variance
-
-    // NDArray<double, 1> fixed_angle_width_bins_photon_variance =
-    // NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, -1.0);
-
-    NDArray<double, 1> sum_statistical_weights =
-        NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
+    NDArray<double, 2> weighted_moments(
+        std::array<ssize_t, 2>{new_num_bins, 3},
+        -1.0); // weighted moments of order 0-2 for each bin
+    NDArray<size_t, 1> num_contributing_photons(
+        std::array<ssize_t, 1>{new_num_bins},
+        0); // number of contributing photons for each bin
 
     for (const auto &file : file_list_) {
         MythenFrame frame = mythen_file_reader->read_frame(file);
 
         LOG(TLogLevel::logDEBUG)
             << fmt::format("redistributing photon counts for file: {}", file);
-        // TODO : actually they should not be added up each set of
-        // modules is independant - at beamline the module positions
-        // overlap (e.g. counterclockwise)
-        //  - how to handle in a generic way? - depends on detector
-        //  arrangement
+
         for (size_t module_index = 0;
              module_index < mythen_detector->max_modules; ++module_index) {
 
@@ -921,9 +724,8 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
             }
 
             redistribute_photon_counts_to_fixed_angle_width_bins<false>(
-                module_index, frame,
-                fixed_angle_width_bins_photon_counts.view(),
-                sum_statistical_weights.view());
+                module_index, frame, weighted_moments.view(),
+                num_contributing_photons.view());
         }
 
         LOG(TLogLevel::logDEBUG) << fmt::format(
@@ -934,37 +736,8 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
         << "redistributed photon counts to fixed angle width bins, now "
            "normalizing by statistical weight";
 
-    // divide by statistial weight
-    for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.shape(0);
-         ++i) {
-
-        /*
-        RedistributedPhotonCountsLogFile.append(
-            fmt::format("{}\n",
-        fixed_angle_width_bins_photon_counts(i)));
-
-        StatisticalWeightsLogFile.append(
-            fmt::format("{}\n", sum_statistical_weights(i)));
-        */
-
-        if (fixed_angle_width_bins_photon_counts(i, 0) > -1.0) {
-            fixed_angle_width_bins_photon_counts(i, 0) =
-                sum_statistical_weights(i) <
-                        std::numeric_limits<double>::epsilon()
-                    ? 0.0
-                    : fixed_angle_width_bins_photon_counts(i, 0) /
-                          sum_statistical_weights(i);
-
-            fixed_angle_width_bins_photon_counts(i, 1) =
-                sum_statistical_weights(i) <
-                        std::numeric_limits<double>::epsilon()
-                    ? 0.0
-                    : fixed_angle_width_bins_photon_counts(i, 1) /
-                          std::pow(sum_statistical_weights(i), 2);
-        }
-    }
-
-    return fixed_angle_width_bins_photon_counts;
+    return computeErrorandMean(weighted_moments.view(),
+                               num_contributing_photons.view());
 }
 
 NDArray<double, 2>
@@ -975,18 +748,18 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_,
     LOG(TLogLevel::logDEBUG)
         << fmt::format("num_fixed_angle_width_bins: {}", new_num_bins);
 
-    NDArray<double, 2> fixed_angle_width_bins_photon_counts =
-        NDArray<double, 2>(
-            std::array<ssize_t, 2>{new_num_bins, 2},
-            -1.0); // first dimension photon counts, second dimension variance
-
-    NDArray<double, 1> sum_statistical_weights =
-        NDArray<double, 1>(std::array<ssize_t, 1>{new_num_bins}, 0.0);
+    NDArray<double, 2> weighted_moments(
+        std::array<ssize_t, 2>{new_num_bins, 3},
+        -1.0); // weighted moments of order 0-2 for each bin
+    NDArray<size_t, 1> num_contributing_photons(
+        std::array<ssize_t, 1>{new_num_bins},
+        0); // number of contributing photons for each bin
 
     if (module_is_disconnected(module_index)) {
         LOG(TLogLevel::logINFO)
             << fmt::format("module {} is disconnected", module_index);
-        return fixed_angle_width_bins_photon_counts;
+        return NDArray<double, 2>(std::array<ssize_t, 2>{new_num_bins, 2},
+                                  -1.0);
     }
 
     for (const auto &file : file_list_) {
@@ -997,32 +770,12 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_,
         MythenFrame frame = mythen_file_reader->read_frame(file);
 
         redistribute_photon_counts_to_fixed_angle_width_bins<false>(
-            module_index, frame, fixed_angle_width_bins_photon_counts.view(),
-            sum_statistical_weights.view());
+            module_index, frame, weighted_moments.view(),
+            num_contributing_photons.view());
     }
 
-    // divide by statistial weight
-    for (ssize_t i = 0; i < fixed_angle_width_bins_photon_counts.shape(0);
-         ++i) {
-
-        if (fixed_angle_width_bins_photon_counts(i, 0) > -1.0) {
-            fixed_angle_width_bins_photon_counts(i, 0) =
-                sum_statistical_weights(i) <
-                        std::numeric_limits<double>::epsilon()
-                    ? 0.0
-                    : fixed_angle_width_bins_photon_counts(i, 0) /
-                          sum_statistical_weights(i);
-
-            fixed_angle_width_bins_photon_counts(i, 1) =
-                sum_statistical_weights(i) <
-                        std::numeric_limits<double>::epsilon()
-                    ? 0.0
-                    : fixed_angle_width_bins_photon_counts(i, 1) /
-                          std::pow(sum_statistical_weights(i), 2);
-        }
-    }
-
-    return fixed_angle_width_bins_photon_counts;
+    return computeErrorandMean(weighted_moments.view(),
+                               num_contributing_photons.view());
 }
 
 void AngleCalibration::optimize_offset_parameter(
@@ -1097,14 +850,14 @@ void AngleCalibration::optimize_offset_parameter(
         };
 
     double previous_similarity_of_peaks =
-        calculate_similarity_of_peaks_between_modules(
+        calculate_similarity_of_peaks_between_modules<false>(
             module_index, frames_with_base_peak_overlap,
             frames_with_base_peak_overlap_prev_module, nullptr);
 
     LOG(TLogLevel::logDEBUG) << fmt::format("initial similarity of peaks: {}",
                                             previous_similarity_of_peaks);
     if (plot) {
-        calculate_similarity_of_peaks_between_modules(
+        calculate_similarity_of_peaks_between_modules<true>(
             module_index, frames_with_base_peak_overlap,
             frames_with_base_peak_overlap_prev_module, plot);
 
@@ -1171,7 +924,7 @@ void AngleCalibration::optimize_offset_parameter(
             ++iteration_index;
 
             if (plot) {
-                calculate_similarity_of_peaks_between_modules(
+                calculate_similarity_of_peaks_between_modules<true>(
                     module_index, frames_with_base_peak_overlap,
                     frames_with_base_peak_overlap_prev_module, plot);
                 plot->show();
@@ -1261,7 +1014,7 @@ void AngleCalibration::optimize_offset_parameter(
             ++iteration_index;
 
             if (plot) {
-                calculate_similarity_of_peaks_between_modules(
+                calculate_similarity_of_peaks_between_modules<true>(
                     module_index, frames_with_base_peak_overlap,
                     frames_with_base_peak_overlap_prev_module, plot);
                 plot->show();
@@ -1334,7 +1087,7 @@ void AngleCalibration::optimize_coupled_parameters(
 
     double previous_similarity_of_peaks =
         calculate_similarity_of_peaks_between_acquisitions(
-            module_index, frames_with_base_peak_overlap, nullptr);
+            module_index, frames_with_base_peak_overlap, plot);
 
     LOG(logDEBUG) << fmt::format("initial similarity of peaks: {}",
                                  previous_similarity_of_peaks);
@@ -1402,7 +1155,7 @@ void AngleCalibration::optimize_coupled_parameters(
                            iteration_index, next_similarity_of_peaks);
 
         if (plot) {
-            calculate_similarity_of_peaks_between_acquisitions(
+            calculate_similarity_of_peaks_between_acquisitions<true>(
                 module_index, frames_with_base_peak_overlap, plot);
             plot->show();
         }
