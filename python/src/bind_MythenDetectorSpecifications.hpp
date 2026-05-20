@@ -33,6 +33,12 @@ void define_MythenDetectorSpecifications_binding(py::module &m) {
         offset: double
             Additional offset to sample detector offset (can change in experimental setup) [degrees] (default: 0.0°)
 
+        sample_x_displacement: double
+            Displacement of sample in x direction of horizontal sample plane [mm] (default: 0.0 mm)
+        
+        sample_y_displacement: double
+            Displacement of sample in y direction of horizontal sample plane [mm] (default: 0.0 mm)
+
         elastic_correction_factor: double
             Elastic correction factor for torsional compliance correction model (default: 0.0)
         
@@ -87,6 +93,12 @@ void define_MythenDetectorSpecifications_binding(py::module &m) {
         .def_readwrite(
             "detector_vertical_axis_offset",
             &MythenDetectorSpecifications::detector_vertical_axis_offset)
+
+        .def_readwrite("sample_x_displacement",
+                       &MythenDetectorSpecifications::sample_x_displacement)
+
+        .def_readwrite("sample_y_displacement",
+                       &MythenDetectorSpecifications::sample_y_displacement)
 
         .def_readwrite("dead_time", &MythenDetectorSpecifications::dead_time)
 
