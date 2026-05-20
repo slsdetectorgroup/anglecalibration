@@ -193,6 +193,39 @@ size_t AngleCalibration::global_to_local_strip_index_conversion(
     return local_strip_index;
 }
 
+double AngleCalibration::sample_displacement_correction(
+    const double diffraction_angle) const {
+
+    /*
+    double sample_displacement_correction =
+        std::atan(std::tan(M_PI / 180.0 * diffraction_angle) *
+                  std::sqrt(std::pow(mythen_detector->sample_x_displacement, 2)
+    + std::pow(mythen_detector->sample_y_displacement, 2)) /
+                  mythen_detector->average_distance_sample_pixel);
+    */
+
+    double whatever1 = std::sin(M_PI / 180.0 * diffraction_angle) +
+                       mythen_detector->sample_y_displacement /
+                           mythen_detector->average_distance_sample_pixel;
+
+    double whatever2 = std::cos(M_PI / 180.0 * diffraction_angle) -
+                       mythen_detector->sample_x_displacement /
+                           mythen_detector->average_distance_sample_pixel;
+
+    if (std::abs(whatever2) < std::numeric_limits<double>::epsilon()) {
+        LOG(TLogLevel::logWARNING) << fmt::format(
+            "Sample displacement correction is unstable for diffraction "
+            "angle {} degrees due to small denominator in arctan.",
+            diffraction_angle);
+        return diffraction_angle;
+    }
+
+    double sample_displacement_correction =
+        180.0 / M_PI * std::atan(whatever1 / whatever2);
+
+    return sample_displacement_correction;
+}
+
 double AngleCalibration::elastic_correction(const double detector_angle) const {
     return detector_angle +
            mythen_detector->elastic_correction_factor *
@@ -214,13 +247,16 @@ double AngleCalibration::diffraction_angle_from_DG_parameters(
             ? MythenDetectorSpecifications::strips_per_module - strip_index - 1
             : strip_index; // TODO: are the values sored in reserve?
 
-    return offset +
-           180.0 / M_PI *
-               (center * std::abs(conversion) -
-                std::atan((center - (strip_index + distance_to_strip)) *
-                          std::abs(conversion))) +
-           elastic_correction(detector_angle) + mythen_detector->offset +
-           mythen_detector->sample_detector_offset;
+    double diffraction_angle =
+        offset +
+        180.0 / M_PI *
+            (center * std::abs(conversion) -
+             std::atan((center - (strip_index + distance_to_strip)) *
+                       std::abs(conversion))) +
+        elastic_correction(detector_angle) + mythen_detector->offset +
+        mythen_detector->sample_detector_offset;
+
+    return sample_displacement_correction(diffraction_angle);
 }
 
 double AngleCalibration::diffraction_angle_from_BC_parameters(
@@ -239,18 +275,20 @@ double AngleCalibration::diffraction_angle_from_BC_parameters(
             ? MythenDetectorSpecifications::strips_per_module - strip_index - 1
             : strip_index; // TODO: are the values sored in reserve?
 
-    return angle_module_center_beam + angle_module_center_normal -
-           180.0 / M_PI *
-               std::atan(
-                   (std::abs(distance_center_sample) *
-                        std::sin(M_PI / 180.0 * angle_module_center_normal) +
-                    (MythenDetectorSpecifications::strips_per_module * 0.5 -
-                     strip_index - distance_to_strip) *
-                        MythenDetectorSpecifications::pitch) /
-                   (std::abs(distance_center_sample) *
-                    std::cos(M_PI / 180.0 * angle_module_center_normal))) +
-           elastic_correction(detector_angle) + mythen_detector->offset +
-           mythen_detector->sample_detector_offset;
+    double diffraction_angle =
+        angle_module_center_beam + angle_module_center_normal -
+        180.0 / M_PI *
+            std::atan((std::abs(distance_center_sample) *
+                           std::sin(M_PI / 180.0 * angle_module_center_normal) +
+                       (MythenDetectorSpecifications::strips_per_module * 0.5 -
+                        strip_index - distance_to_strip) *
+                           MythenDetectorSpecifications::pitch) /
+                      (std::abs(distance_center_sample) *
+                       std::cos(M_PI / 180.0 * angle_module_center_normal))) +
+        elastic_correction(detector_angle) + mythen_detector->offset +
+        mythen_detector->sample_detector_offset;
+
+    return sample_displacement_correction(diffraction_angle);
 }
 
 double AngleCalibration::diffraction_angle_from_EE_parameters(
@@ -263,14 +301,17 @@ double AngleCalibration::diffraction_angle_from_EE_parameters(
             ? MythenDetectorSpecifications::strips_per_module - strip_index - 1
             : strip_index;
 
-    return angle -
-           180.0 / M_PI *
-               std::atan((module_center_distance -
-                          MythenDetectorSpecifications::pitch *
-                              (strip_index + distance_to_strip)) /
-                         std::abs(normal_distance)) +
-           elastic_correction(detector_angle) + mythen_detector->offset +
-           mythen_detector->sample_detector_offset;
+    double diffraction_angle =
+        angle -
+        180.0 / M_PI *
+            std::atan((module_center_distance -
+                       MythenDetectorSpecifications::pitch *
+                           (strip_index + distance_to_strip)) /
+                      std::abs(normal_distance)) +
+        elastic_correction(detector_angle) + mythen_detector->offset +
+        mythen_detector->sample_detector_offset;
+
+    return sample_displacement_correction(diffraction_angle);
 }
 
 double AngleCalibration::angular_strip_width_from_DG_parameters(

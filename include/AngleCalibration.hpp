@@ -404,6 +404,16 @@ class AngleCalibration {
         const size_t global_strip_index) const;
 
     /**
+     * @brief calculates the correction of the diffraction angle due to sample
+     * displacement in the x and y direction of the horizontal sample plane
+     * @param diffraction_angle diffraction angle calculated at center of strip
+     * without sample displacement correction [degrees]
+     * @return correction of diffraction angle due to sample displacement
+     * [degrees]
+     */
+    double sample_displacement_correction(const double diffraction_angle) const;
+
+    /**
      * @brief calculates the elastic correction factor for given detector angle
      * based on torsional compliance correction model
      * @param detector_angle detector axis motor position [degrees]

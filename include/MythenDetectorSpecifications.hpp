@@ -52,6 +52,14 @@ struct MythenDetectorSpecifications {
     /// [degrees]
     double detector_vertical_axis_offset = 0.0;
 
+    /// @brief displacement of sample in x direction of horizontal sample plane
+    /// // TODO whats the unit?
+    double sample_x_displacement = 0.0;
+
+    /// @brief displacement of sample in y direction of horizontal sample plane
+    /// // TODO whats the unit?
+    double sample_y_displacement = 0.0;
+
     /// @brief measured dead-time [s]
     double dead_time =
         76.08e-9; // measured dead-time 31.8E-9_DP, 95.E-9_DP other beam

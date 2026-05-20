@@ -15,6 +15,8 @@ class PlotHelper:
             Calibrated angle-calibration object used to compute plot axes and limits.
         """
 
+        self._overwrite_plot = False
+
         # maybe add freeze 
         self._anglecalibration = anglecalibration
         self._left_module_boundary_as_bin_index = lambda module_index, detector_angle : int((self._anglecalibration.diffraction_angle_from_DG_parameters( module_index, detector_angle, 0, -0.5) -  self._anglecalibration.angular_range[0]) // self._anglecalibration.histogram_bin_width)
@@ -79,11 +81,11 @@ class PlotHelper:
             plt.show(block=False)
             input("Press Enter to continue...")
         else:
-            if self._overwrite_plot:
+            if self.overwrite_plot:
                 axis.clear()
 
             axis.plot(bins, photon_counts[left_bin_boundary:right_bin_boundary])
-            if self._overwrite_plot:
+            if self.overwrite_plot:
                 fig = axis.figure
                 fig.canvas.draw()
                 fig.show()  
@@ -128,9 +130,9 @@ class PlotHelper:
             plt.show(block=False)
             input("Press Enter to continue...")
         else:
-            if self._overwrite_plot:
+            if self.overwrite_plot:
                 axis.clear()
             axis.plot(bins, photon_counts[left_bin_boundary:right_bin_boundary])
-            if self._overwrite_plot:
+            if self.overwrite_plot:
                 plt.show(block=False)
                 input("Press Enter to continue...")
