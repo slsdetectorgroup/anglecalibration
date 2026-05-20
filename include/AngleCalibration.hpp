@@ -314,8 +314,7 @@ class AngleCalibration {
      * Beer's Law)
      * @param detector_angle detector position [degrees]
      * @param strip_index local strip index of module e.g. 0-1279
-     * @param distance_to_strip distance to strip (if 0.0 calculates diffraction
-     * angle at center of strip) [given in strips]
+     * @param distance_to_strip distance to strip [given in strips]
      * @return diffraction angle [degrees]
      */
     double diffraction_angle_from_DG_parameters(
@@ -326,8 +325,7 @@ class AngleCalibration {
      * parameters (used in Beer's Law)
      * @param detector_angle detector position [degrees]
      * @param strip_index local strip index of module e.g. 0-1279
-     * @param distance_to_strip distance to strip (if 0.0 calculates diffraction
-     * angle at center of strip) [given in strips]
+     * @param distance_to_strip distance to strip [given in strips]
      * @return diffraction angle [degrees]
      */
     double diffraction_angle_from_BC_parameters(
@@ -338,8 +336,7 @@ class AngleCalibration {
      * Beer's Law)
      * @param detector_angle detector position [degrees]
      * @param strip_index local strip index of module
-     * @param distance_to_strip distance to strip (if 0.0 calculates diffraction
-     * angle at center of strip) [given in strips]
+     * @param distance_to_strip distance to strip [given in strips]
      * @return diffraction angle [degrees]
      */
     double diffraction_angle_from_EE_parameters(
@@ -921,12 +918,12 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
 
         double left_strip_boundary_angle = diffraction_angle_from_BC_parameters(
             module_index, frame.detector_angle, strip_index,
-            -0.5); // left strip boundary in angles [degrees] // -0.5
+            0.0); // left strip boundary in angles [degrees] // -0.5
 
         double right_strip_boundary_angle =
             diffraction_angle_from_BC_parameters(
                 module_index, frame.detector_angle, strip_index,
-                +0.5); // right strip boundary in angles [degrees] // +0.5
+                +1.0); // right strip boundary in angles [degrees] // +0.5
 
         if (left_strip_boundary_angle < m_min_angle ||
             right_strip_boundary_angle > m_max_angle) {

@@ -145,7 +145,7 @@ class PlotHelper {
 
         return static_cast<size_t>(
             (m_anglecalibration->diffraction_angle_from_DG_parameters(
-                 module_index, detector_angle, 0, -0.5) -
+                 module_index, detector_angle, 0, 0.0) -
              m_anglecalibration->get_angular_range().first) /
             m_anglecalibration->get_histogram_bin_width());
     }
@@ -158,7 +158,7 @@ class PlotHelper {
                  module_index, detector_angle,
                  m_anglecalibration->get_detector_specifications()
                      ->strips_per_module,
-                 +0.5) -
+                 +1.0) -
              m_anglecalibration->get_angular_range().first) /
             m_anglecalibration->get_histogram_bin_width());
     }

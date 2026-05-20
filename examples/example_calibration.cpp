@@ -110,9 +110,9 @@ int main() {
 
     LOG(TLogLevel::logINFO) << fmt::format(
         "range of detector [degrees]: {}",
-        anglecalibration.diffraction_angle_from_DG_parameters(0, 0.0, 0, -0.5) -
+        anglecalibration.diffraction_angle_from_DG_parameters(0, 0.0, 0, 0.0) -
             anglecalibration.diffraction_angle_from_DG_parameters(23, 0.0, 1279,
-                                                                  +0.5));
+                                                                  +1.0));
 
     auto first_frame = mythen_file_reader->read_frame(filelist[0]);
     LOG(TLogLevel::logINFO)

@@ -40,10 +40,10 @@ void get_angle_range_of_module(
         mythen_file_reader->read_frame(file_list[0]).detector_angle;
     double max_left_module_angle =
         anglecalibration.diffraction_angle_from_DG_parameters(
-            module_index, detector_angle, 0, -0.5);
+            module_index, detector_angle, 0, 0.0);
     double max_right_module_angle =
         anglecalibration.diffraction_angle_from_DG_parameters(
-            module_index, detector_angle, 1279, +0.5);
+            module_index, detector_angle, 1279, +1.0);
 
     double min_left_module_angle = max_left_module_angle;
     double min_right_module_angle = max_right_module_angle;
@@ -52,10 +52,10 @@ void get_angle_range_of_module(
         detector_angle = mythen_file_reader->read_frame(frame).detector_angle;
         double left_module_angle =
             anglecalibration.diffraction_angle_from_DG_parameters(
-                module_index, detector_angle, 0, -0.5);
+                module_index, detector_angle, 0, 0.0);
         double right_module_angle =
             anglecalibration.diffraction_angle_from_DG_parameters(
-                module_index, detector_angle, 1279, +0.5);
+                module_index, detector_angle, 1279, +1.0);
 
         if (left_module_angle < min_left_module_angle &&
             right_module_angle < min_right_module_angle) {
@@ -112,7 +112,7 @@ void select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
 
     double left_module_strip_angle =
         anglecalibration->diffraction_angle_from_DG_parameters(module_index,
-                                                               0.0, 0, -0.5);
+                                                               0.0, 0, 0.0);
     LOG(TLogLevel::logDEBUG)
         << fmt::format("strip angle: {}", left_module_strip_angle);
 

@@ -72,7 +72,7 @@ void define_FlatField_binding(py::module &m) {
             strip_index: int
                 Local strip index of module e.g. 0-1279
             distance_to_strip: float
-                Distance to strip (if 0.0 calculates diffraction angle at center of strip) [given in strips]
+                Distance to strip [given in strips]
             Returns
             -------
             float

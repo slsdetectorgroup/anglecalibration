@@ -188,12 +188,12 @@ void FlatField::create_normalized_flatfield_from_filelist(
             const double left_strip_boundary_angle =
                 diffraction_angle_from_DG_parameters(
                     module_index, frame.detector_angle, local_strip_index,
-                    -0.5); // left strip boundary in angles [degrees]
+                    0.0); // left strip boundary in angles [degrees]
 
             const double right_strip_boundary_angle =
                 diffraction_angle_from_DG_parameters(
                     module_index, frame.detector_angle, local_strip_index,
-                    +0.5); // right strip boundary in angles [degrees]
+                    1.0); // right strip boundary in angles [degrees]
 
             // skip if channel is completely outside of soft window
             if (right_strip_boundary_angle < soft_window.first ||

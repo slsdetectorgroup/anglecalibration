@@ -19,9 +19,9 @@ class PlotHelper:
 
         # maybe add freeze 
         self._anglecalibration = anglecalibration
-        self._left_module_boundary_as_bin_index = lambda module_index, detector_angle : int((self._anglecalibration.diffraction_angle_from_DG_parameters( module_index, detector_angle, 0, -0.5) -  self._anglecalibration.angular_range[0]) // self._anglecalibration.histogram_bin_width)
+        self._left_module_boundary_as_bin_index = lambda module_index, detector_angle : int((self._anglecalibration.diffraction_angle_from_DG_parameters( module_index, detector_angle, 0, 0.0) -  self._anglecalibration.angular_range[0]) // self._anglecalibration.histogram_bin_width)
 
-        self._right_module_boundary_as_bin_index = lambda module_index, detector_angle : int((self._anglecalibration.diffraction_angle_from_DG_parameters( module_index, detector_angle, self._anglecalibration.MythenDetectorSpecifications.strips_per_module, +0.5) -  self._anglecalibration.angular_range[0]) // self._anglecalibration.histogram_bin_width)
+        self._right_module_boundary_as_bin_index = lambda module_index, detector_angle : int((self._anglecalibration.diffraction_angle_from_DG_parameters( module_index, detector_angle, self._anglecalibration.MythenDetectorSpecifications.strips_per_module, 1.0) -  self._anglecalibration.angular_range[0]) // self._anglecalibration.histogram_bin_width)
         
         self._bin_to_diffraction_angle = lambda bin_index : bin_index * self._anglecalibration.histogram_bin_width + self._anglecalibration.angular_range[0]
     

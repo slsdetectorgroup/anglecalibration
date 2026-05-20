@@ -21,7 +21,7 @@ def select_base_peak(anglecalibration,
 
     detector_angle_range = (6.0, 33.0) 
 
-    left_module_strip_angle = anglecalibration.diffraction_angle_from_DG_parameters(module_index, 0.0, 0, -0.5)
+    left_module_strip_angle = anglecalibration.diffraction_angle_from_DG_parameters(module_index, 0.0, 0, 0.0)
       
     print("strip angle: ", left_module_strip_angle)
 

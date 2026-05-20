@@ -318,18 +318,18 @@ double AngleCalibration::angular_strip_width_from_DG_parameters(
     const size_t module_index, const size_t local_strip_index) const {
 
     return std::abs(diffraction_angle_from_DG_parameters(
-                        module_index, 0.0, local_strip_index, 0.5) -
+                        module_index, 0.0, local_strip_index, 0.0) -
                     diffraction_angle_from_DG_parameters(
-                        module_index, 0.0, local_strip_index, -0.5));
+                        module_index, 0.0, local_strip_index, 1.0));
 }
 
 double AngleCalibration::angular_strip_width_from_BC_parameters(
     const size_t module_index, const size_t local_strip_index) const {
 
     return std::abs(diffraction_angle_from_BC_parameters(
-                        module_index, 0.0, local_strip_index, 0.5) -
+                        module_index, 0.0, local_strip_index, 0.0) -
                     diffraction_angle_from_BC_parameters(
-                        module_index, 0.0, local_strip_index, -0.5));
+                        module_index, 0.0, local_strip_index, 1.0));
 }
 
 double AngleCalibration::angular_strip_width_from_EE_parameters(
@@ -338,10 +338,10 @@ double AngleCalibration::angular_strip_width_from_EE_parameters(
 
     return std::abs(diffraction_angle_from_EE_parameters(
                         module_center_distance, normal_distance, angle, 0.0,
-                        local_strip_index, -0.5) -
+                        local_strip_index, 0.0) -
                     diffraction_angle_from_EE_parameters(
                         module_center_distance, normal_distance, angle, 0.0,
-                        local_strip_index, 0.5));
+                        local_strip_index, 1.0));
 }
 
 double AngleCalibration::chi_similarity_criterion(
@@ -828,7 +828,7 @@ void AngleCalibration::optimize_offset_parameter(
     // old reference parameters: // parameters can only change +,-
     // base_peak_roi_width
     double old_reference_left_strip_boundary_angle =
-        diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, -0.5);
+        diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, 0.0);
 
     LOG(TLogLevel::logDEBUG) << fmt::format(
         "initial parameter: {}", BCparameters.angle_center_beam(module_index));
@@ -843,7 +843,7 @@ void AngleCalibration::optimize_offset_parameter(
         double similarity_of_peaks{};
 
         double new_reference_left_strip_boundary_angle =
-            diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, -0.5);
+            diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, 0.0);
 
         if (std::abs(new_reference_left_strip_boundary_angle -
                      old_reference_left_strip_boundary_angle) >
@@ -1122,7 +1122,7 @@ void AngleCalibration::optimize_coupled_parameters(
     // old reference parameters: // parameters can only change +,-
     // base_peak_roi_width
     double old_reference_left_strip_boundary_angle =
-        diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, -0.5);
+        diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, 0.0);
 
     double next_similarity_of_peaks{};
 
@@ -1147,7 +1147,7 @@ void AngleCalibration::optimize_coupled_parameters(
         BCparameters.angle_center_module_normal(module_index) = parameters[1];
 
         double new_reference_left_strip_boundary_angle =
-            diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, -0.5);
+            diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, 0.0);
 
         double similarity_of_peaks{};
 
