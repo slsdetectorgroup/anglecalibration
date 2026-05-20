@@ -364,6 +364,16 @@ class AngleCalibration {
                                               const double photon_count_error,
                                               const double exposure_time) const;
 
+    /**
+     * @brief calculates the correction of the diffraction angle due to sample
+     * displacement in the x and y direction of the horizontal sample plane
+     * @param diffraction_angle diffraction angle calculated at center of strip
+     * without sample displacement correction [degrees]
+     * @return correction of diffraction angle due to sample displacement
+     * [degrees]
+     */
+    double sample_displacement_correction(const double diffraction_angle) const;
+
   private:
     /** @brief calculated the strip width expressed as angle from DG
      * module parameters
@@ -399,16 +409,6 @@ class AngleCalibration {
      */
     size_t global_to_local_strip_index_conversion(
         const size_t global_strip_index) const;
-
-    /**
-     * @brief calculates the correction of the diffraction angle due to sample
-     * displacement in the x and y direction of the horizontal sample plane
-     * @param diffraction_angle diffraction angle calculated at center of strip
-     * without sample displacement correction [degrees]
-     * @return correction of diffraction angle due to sample displacement
-     * [degrees]
-     */
-    double sample_displacement_correction(const double diffraction_angle) const;
 
     /**
      * @brief calculates the elastic correction factor for given detector angle
@@ -918,12 +918,12 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
 
         double left_strip_boundary_angle = diffraction_angle_from_BC_parameters(
             module_index, frame.detector_angle, strip_index,
-            0.0); // left strip boundary in angles [degrees] // -0.5
+            0.0); // left strip boundary in angles [degrees]
 
         double right_strip_boundary_angle =
             diffraction_angle_from_BC_parameters(
                 module_index, frame.detector_angle, strip_index,
-                +1.0); // right strip boundary in angles [degrees] // +0.5
+                +1.0); // right strip boundary in angles [degrees]
 
         if (left_strip_boundary_angle < m_min_angle ||
             right_strip_boundary_angle > m_max_angle) {
@@ -971,10 +971,6 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             std::pow(strip_width_angle / histogram_bin_width,
                      2); // Var(aX) = a^2 Var(X)
 
-        PhotonCountsVarianceLogFile.append(
-            fmt::format("{}\n", 1. / inverse_photon_counts_variance_per_bin));
-
-        /*
         if (photon_counts_per_bin < std::numeric_limits<double>::epsilon() ||
             inverse_photon_counts_variance_per_bin <
                 std::numeric_limits<double>::epsilon()) {
@@ -982,9 +978,8 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
             // bad_channels(global_strip_index) =
             // true; // mark channel as bad if no
 
-            // continue;
+            continue;
         }
-        */
 
         LOG(TLogLevel::logDEBUG2)
             << fmt::format("corrected photon count for strip {} of module {}",

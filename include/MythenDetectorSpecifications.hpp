@@ -43,6 +43,7 @@ struct MythenDetectorSpecifications {
 
     /// @brief additional offset to sample detector offset (can change in
     /// experimental setup) [degrees]
+    // offset of detector to sample
     double offset = 0.0;
 
     /// @brief elastic correction factor

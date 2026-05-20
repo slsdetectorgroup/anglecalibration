@@ -223,7 +223,19 @@ double AngleCalibration::sample_displacement_correction(
     double sample_displacement_correction =
         180.0 / M_PI * std::atan(whatever1 / whatever2);
 
-    return sample_displacement_correction;
+    // preserve original angle information in range [-180, 180]
+    const bool diffraction_angle_in_second_quadrant =
+        diffraction_angle / 90.0 > 1.0;
+    const bool diffraction_angle_in_third_quadrant =
+        diffraction_angle / 90.0 < -1.0;
+
+    if (diffraction_angle_in_second_quadrant) {
+        return 180.0 + sample_displacement_correction;
+    } else if (diffraction_angle_in_third_quadrant) {
+        return -180.0 + sample_displacement_correction;
+    } else {
+        return sample_displacement_correction;
+    }
 }
 
 double AngleCalibration::elastic_correction(const double detector_angle) const {
@@ -699,18 +711,7 @@ NDArray<double, 2> AngleCalibration::computeErrorandMean(
     // divide by statistial weight
     for (ssize_t i = 0; i < weighted_sums.shape(0); ++i) {
 
-        /*
-        RedistributedPhotonCountsLogFile.append(
-            fmt::format("{}\n",
-        weighted_sums(i)));
-
-        StatisticalWeightsLogFile.append(
-            fmt::format("{}\n", weighted_sums(i, 0)));
-
-        SumLogFile.append(fmt::format("{}\n", weighted_sums(i, 1)));
-        */
-
-        if (weighted_sums(i, 1) > -1.0) {
+        if (weighted_sums(i, 1) > -1.0 && num_contributing_photons(i) > 0) {
             fixed_angle_width_bins_photon_counts(i, 0) =
                 weighted_sums(i, 0) < std::numeric_limits<double>::epsilon()
                     ? 0.0

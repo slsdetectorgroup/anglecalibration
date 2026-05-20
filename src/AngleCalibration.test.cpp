@@ -340,3 +340,27 @@ TEST_CASE("check flatfield correction and error propagation",
     }
 }
 
+TEST_CASE("check displacement correction", "[anglecalibration]") {
+
+    auto [diffraction_angle, corrected_diffraction_angle] =
+        GENERATE(std::make_pair(0.0, 0.0), std::make_pair(90.0, 90.0),
+                 std::make_pair(-90.0, -90.0), std::make_pair(150.0, 150.0),
+                 std::make_pair(-150.0, -150.0), std::make_pair(-75.0, -75.0),
+                 std::make_pair(75.0, 75.0), std::make_pair(-180.0, -180.0),
+                 std::make_pair(180.0, 180.0));
+
+    std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
+        std::make_shared<MythenDetectorSpecifications>();
+
+    auto file_path = test_data_path();
+
+    AngleCalibration anglecalibration(mythen_detector_ptr,
+                                      std::shared_ptr<FlatField>{},
+                                      std::shared_ptr<MythenFileReader>{});
+
+    double sample_displacement_correction =
+        anglecalibration.sample_displacement_correction(diffraction_angle);
+
+    CHECK(sample_displacement_correction ==
+          Catch::Approx(corrected_diffraction_angle));
+}
