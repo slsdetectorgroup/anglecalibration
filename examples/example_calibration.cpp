@@ -7,10 +7,9 @@
 #include <filesystem>
 
 /**
- * How to run: All data for this example can be found in the github directory
- * https://gitea.psi.ch/angcal/VariaMay2025 before running execute: export
- * ANGCAL_TEST_PATH=Path_to_git_repository
- *
+ * How to run: All data for this example can be found on
+ * https://zenodo.org/records/20645666. Before running execute: export
+ * ANGCAL_TEST_PATH=Path/to/mythenanglecalibrationtestdata
  */
 
 using namespace angcal;
@@ -20,8 +19,6 @@ int main() {
     auto file_path = data_path();
 
     assert(std::filesystem::exists(file_path));
-
-    // export ANGCAL_TEST_DATA=/home/mazzol_a/ANGCALDATA/angcal22_Jul25/
 
     auto bad_channels_filename = file_path / "bc2025_001_RING.chans";
 
@@ -37,26 +34,6 @@ int main() {
 
     auto output_filename =
         file_path / "angcal_Jul2025_P12_0p0105_new_calibrated.off";
-
-    // export
-    // ANGCAL_TEST_DATA=~/Documents/VariaMay2025/Antonio20250512/angcal_M3_Mar21_2
-
-    /*
-    auto bad_channels_filename = file_path / "bcX.txt";
-
-    auto flatfield_filename =
-        file_path / "Flatfield_E17p5keV_T8751eV_MIX_Mar2021_open_WS.raw";
-
-    auto initial_angles_filename = file_path / "angcal_Mar2021_P10.off";
-
-    std::string acquisition_fileprefix = "ang1upSi0p3mm_";
-
-    const size_t num_files = 1001;
-
-    auto output_filename = file_path / "angcal_Mar2021_P10_calibrated.off";
-
-    // base peaks: 31.588, 23.5126, 28.771
-    */
 
     std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
         std::make_shared<MythenDetectorSpecifications>();
@@ -135,8 +112,6 @@ int main() {
 
     anglecalibration.set_base_peak_ROI_width(0.18);
 
-    // anglecalibration.set_histogram_bin_width(0.01);
-
     // plot everything redistributed to fixed angle width bins
     PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
 
@@ -166,18 +141,5 @@ int main() {
     bcparameters.convert_to_DGParameters(dgparameters);
 
     anglecalibration.write_DG_parameters_to_file(output_filename, dgparameters);
-    */
-
-    /*
-    auto calibrated_angles_filename =
-        file_path / "angcal_Jul2025_P12_0p0105_new_calibrated.off";
-
-    anglecalibration.read_initial_calibration_from_file(
-        calibrated_angles_filename);
-
-    anglecalibration.set_base_peak_angle(22.068);
-
-    plot_all_base_peaks(std::make_shared<AngleCalibration>(anglecalibration),
-                        mythen_file_reader, filelist);
     */
 }

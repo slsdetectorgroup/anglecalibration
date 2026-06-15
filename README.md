@@ -95,27 +95,92 @@ Import in your python project
 import angcal
 ```
 
-## Example Usage
+## Python Example Usage: 
+
+### Calibration
+
+A toy example of a calibration in python can be found in https://github.com/slsdetectorgroup/anglecalibration/blob/main/python/examples/calibration.py. 
+
+The example data can be found here https://zenodo.org/records/20645666 under mythenanglecalibrationtestdata.zip. It contains: 
+
+**Flatfield_EkeV22p0_T11000eV_up_TESTFF1_clean_Jun2025_open_WS.raw**
+Contains the already calculated normalized flatfield stored as a text file. 
+The first dimension stores the channel index. The second dimension the normalized flatfield value for that channel and the third dimension the standard error of the mean (SEM). The fourth and fifth column denote the solid angle and the channel width in diffraction plane given in angles. Note that the fourth and fifth column are kept due to legacy but irrelevant for the code. A value of -1.0 denotes that the channel was not covered by the laser beam at all or not within the soft window or denoted as a bad channel. 
+
+**bc2025_001_RING.chans**
+Contains the bad channels stored as a text file. Each row denotes the index of a bad channel. Multiple consecutive bad channels can be collapsed into one row by denoting the start channel and end channel (inclusive) e.g. ``0-10``. 
+
+**angcal_Jul2025_P12_0p0105.off**
+Contains the initial module parameters for calibration. They are saved as "Detector Group (DG) parameters" and thus include the center, conversion and offset of each module. 
+
+The dataset also contains all the acquisition files for different detector positions stored as hdf5 files.
+
+One can set an environment variable to the local path of ``mythenanglecalibrationtestdata``: 
+
+```bash
+export ANGCAL_TEST_DATA=/path/to/mythenanglecalibrationtestdata
+```
+
+### Conversion 
+
+An example conversion can be found in https://github.com/slsdetectorgroup/anglecalibration/blob/main/python/examples/conversion.py. 
+
+The example data can be found here https://zenodo.org/records/20645666 under mythenangleconversiontestdata.zip.
+
+### Calculating FlatField
+
+An example of calculating the flatfield can be found in https://github.com/slsdetectorgroup/anglecalibration/blob/main/python/examples/flatfieldcalibration.py. 
+
+The respective example data can be found here https://zenodo.org/records/20645666 under MythenFlatFieldCalibrationData.zip.
+It contains: 
+
+**bc2025_001_RING.chans**
+Contains the bad channels stored as a text file. Each row denotes the index of a bad channel. Multiple consecutive bad channels can be collapsed into one row by denoting the start channel and end channel (inclusive) e.g. ``0-10``. 
+
+**angcal_Jul2025_P12_0p0105.off**
+Contains the initial module parameters for calibration. They are saved as "Detector Group (DG) parameters" and thus include the center, conversion and offset of each module. 
+
+Additionally it contains all the flatfield acquisitions taken at different detector positions stored as hdf5 files. 
+
+One can set an environment variable to the local path of ``MythenFlatFieldCalibrationData``: 
+
+```bash
+export ANGCAL_FLATFIELD_DATA=/path/to/MythenFlatFieldCalibrationData
+```
+
+## C++ Example Usage
+
+### Calibration: 
 
 A toy example of a calibration can be found in https://github.com/slsdetectorgroup/anglecalibration/blob/main/examples/example_calibration.cpp 
 
-The example data is located in https://gitea.psi.ch/angcal/VariaMay2025. It contains: 
-
-- Flatfield_E17p5keV_T8751eV_MIX_Mar2021_open_WS.raw (the already calculated inverse normalized flatfield)
-
-- bcX.txt (the bad channels)
-
-- angcal_Mar2021_P10.off (the initial module parameters to calibrate (saved as "Detector Group (DG) parameters"))
-
-- all the acquisition files for different detector positions (one frame per file) (Note that the file only contains the photon counts for the good channels.)
+Information about the example data is given here [here](#calibration)
 
 Run the example as follows: 
 
 ```bash 
-export ANGCAL_TEST_DATA=/path/to/local/gitea.psi.ch/angcal/VariaMay2025 
+export ANGCAL_TEST_DATA=/path/to/mythenanglecalibrationtestdata
 #in build folder
 ./run_calibration
 ```
+
+### Conversion: 
+
+A toy example for a conversion can be found in https://github.com/slsdetectorgroup/anglecalibration/blob/main/examples/example_conversion.cpp 
+
+Information about the example data is given [here](#conversion)
+
+Run the example as follows:
+
+```bash 
+export ANGCAL_TEST_DATA=/path/to/mythenangleconversiontestdata
+#in build folder
+./run_conversion 
+```
+
+
+
+
 
 
 

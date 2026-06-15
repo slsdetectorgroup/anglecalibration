@@ -6,9 +6,9 @@ import os
 import matplotlib.pyplot as plt
 
 def env_data_path():
-    env_value = os.environ.get("ANGCAL_TEST_DATA")
+    env_value = os.environ.get("ANGCAL_FLATFIELD_DATA")
     if not env_value:
-        raise RuntimeError("Environment variable ANGCAL_TEST_DATA is not set or is empty")
+        raise RuntimeError("Environment variable ANGCAL_FLATFIELD_DATA is not set or is empty")
 
     return Path(env_value)
 
@@ -16,15 +16,15 @@ mythen_detector = MythenDetectorSpecifications()
 
 flatfield = FlatField(mythen_detector)
 
-flatfield.read_module_parameters_from_file(env_data_path() / "CALIB_2025/angcal_Jul2025_P12_0p0105.off")
+flatfield.read_module_parameters_from_file(env_data_path() / "angcal_Jul2025_P12_0p0105.off")
 
-flatfield.read_bad_channels_from_file(str(env_data_path() / "CALIB_2025/bc2025_001_RING.chans"))
+flatfield.read_bad_channels_from_file(str(env_data_path() / "bc2025_001_RING.chans"))
 
 bad_channels_array = flatfield.bad_channels
 
 file_reader = EpicsMythenFileReader() 
 
-file_list = [env_data_path() / f"H5DATA/opff_up_STRAIGHT_E22p0_T11000_{i:04d}.h5" for i in range(0,1601)]
+file_list = [env_data_path() / f"opff_up_STRAIGHT_E22p0_T11000_{i:04d}.h5" for i in range(0,1601)]
 
 incident_intensity_first_frame = file_reader.read_frame(str(file_list[0])).incident_intensity
 

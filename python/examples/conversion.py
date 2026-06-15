@@ -7,9 +7,6 @@ import os
 import numpy as np 
 import matplotlib.pyplot as plt
 
-
-# Path("/home/mazzol_a/Documents/VariaMay2025/Antonio20250512/AngularConversionTestData/")
-
 def env_data_path():
     env_value = os.environ.get("ANGCAL_TEST_DATA")
     if not env_value:
@@ -60,26 +57,14 @@ anglecalibration.histogram_bin_width = 0.0036  # in degrees (dfeault value)
 
 anglecalibration.angular_range = (0.0, 90.5)  # in degrees 
 
-print("Angle Range: ", anglecalibration.angular_range)
-
 redistributed_photon_counts = anglecalibration.convert(file_list)
 
 print("conversion is done")
-
-print("num fixed angle width bins: ", anglecalibration.num_fixed_angle_width_bins)
 
 #plot the converted diffraction pattern
 plotter = PlotHelper(anglecalibration)
 
 plotter.plot_diffraction_pattern(redistributed_photon_counts[:,0].view())
-
-bin_angles = np.arange(anglecalibration.angular_range[0], anglecalibration.angular_range[1], anglecalibration.histogram_bin_width)
-
-covered = redistributed_photon_counts[:,0] != -1.0 # bins with a value of -1 are bad channels or not covered bins 
-
-stacked_array = np.column_stack((bin_angles[covered], redistributed_photon_counts[covered]))
-
-np.savetxt(my_path / "converted.dat", stacked_array)
 
 
 

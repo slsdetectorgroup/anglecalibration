@@ -15,23 +15,6 @@ def env_data_path():
 
     return Path(env_value)
 
-
-def plot(array : np.array, x=None): 
-    if x is not None:
-        plt.plot(x, array)
-    else:
-        plt.plot(np.arange(0, array.size,1), array)
-    plt.show()
-
-def plot_excluding_channels(array: np.array, channels_to_exclude: np.array, x = None):
-    good_channels = np.logical_not(channels_to_exclude)
-    if x is not None:
-        plt.plot(x[good_channels], array[good_channels])
-    else:
-        plt.plot(np.arange(0, array.size,1)[good_channels], array[good_channels])
-    plt.show()
-
-
 my_path = env_data_path()
 
 # setup mythen detector specifications - stores all relevant parameters of the detector setup

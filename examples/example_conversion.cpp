@@ -6,7 +6,7 @@
 
 /** How To use
  * set environmnet variable to where youre test data is located
- *  export ANGCAL_TEST_DATA=/home/mazzol_a/Documents/AngularConversionTestData
+ *  export ANGCAL_TEST_DATA=/path/to/local/mythenangleconversiontestdata
  */
 
 using namespace angcal;
