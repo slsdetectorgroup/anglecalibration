@@ -174,6 +174,7 @@ Calculating the Diffraction Pattern from the Raw Intensity Spectrum
 ---------------------------------------------------------------------
 
 To obtain the diffraction pattern from the raw intensity spectrum the raw photon counts are corrected and then redistributed to fixed sized bins covering a fixed angle. 
+As there are gaps between modules one generally does not only use a single acquisition for the conversion but the mean over several acquisitions taken at different detector angles. 
 
 Raw Photon Count Correction
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -304,22 +305,14 @@ to small resolution histogram bins covering a fixed angle.
 
     Depending on the strip position relative to the sample the covered strip angle is much larger :math:`\theta_2 > \theta_1`. 
 
-
-The redistributed photon intensity :math:`I_{red, i}` at fixed angle width bin :math:`i` is given by: 
+The redistributed photon intensity :math:`I_{red, i}` at fixed angle width bin :math:`i` is then given by: 
 
 .. math:: 
 
-    I_{red, i} = I_{corr}*\frac{w_{bin}}{w_{strip}}, 
+    I_{red, i} = I_{corr} \cdot \frac{w_{bin}}{w_{strip}}, 
 
-.. 
-    oke its actually not multiplied with c_bin 
-    maybe better: 
-    .. math:: 
-        I_{red, i} = \sum_{strip\_index \in {strip\_indices covering bin i} (I_{fcorr}(strip\_index) + 1)*\frac{w_{bin}}{w_{strip}(strip\_index)}*c_{bin}, 
 
-where :math:`I_{corr}` are the corrected photon counts, 
-:math:`w_{bin}` is the histogram bin width denoted as an angle 
-and :math:`w_{strip}` the strip width denoted in angles. 
+where :math:`w_{strip}` is the strip's angular width and :math:`w_{bin}` is the fixed angle width of the histogram bins and :math:`I_{corr}` are the corrected photon counts.
 
 The strip width :math:`w_{strip}` for strip width index :math:`si` is given as the difference in diffraction angle of the 
 strip's start :math:`\theta_{B_{si - 0.5}}` and endpoint :math:`\theta_{B_{si + 0.5}}`: 
@@ -330,46 +323,81 @@ strip's start :math:`\theta_{B_{si - 0.5}}` and endpoint :math:`\theta_{B_{si + 
     w_{strip}(si) &= \phi_m - \arctan\left(\frac{D_m - (si + 0.5) * p}{R_m}\right) - \left(\phi_m - \arctan\left(\frac{D_m - (si - 0.5) * p}{R_m}\right)\right) \\ 
               &= \arctan\left(\frac{D_m - (si - 0.5) * p}{R_m}\right) - \arctan\left(\frac{D_m - (si + 0.5) * p}{R_m}\right)
     \end{align}
-.. 
-    what if the strip width is smaller than the bin - wrong photon counts 
 
-The resulting variance is then given as: 
+To avoid any gaps in the diffraction pattern we use the weighted average of several acquisitions :math:`M` taken at different detector angles. Note that several strip from different acquisitions might overlap with one bin. 
+Nor might a strip cover the entire bin. 
 
-.. math:: 
-    \sigma_{red, i}^{2} = \sigma_{red, i}^{2}\left(\frac{w_{bin}}{w_{strip}}\right)^{2}
+We thus use the weighted average of all the corrected photon counts of strip's, where the strip overlaps with the bin :math:`T`: 
 
-Note as there will be "holes" between strips we average over several acquisitions with slightly shifted detector positions. Thus several strip widths from different acquisitions might overlap with one bin. Nor might a strip cover the entire bin. We thus use the weighted average of all the corrected photon counts of strip's, where the strip overlaps with the bin :math:`T`: 
+The final redistributed photon intensity :math:`I_{red, i}` at fixed angle width bin :math:`i` is then given by: 
 
 .. math:: 
 
-    T = \left\{si \in \{0, \dots, 1279\} | \left[\theta_{B_{si- 0.5}}, \theta_{B_{si + 0.5}}\right] \cap \left[(i - 0.5)*w_{bin}, (i + 0.5)*w_{bin}\right] \neq \emptyset \right\}
+    I_{red, i} = \frac{\sum_{j=0}^{M} I_{red, i, j}*w_{i,j}}{\sum_{j=0}^{M} w_{i,j}}, 
 
-The weighted average is then given by: 
+where :math:`N` is the number of bins for the fixed angle width bin histogram and :math:`I_{red, i}` are the redistributed photon counts for acquisition :math:`j`.
+
+The statistical weights :math:`w_{i, j}` are given by the overlap factor of the strip :math:`si` with the fixed angle width bin and the corrected photon counts variance :math:`\sigma_{corr}^{2}`:
 
 .. math:: 
 
-    I_{red, i} = \sum_{si \in T} \alpha'_{si, i} * I_{corr}(si), 
+    w_{i, j} = \sigma_{corr,si}^{-2} * c_{si, i}.
+
+The coverage factor of strip index :math:`si` with the fixed angle width bin :math:`i` is given by: 
+
+.. math:: 
+
+    c_{si, i} = \frac{\min(\theta_{B_{si+0.5}}, (i + 0.5)*w_{bin}) 
+ - \max(\theta_{B_{si-0.5}}, (i - 0.5)*w_{bin}) }{w_{bin}}
+
+
+We use theory from weighted least squares to calculate the error of the redistributed photon counts. 
+
+We use the Neyman (variance-weighted) :math:`\chi²` similarity criterion to estimate the error. 
+
+.. math:: 
+
+    \chi^{2}_{i} = \sum_{j=1}^M w_{i,j}*(I_{red, i, j} - I_{red, i}^{*})^{2}, 
+
+where :math:`I_{red, i}^{*}` is the actual value for the redistributed photon counts for fixed angle width bin :math:`i` and acquisition :math:`j`.
+
+Calculating the minimum of :math:`\chi²` analytically results in the weighted average of all observed values: 
+
+.. math:: 
+    a_{min,i} = \frac{\sum_{j=1}^M I_{red, i, j} * w_{i, j}}{\sum_{j=1}^M w_{i, j}}
+
+The average residual :math:`\chi_i^{2}|a_{min,i}` for bin :math:`i` for all the acquisition :math:`j` is given by: 
+
+.. math:: 
+
+    av\_res_{i} = \sqrt{\frac{1}{M-1} * \chi_i^{2}|a_{min,i}} = \sqrt{\frac{1}{M - 1}*(S_{2,i} -S_{1,i}^{2}*S_{0,i}^{-1})}, 
+
+where 
+
+.. math:: 
+
+    S_{p,i} = \sum_{j=1}^M I_{red, i, j}^{p} * w_{i, j}
+
+According to least squares error estimator the variance and thus the error of the estimates are given by: 
+
+.. math:: 
+
+    \sigma_{I_{red, i}}^{2} = av\_res_{i}^{2}*H^{-1}_{i}|_{a_{min, i}}, 
+
+
+where :math:`H^{-1}` is the inverse Hessian matrix of the :math:`\chi²`-similarity criterion evaluated at the minimum :math:`a_{min, i}`.
+
+The entries of the Hessian matrix are given by: 
+
+.. math:: 
+
+    H^{-1}_{i} = \frac{1}{\sum_{j=0}^{M} w_{i,j}}
+
+the error :math:`\sigma_i` for bin :math:`i` is given by: 
+
+.. math:: 
     
-where the normalized statistical weights :math:`\alpha'_{si,i}` are given by: 
-
-.. math::
-
-    \alpha'_{si, i} = \frac{c_{si,i} * \sigma_{corr}^{-2}(si)}{\sum_{si \in T} c_{si,i} * \sigma_{corr}^{-2}(si)}.
-    
-
-The parameter :math:`c_{si, i}` denotes the bin coverage factor e.g. how much of the bin is covered by the strip: 
-
-.. math:: 
-
-    c_{si, i} = \frac{\min(\theta_{B_{si + 0.5}}, (i + 0.5)*w_{i}) 
- - \max(\theta_{B_{si - 0.5}}, (i - 0.5)*w_{i}) }{w_{i}}. 
-
-Despite charge sharing, we assume that the photon counts per strip :math:`si` are independant of each other. The resulting variance for the redistributed photon counts is then given by: 
-
-.. math:: 
-
-    \sigma_{red, i}² = \sum_{si \in T} (\alpha'_{si, i})^{2} * \sigma_{corr}^{2}(si).
-
+    \sigma_i = \sqrt{av\_res_{i}^{2} * \frac{1}{\sum_{j=0}^{M} w_{i,j}}}.
 
 
 Parameter Calibration
@@ -424,16 +452,6 @@ Remember that the module's parameters are rotation invariant.
 In theory this results in the same diffraction pattern as well as the same base peak just
 shifted by the rotation angle. However, as the diffraction angle :math:`\theta_B` also depends on the strip index, the diffraction patterns are slightly off for not perfectly calibrated module parameters :math:`L_m`, :math:`\delta_m`. 
 See :numref:`overlapping_base_peak` for an example of overlapping base peak regions.
-We thus minimize the Pearsons :math:`\chi²`-similarity of the shifted acquired base peaks within one module to get the optimal parameters :math:`\delta_m` and :math:`L_m` for each module.
-We use regularized Newton method to minimize the :math:`\chi²`-similarity criterion.
-
-
-.. 
-    add a figure of overlapping base peak angles, e.g. selected base peak of diffraction angle
-
-
-
-
 
 .. _overlapping_base_peak: 
 
@@ -444,6 +462,75 @@ We use regularized Newton method to minimize the :math:`\chi²`-similarity crite
     :alt: Two base peaks of different acquisitions but for the same module 0.  
 
     Two base peaks of different acquisitions but for the same module 0. 
+
+We minimize the error of the :math:`\chi²`-similarity of the shifted acquired base peaks within one module to get the optimal parameters :math:`\delta_m` and :math:`L_m` for each module.
+
+We now want to minimize the Neyman (variance-weighted) :math:`\chi²`-similarity criterion for the base peak region of interest :math:`ROI_{\alpha}`: 
+
+.. math:: 
+
+    \chi^{2}_{i}(L_m, \delta_m, \Psi_m) = \sum_{j=1}^M w_{i,j}*(I_{red, i, j}(L_m, \delta_m, \Psi_m)  - I_{red, i}(L_m^{*}, \delta_m^{*}, \Psi_m^{*}))^{2}, \, \, \textrm{for bin}_i \cap ROI_{\alpha} \neq \emptyset, 
+
+where :math:`M` are the number of regions of interests of different aquisitions, :math:`I_{red,i}(L_m, \delta_m, \Psi_m)` is the redistributed corrected photon intensity for fixed angle width bin :math:`i` and acquisition :math:`j` and module parameters :math:`L_m`, :math:`\delta_m` and :math:`\Psi_m` and
+:math:`L_m^{*}`, :math:`\delta_m^{*}` and :math:`\Psi_m^{*}` are the actual module parameters. 
+
+ 
+We evaluate the minimum of the :math:`\chi^{2}` similarity criterion analytically and get the weighted averaged mean over all acquisitions: 
+
+.. math:: 
+
+    a_{min,i} = \frac{\sum_{j=1}^M I_{red, i, j}(L_m, \delta_m, \Psi_m) * w_{i, j}}{\sum_{j=1}^M w_{i, j}}.
+
+The average residual :math:`\chi_k^{2}|a_{min,i}` is then given by: 
+
+.. math:: 
+
+    av\_res_{i} = \sqrt{\frac{1}{M-1} * \chi_i^{2}|a_{min,i}} = \sqrt{\frac{1}{M - 1}*(S_{2,i} -S_{1,i}^{2}*S_{0,i}^{-1})}, 
+
+where 
+
+.. math:: 
+
+    S_{p,i} = \sum_{j=1}^M I_{red, i, j}^{p} * w_{i, j}.
+
+According to least squares error estimator the variance and thus the error of the estimates are given by: 
+
+.. math:: 
+
+    \sigma_{I_{red, i}(L_m, \delta_m, \Psi_m)}^{2} = av\_res_{i}^{2}*H^{-1}_{i}|_{a_{min, i}}, 
+
+
+where :math:`H^{-1}` is the inverse Hessian matrix of the :math:`\chi²`-similarity criterion evaluated at the minimum :math:`a_{min, i}`.
+
+The entries of the Hessian matrix are given by: 
+
+..    
+    .. math:: 
+
+    \begin{align}
+    H_{i,n,m} &= \frac{\partial^{2}{\chi^{2}}}{\partial_{\sum_n} \partial_{\sum_m}} |_{\sum^{*}}  \\
+    &= (\sum_{j=0}^M 2*w_{i, j} * (I_{red, j, i}(\sum) - I_{red, i, j}(\sum^{ *}))*\frac{\partial I_{red, j, i}}{\partial \sum_{n}}*\frac{\partial I_{red, i, j}}{\partial \sum_{m}} + \sum_{j=0}^M 2*w_{i, j} * \frac{\partial I_{red, j, i}}{\partial \sum_{n}}*\frac{\partial I_{red, i, j}}{\partial \sum_{m}})|_{\sum^{* }} \\
+    &= 
+    \sum_{j=0}^M 2*w_{i, j} * \frac{\partial I_{red, j, i}}{\partial \sum_{n}}*\frac{\partial I_{red, i, j}}{\partial \sum_{m}}|_{\sum^{* }}, 
+    \end{align}
+
+    where :math:`\sum` is the parameter set :math:`\{\delta_m, L_m, \Psi_m\}` and :math:`\sum^{*}` are the actual module parameters. 
+
+The inverse Hessian matrix is then given by 
+
+.. math:: 
+
+    H^{-1}_{i} = \frac{1}{\sum_{j=0}^{M} w_{i,j}}
+
+and the mean error for all bins :math:`i` is given by: 
+
+.. math:: 
+    
+    \sigma^{2} = \frac{1}{N} \sum_{i=1}^{N} \sigma_{I_{red, i}(L_m, \delta_m, \Psi_m)}^{2} = \frac{1}{N} \sum_{i=1}^{N} av\_res_{i}^{2} * \frac{1}{\sum_{j=0}^{M} w_{i,j}}.
+
+
+We use regularized Newton method to minimize the error of the :math:`\chi²`-similarity criterion :math:`\sigma^2`.
+
 
 
 Calibration of :math:`\Psi_m`:
@@ -464,72 +551,6 @@ If :math:`\theta_{com, m} < \theta_{com, m-1}` we shift the base peak of module 
 .. 
     Is the measurement error prone or only the conversion 
     How to work with errors in measurements 
-
-
-.. _pearsonchisquare:
-
-:math:`\chi²`- similarity criterion 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Let :math:`ROI_{\alpha} = \{ \{I_{red,0}, \sigma^{2}_{red,0}\}, \cdots , \{I_{red,N}, \sigma^{2}_{red,N} \} \}` 
-denote redistributed photon intensities within the base peak region 
-of interest, where :math:`N` is the number of bins covered by the 
-base peak region. With M acquisition's we have :math:`M` regions of interests. 
-
-We now want to minimize the Neyman (variance-weighted) :math:`\chi²`-similarity criterion: 
-
-.. math:: 
-
-    \chi^{2}_{k} = \sum_{j=1}^M \frac{(I_{red, k, j} - \mathbb{E}_{k}(\sum))^{2}}{\sigma_{k,j}^{2}}, 
-
-
-where :math:`I_{red,k,j}` is the redistributed corrected photon intensity for fixed angle width bin :math:`k` and acquisition :math:`j` and :math:`\mathbb{E}_{k}(\sum)` denote the variance and expected value for the bin :math:`k` using the module parameters :math:`\sum`.
-With the module's parameter set :math:`R`, :math:`D` and :math:`\phi` these are: 
-
-
-MMh im confused - the observed values also depend on the module parameters. 
-Also why isnt it a fixed variance expecting for bin k? 
-
-The expected value which minimizes the :math:`\chi²`-similarity criterion is given by the weighted average of all observed values:
-
-.. math:: 
-    
-    a_{min,k} = \mathbb{E}_{k}(R, D, \phi) = \frac{\sum_{j=1}^M I_{red, k, j} * \sigma_{red, k, j}^{-2}}{\sum_{j=1}^M \sigma_{red, k, j}^{-2}}.
-
-and resulting variance: 
-
-.. math:: 
-
-    \sigma_{a_{min,k}}^{2} = \frac{1}{\sum_{j=1}^{M} \sigma_{red,k,j}^{- 2}}. 
-
-The average :math:`\chi_k^{2}|a_{min,k}` is then given by the average residual :math:`av\_res_{k}`: 
-
-.. math:: 
-
-    av\_res_{k} = \sqrt{\frac{1}{M-1} * \chi_k^{2}|a_{min,k}} = \sqrt{\frac{1}{M - 1}*(S_{2,k} -S_{1,k}^{2}*S_{0,k}^{-1})}, 
-
-
-with: 
-
-.. math:: 
-    S_{p,k} = \sum_{j=1}^M I_{red, k, j}^{p} * \sigma_{red, k, j}^{-2}
-
-
-We then scale the variance :math:`\sigma_{a_{min,k}}` by the average residual. The scaled variances are then summed up for each bin within the base peak region. 
-
-We then get the similarity criterion for different base peak regions:
-
-.. math:: 
-
-    \sum_{k=1}^{N} av\_res_{k} * \sigma_{a_{min,k}} 
-
-The goal is to minimize this similarity criterion based on the module parameters :math:`\sum`.
-
-
-
-
-
-
 
 
 
