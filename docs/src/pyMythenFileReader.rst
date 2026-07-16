@@ -18,18 +18,22 @@ Example
 .. py::currentmodule:: angcal  
     
 .. autoclass:: angcal._angcal.MythenFileReader
-   :members:
-   :undoc-members:
-   :private-members:
+    :special-members: __init__
+    :show-inheritance:
+    :inherited-members:
+    :member-order: groupwise
 
 .. autoclass:: angcal._angcal.RawMythenFileReader
-   :members:
-   :undoc-members:
-   :private-members:
+   :special-members: __init__
+   :show-inheritance:
+   :inherited-members:
+   :member-order: groupwise
 
 .. autoclass:: angcal._angcal.EpicsMythenFileReader
-   :members:
-   :undoc-members:
+   :special-members: __init__
+   :show-inheritance:
+   :inherited-members:
+   :member-order: groupwise
    :private-members:
 
 
@@ -37,6 +41,5 @@ MythenFrame
 ===========
 
 .. autoclass:: angcal._angcal.MythenFrame
-   :members:
    :undoc-members:
    :private-members:

@@ -286,7 +286,9 @@ with respective variance:
 
 .. math:: 
     \sigma_{corr} = \left(\frac{I_{0,1s}}{I_0}\right)^2 \cdot \left(\frac{C}{C(\tau_d)}\right)^2 \cdot \left(\frac{2*\arctan{\left(\frac{w/2}{\bar{L}}\right)}}{2*\arctan{\left(\frac{w/2}{L}\right)}}\right)^2 \cdot \sigma_{f,corr}. 
- 
+
+
+.. _pearsonchisquare: 
 
 Conversion to fixed angular strip width bins
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

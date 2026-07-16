@@ -48,6 +48,8 @@ class PlotHelper:
             Module index to restrict the plotted range.
         motor_position : float, optional
             Detector motor position in degrees.
+        axis: matplotlib.axes.Axes, optional
+            Axis to plot on. If None, a new figure will be created.
         """
        
         if(module_index is not None and motor_position is None):
@@ -101,6 +103,8 @@ class PlotHelper:
             1D photon-count array.
         module_index : int, optional
             Module index for title/selection.
+        axis : matplotlib.axes.Axes, optional
+            Axis to plot on. If None, a new figure will be created.
         """
         
         plot_title = f"Base Peak for module {module_index}" if module_index is not None else "Base Peak"
