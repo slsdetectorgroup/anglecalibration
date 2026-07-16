@@ -44,7 +44,11 @@ double AngleCalibration::get_histogram_bin_width() const {
 }
 
 ssize_t AngleCalibration::get_base_peak_ROI_num_bins() const {
-    return 2 * static_cast<ssize_t>(base_peak_roi_width / histogram_bin_width) +
+
+    return static_cast<ssize_t>((base_peak_angle + base_peak_roi_width) /
+                                histogram_bin_width) -
+           static_cast<ssize_t>((base_peak_angle - base_peak_roi_width) /
+                                histogram_bin_width) +
            1;
 }
 

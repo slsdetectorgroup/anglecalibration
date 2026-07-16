@@ -892,11 +892,13 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     if constexpr (base_peak_ROI_only) {
         number_of_bins = get_base_peak_ROI_num_bins(); // fixed angle width bins
                                                        // in base peak ROI
-        left_boundary_roi_base_peak = (base_peak_angle - base_peak_roi_width +
-                                       0.5 * histogram_bin_width); // in degrees
+        left_boundary_roi_base_peak =
+            base_peak_angle -
+            base_peak_roi_width; //+
+                                 // 0.5 * histogram_bin_width); // in degrees
         right_boundary_roi_base_peak =
-            (base_peak_angle + base_peak_roi_width -
-             0.5 * histogram_bin_width); // in degrees
+            base_peak_angle +
+            base_peak_roi_width; //-0.5 * histogram_bin_width); // in degrees
     } else {
         number_of_bins = num_fixed_angle_width_bins();
         left_boundary_roi_base_peak = m_min_angle;  // dummy values
@@ -980,10 +982,6 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
 
             continue;
         }
-
-        LOG(TLogLevel::logDEBUG2)
-            << fmt::format("corrected photon count for strip {} of module {}",
-                           strip_index, module_index);
 
         ssize_t left_bin_index_covered_by_strip{};
 
