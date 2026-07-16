@@ -292,7 +292,7 @@ void define_AngleCalibration_binding(py::module &m) {
                 }
             },
             py::arg("file_list"), py::arg("base_peak_angle"),
-            py::arg("output_filename"),
+            py::arg("output_filename") = std::nullopt,
             py::arg("plot_calibration_process") = false,
             R"(
             calibrates BC parameters for all modules
