@@ -355,7 +355,7 @@ NDArray<double, 2> FlatField::get_normalized_flatfield() const {
     return flat_field;
 }
 
-NDView<double, 2> FlatField::get_normalized_flatfield_view() const {
+NDView<const double, 2> FlatField::get_normalized_flatfield_view() const {
     return flat_field.view();
 }
 

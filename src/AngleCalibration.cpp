@@ -159,7 +159,7 @@ void AngleCalibration::read_bad_channels_from_file(
         });
 }
 
-NDView<bool, 1> AngleCalibration::get_bad_channels() const {
+NDView<const bool, 1> AngleCalibration::get_bad_channels() const {
     return bad_channels.view();
 }
 

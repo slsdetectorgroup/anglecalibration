@@ -140,7 +140,7 @@ class FlatField {
     // TODO: should it be view? or copy?
     NDArray<double, 2> get_normalized_flatfield() const;
 
-    NDView<double, 2> get_normalized_flatfield_view() const;
+    NDView<const double, 2> get_normalized_flatfield_view() const;
 
     /**
      * @brief calculates diffraction angle from DG module parameters (used in
