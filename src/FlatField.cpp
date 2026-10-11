@@ -12,6 +12,11 @@ FlatField::FlatField(
     bad_channels =
         NDArray<bool, 1>(std::array<ssize_t, 1>{mythen_detector->num_strips()},
                          false); // default initialized to false
+
+    flat_field = NDArray<double, 2>(
+        std::array<ssize_t, 2>{
+            static_cast<ssize_t>(mythen_detector->num_strips()), 2},
+        -1.0);
 }
 
 void FlatField::set_scale_factor(const double scale_factor_) {
@@ -134,123 +139,98 @@ double FlatField::Antonio_solid_angle_correction_factor(
 }
 */
 
-void FlatField::create_normalized_flatfield_from_filelist(
-    const std::vector<std::filesystem::path> &filelist,
-    std::shared_ptr<MythenFileReader> file_reader) {
+// TODO: should be 2d if multiple counters enabled
+void FlatField::add_flatfield(const NDView<uint32_t, 1> photon_counts,
+                              const uint32_t incident_intensity,
+                              const double detector_angle) {
 
-    flat_field = NDArray<double, 2>(
-        std::array<ssize_t, 2>{
-            static_cast<ssize_t>(mythen_detector->num_strips()), 2},
-        -1.0);
+    if (incident_intensity == 0) {
+        throw std::runtime_error("incident intensity is zero for file {}. "
+                                 "Cannot apply I0 correction");
+    }
 
-    NDArray<double, 1> sum_statistical_weights(
-        std::array<ssize_t, 1>{mythen_detector->num_strips()}, 0.0);
+    const double I0_correction_factor =
+        scale_factor / static_cast<double>(incident_intensity);
 
     constexpr uint32_t mighells_correction_constant = 1;
 
-    size_t file_index = 0;
+    for (ssize_t strip_index = 0; strip_index < mythen_detector->num_strips();
+         ++strip_index) {
 
-    for (const auto &file : filelist) {
-        auto frame = file_reader->read_frame(file);
-
-        uint64_t incident_intensity = frame.incident_intensity;
-
-        LOG(TLogLevel::logDEBUG1)
-            << fmt::format("incident intensity {}", incident_intensity);
-
-        if (frame.incident_intensity == 0) {
-            throw std::runtime_error(
-                fmt::format("incident intensity is zero for file {}. "
-                            "Cannot apply I0 correction",
-                            file.string()));
+        if (bad_channels(strip_index)) {
+            continue; // skip bad channels
         }
 
-        // IncidentIntensityLogFile.append(
-        // fmt::format("{}\n", incident_intensity));
+        const size_t module_index =
+            strip_index / MythenDetectorSpecifications::strips_per_module;
+        const size_t local_strip_index =
+            strip_index % MythenDetectorSpecifications::strips_per_module;
 
-        const double I0_correction_factor =
-            scale_factor / static_cast<double>(incident_intensity);
+        const double left_strip_boundary_angle =
+            diffraction_angle_from_DG_parameters(
+                module_index, detector_angle, local_strip_index,
+                0.0); // left strip boundary in angles [degrees]
+
+        const double right_strip_boundary_angle =
+            diffraction_angle_from_DG_parameters(
+                module_index, detector_angle, local_strip_index,
+                1.0); // right strip boundary in angles [degrees]
+
+        // skip if channel is completely outside of soft window
+        if (right_strip_boundary_angle < soft_window.first ||
+            left_strip_boundary_angle > soft_window.second) {
+            continue;
+        }
+
+        // mighells correction
+        double photon_count =
+            photon_counts(strip_index) != 0
+                ? photon_counts(strip_index) + mighells_correction_constant
+                : 0.0;
+
+        double variance_photon_count = photon_count; // poisson statistics
+
+        if (photon_count <= std::numeric_limits<double>::epsilon()) {
+            // bad_channels(strip_index) = true; // mark as bad channel
+            flat_field(strip_index, 0) = 0.0;
+            flat_field(strip_index, 1) = 0.0;
+            continue; // skip bad channels
+        }
+
+        // incident intensity correction
+        photon_count *= I0_correction_factor;
+        variance_photon_count *= I0_correction_factor * I0_correction_factor;
+
+        // scale by soft_window coverage
+        double soft_window_coverage =
+            (std::min(right_strip_boundary_angle, soft_window.second) -
+             std::max(left_strip_boundary_angle, soft_window.first)) /
+            (right_strip_boundary_angle - left_strip_boundary_angle);
+
+        // StripWidthLogFile.append(
+        //  fmt::format("{}\n", right_strip_boundary_angle -
+        //  left_strip_boundary_angle));
+
+        // CoverageLogFile.append(fmt::format("{}\n",
+        // soft_window_coverage));
 
         LOG(TLogLevel::logDEBUG1)
-            << fmt::format("detector angle: {}", frame.detector_angle);
+            << fmt::format("strip {}, soft_window_coverage {}", strip_index,
+                           soft_window_coverage);
 
-        for (ssize_t strip_index = 0;
-             strip_index < mythen_detector->num_strips(); ++strip_index) {
-            if (bad_channels(strip_index)) {
-                continue; // skip bad channels
-            }
-
-            const size_t module_index =
-                strip_index / MythenDetectorSpecifications::strips_per_module;
-            const size_t local_strip_index =
-                strip_index % MythenDetectorSpecifications::strips_per_module;
-
-            const double left_strip_boundary_angle =
-                diffraction_angle_from_DG_parameters(
-                    module_index, frame.detector_angle, local_strip_index,
-                    0.0); // left strip boundary in angles [degrees]
-
-            const double right_strip_boundary_angle =
-                diffraction_angle_from_DG_parameters(
-                    module_index, frame.detector_angle, local_strip_index,
-                    1.0); // right strip boundary in angles [degrees]
-
-            // skip if channel is completely outside of soft window
-            if (right_strip_boundary_angle < soft_window.first ||
-                left_strip_boundary_angle > soft_window.second) {
-                continue;
-            }
-
-            // mighells correction
-            double photon_counts = frame.photon_counts(strip_index) != 0
-                                       ? frame.photon_counts(strip_index) +
-                                             mighells_correction_constant
-                                       : 0.0;
-
-            double variance_photon_counts = photon_counts; // poisson statistics
-
-            if (photon_counts <= std::numeric_limits<double>::epsilon()) {
-                // bad_channels(strip_index) = true; // mark as bad channel
-                flat_field(strip_index, 0) = 0.0;
-                flat_field(strip_index, 1) = 0.0;
-                continue; // skip bad channels
-            }
-
-            // incident intensity correction
-            photon_counts *= I0_correction_factor;
-            variance_photon_counts *=
-                I0_correction_factor * I0_correction_factor;
-
-            // scale by soft_window coverage
-            double soft_window_coverage =
-                (std::min(right_strip_boundary_angle, soft_window.second) -
-                 std::max(left_strip_boundary_angle, soft_window.first)) /
-                (right_strip_boundary_angle - left_strip_boundary_angle);
-
-            // StripWidthLogFile.append(
-            //  fmt::format("{}\n", right_strip_boundary_angle -
-            //  left_strip_boundary_angle));
-
-            // CoverageLogFile.append(fmt::format("{}\n",
-            // soft_window_coverage));
-
-            LOG(TLogLevel::logDEBUG1)
-                << fmt::format("strip {}, soft_window_coverage {}", strip_index,
-                               soft_window_coverage);
-
-            if (flat_field(strip_index, 0) == -1.0) {
-                flat_field(strip_index, 0) =
-                    0.0; // initialize to zero if not set yet
-                flat_field(strip_index, 1) =
-                    0.0; // initialize to zero if not set yet
-            }
-            flat_field(strip_index, 0) += photon_counts * soft_window_coverage;
-            flat_field(strip_index, 1) += variance_photon_counts *
-                                          soft_window_coverage *
-                                          soft_window_coverage;
+        if (flat_field(strip_index, 0) == -1.0) {
+            flat_field(strip_index, 0) =
+                0.0; // initialize to zero if not set yet
+            flat_field(strip_index, 1) =
+                0.0; // initialize to zero if not set yet
         }
-        ++file_index;
+        flat_field(strip_index, 0) += photon_count * soft_window_coverage;
+        flat_field(strip_index, 1) +=
+            variance_photon_count * soft_window_coverage * soft_window_coverage;
     }
+}
+
+void FlatField::normalize_flatfield() {
 
     double sum_good_strips = 0.0; // for normalization
     size_t num_good_strips = 0;   // for normalization
@@ -355,7 +335,7 @@ NDArray<double, 2> FlatField::get_normalized_flatfield() const {
     return flat_field;
 }
 
-NDView<double, 2> FlatField::get_normalized_flatfield_view() const {
+NDView<const double, 2> FlatField::get_normalized_flatfield_view() const {
     return flat_field.view();
 }
 

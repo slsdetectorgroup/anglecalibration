@@ -68,24 +68,21 @@ class FlatField {
      */
     double solid_angle(const size_t module_index, size_t strip_index) const;
 
-    /*
-    double
-    Antonio_solid_angle_correction_factor(const size_t module_index,
-                                          const size_t strip_index) const;
-
-    double transverse_width_correction_factor(const size_t module_index,
-                                              size_t strip_index) const;
-    */
+    /**
+     * @brief adds flatfield from single acquisition to the accumulated
+     * flatfield
+     * @param photon_counts photon counts for each strip
+     * @param incident_intensity incident intensity for normalization
+     * @param detector_angle position of detector [degrees]
+     */
+    void add_flatfield(const NDView<uint32_t, 1> photon_counts,
+                       const uint32_t incident_intensity,
+                       const double detector_angle);
 
     /**
-     * @brief creates normalized flatfield from list of files containing
-     * flatfield acquisitions
-     * @param filelist list of files containing flatfield acquisitions
-     * @param file_reader custom file reader to read mythen acquisition files
+     * @brief normalizes the accumulated flatfield
      */
-    void create_normalized_flatfield_from_filelist(
-        const std::vector<std::filesystem::path> &filelist,
-        std::shared_ptr<MythenFileReader> file_reader);
+    void normalize_flatfield();
 
     // TODO: maybe dont support reading at all
     // caveat user has to pass by value or move otherwise copied twice from
@@ -140,7 +137,7 @@ class FlatField {
     // TODO: should it be view? or copy?
     NDArray<double, 2> get_normalized_flatfield() const;
 
-    NDView<double, 2> get_normalized_flatfield_view() const;
+    NDView<const double, 2> get_normalized_flatfield_view() const;
 
     /**
      * @brief calculates diffraction angle from DG module parameters (used in

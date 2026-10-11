@@ -28,8 +28,26 @@ py::array return_image_data(aare::NDArray<T, Ndim> *image) {
         free_when_done);       // numpy array references this parent
 }
 
+template <ssize_t Ndim, class T, int Flags>
+auto get_checked_shape(const py::array_t<T, Flags> &arr) {
+    if (arr.ndim() != Ndim) {
+        throw py::value_error(
+            fmt::format("Expected {}D array, got {}D", Ndim, arr.ndim()));
+    }
+    if (!(arr.flags() & py::array::c_style)) {
+        throw py::value_error(
+            "Array is not C-contiguous. Use np.ascontiguousarray(arr)");
+    }
+    aare::Shape<Ndim> shape{};
+    for (ssize_t i = 0; i < Ndim; ++i) {
+        shape[i] = arr.shape(i);
+    }
+    return shape;
+}
+
 template <class T, int Flags> auto make_view_1d(py::array_t<T, Flags> &arr) {
-    return aare::NDView<T, 1>(arr.mutable_data(), aare::Shape<1>(arr.shape(0)));
+    auto shape = get_checked_shape<1>(arr);
+    return aare::NDView<T, 1>(arr.mutable_data(), shape);
 }
 
 template <typename T, ssize_t Ndim>

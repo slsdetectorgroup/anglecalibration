@@ -34,7 +34,12 @@ print("incident intensity first frame: ", incident_intensity_first_frame)
 
 flatfield.soft_window = (3.0, 30.0)
 
-flatfield.create_normalized_flatfield_from_filelist(file_list, file_reader)
+for file_idx in range(0, 1601): 
+    file_name = env_data_path() / f"opff_up_STRAIGHT_E22p0_T11000_{file_idx:04d}.h5"
+    frame = file_reader.read_frame(str(file_name))
+    flatfield.add_flatfield(frame.photon_counts, frame.incident_intensity, frame.detector_angle)
+
+flatfield.normalize_flatfield()
 
 flatfield_array = flatfield.normalized_flatfield
 

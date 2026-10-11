@@ -129,7 +129,7 @@ class AngleCalibration {
         std::shared_ptr<SimpleFileInterface> file_reader =
             std::make_shared<CustomBadChannelsFile>());
 
-    NDView<bool, 1> get_bad_channels() const;
+    NDView<const bool, 1> get_bad_channels() const;
 
     /**
      * @brief set bad channels

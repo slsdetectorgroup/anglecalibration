@@ -23,24 +23,36 @@ void define_FlatField_binding(py::module &m) {
              )")
 
         .def(
-            "create_normalized_flatfield_from_filelist",
+            "add_flatfield",
             [](FlatField &self,
-               const std::vector<std::filesystem::path> &file_list,
-               std::shared_ptr<MythenFileReader> mythen_file_reader) {
-                self.create_normalized_flatfield_from_filelist(
-                    file_list, mythen_file_reader);
+               py::array_t<uint32_t, py::array::c_style> photon_counts,
+               const uint32_t incident_intensity, const double detector_angle) {
+                auto photon_counts_view =
+                    make_view_1d(photon_counts); // check if 1d
+                self.add_flatfield(photon_counts_view, incident_intensity,
+                                   detector_angle);
             },
-            py::arg("file_list"), py::arg("mythen_file_reader"), R"(
+            py::arg("photon_counts"), py::arg("incident_intensity"),
+            py::arg("detector_angle"), R"(
 
-                Create normalized flatfield from list of files containing flatfield acquisitions
+                Add flatfield from single acquisition to the accumulated flatfield
 
                 Parameters
                 ----------
                 
-                file_list: list of str
-                    list of paths to acquisition files containing flatfield acquisitions
-                mythen_file_reader: MythenFileReader
-                    file reader to read mythen acquisition files
+                photon_counts: numpy.ndarray of uint32, shape (n_channels,)
+                    Photon counts for each strip
+                incident_intensity: int
+                    Incident intensity for normalization
+                detector_angle: float
+                    Position of detector [degrees]
+                )")
+
+        .def(
+            "normalize_flatfield",
+            [](FlatField &self) { self.normalize_flatfield(); },
+            R"(
+                Normalize the accumulated flatfield
                 )")
 
         /*
