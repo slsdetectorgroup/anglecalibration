@@ -155,7 +155,7 @@ class AngleCalibration {
      * (default: false)
      * @param frames 2D NDView of frames (rows: acquisitions, cols: channels) -
      * need to be sorted by detector angle
-     * @param detector_angles vector of monitor positions for acquisitions
+     * @param detector_angles 1D NDView of monitor positions for acquisitions
      * @param base_peak_angle angle of the selcted base peak [degrees]
      * @param output_file optional, if provided the optimized BC parameters are
      * converted back to DG parameters and are appended to the file (given as
@@ -164,7 +164,7 @@ class AngleCalibration {
     template <bool visualize_calibration = false>
     void
     calibrate(const NDView<uint32_t, 2> frames,
-              const std::vector<double> &detector_angles,
+              const NDView<double, 1> detector_angles,
               const double base_peak_angle,
               std::optional<std::filesystem::path> output_file = std::nullopt);
 
@@ -174,13 +174,14 @@ class AngleCalibration {
      * (default: false)
      * @param frames 2D NDView of frames (rows: acquisitions, cols: channels) -
      * need to be sorted by detector angle
-     * @param detector_angles vector of monitor positions for the acquisitions
+     * @param detector_angles 1D NDView of monitor positions for the
+     * acquisitions
      * @param base_peak_angle angle of the selcted base peak given in degrees
      * @param module_index index of module to be calibrated
      */
     template <bool visualize_calibration = false>
     void calibrate(const NDView<uint32_t, 2> frames,
-                   const std::vector<double> &detector_angles,
+                   const NDView<double, 1> detector_angles,
                    const double base_peak_angle_, const size_t module_index);
 
     /**
@@ -191,13 +192,13 @@ class AngleCalibration {
      * @param module_index index of module to be calibrated
      * @param frames_width_base_peak_overlap frames with base peak overlap for
      * the module
-     * @param detector_angles vector of monitor positions for acquisitions
+     * @param detector_angles 1D NDView of monitor positions for acquisitions
      */
     template <bool visualize_calibration = false>
     void calibrate_coupled_parameters(
         const size_t module_index,
         const NDView<uint32_t, 2> frames_width_base_peak_overlap,
-        const std::vector<double> &detector_angles);
+        const NDView<double, 1> detector_angles);
 
     /**
      * @brief calibrates the angle between center of module and beam (phi) for a
@@ -207,21 +208,21 @@ class AngleCalibration {
      * @param module_index index of module to be calibrated
      * @param frames_with_base_peak_overlap frames with base peak overlap module
      * to be calibrated
-     * @param detector_angles_with_base_peak_overlap vector of monitor positions
-     * for acquisitions
+     * @param detector_angles_with_base_peak_overlap 1D NDView of monitor
+     * positions for acquisitions
      * @param frames_with_base_peak_overlap_prev_module frames with base peak
      * overlap prev module
-     * @param detector_angles_with_base_peak_overlap_prev_module vector of
+     * @param detector_angles_with_base_peak_overlap_prev_module 1D NDView of
      * monitor positions for acquisitions for the previous module
      */
     template <bool visualize_calibration = false>
     void calibrate_offset(
         const size_t module_index,
         const NDView<uint32_t, 2> frames_with_base_peak_overlap,
-        const std::vector<double> &detector_angles_with_base_peak_overlap,
+        const NDView<double, 1> detector_angles_with_base_peak_overlap,
         const NDView<uint32_t, 2> frames_with_base_peak_overlap_prev_module,
-        const std::vector<double>
-            &detector_angles_with_base_peak_overlap_prev_module);
+        const NDView<double, 1>
+            detector_angles_with_base_peak_overlap_prev_module);
 
     /**
      * @brief calculates the average angle of the base peak center over several
@@ -229,14 +230,14 @@ class AngleCalibration {
      * @param module_index index of module to calculate base peak center for
      * @param frames_with_base_peak_overlap frames with base peak overlap for
      * the given module index
-     * @param detector_angles_with_base_peak_overlap vector of monitor positions
-     * for acquisitions
+     * @param detector_angles_with_base_peak_overlap 1D NDView of monitor
+     * positions for acquisitions
      * @return average angle of base peak center [degrees]
      */
     double center_base_peak(
         const size_t module_index,
         const NDView<uint32_t, 2> frames_with_base_peak_overlap,
-        const std::vector<double> &detector_angles_with_base_peak_overlap);
+        const NDView<double, 1> detector_angles_with_base_peak_overlap);
 
     /** @brief check if base peak ROI is contained within module region
      * @param detector_angle: detector position (offset of first strip from
@@ -418,14 +419,13 @@ class AngleCalibration {
      * the respective module region
      * @param frames 2D NDView of frames (rows: acquisitions, cols: channels) -
      * need to be sorted by detector angle
-     * @param detector_angles vector of monitor positions for acquisition
+     * @param detector_angles 1D NDView of monitor positions for acquisition
      * @param module_index index of module
      */
-    std::tuple<NDView<uint32_t, 2>, std::vector<double>>
-    get_frames_with_base_peak_overlap(
-        const NDView<uint32_t, 2> frames,
-        const std::vector<double> &detector_angles,
-        const size_t module_index) const;
+    std::tuple<NDView<uint32_t, 2>, NDView<double, 1>>
+    get_frames_with_base_peak_overlap(const NDView<uint32_t, 2> frames,
+                                      const NDView<double, 1> detector_angles,
+                                      const size_t module_index) const;
 
     /**
      * @brief redistributes photon counts around designated region to
@@ -457,8 +457,8 @@ class AngleCalibration {
      * between the found base peaks regions
      * @param frames_with_base_peak_overlap vector of frames from acquisitions
      * for which the base peak ROI is covered by the respective module region
-     * @param detector_angles_with_base_peak_overlap vector of monitor positions
-     * for acquisitions
+     * @param detector_angles_with_base_peak_overlap 1D NDView of monitor
+     * positions for acquisitions
      * @brief plot wrapper to visualize calibration process
      * (default nullptr)
      * @return similarity of peaks
@@ -467,7 +467,7 @@ class AngleCalibration {
     double calculate_similarity_of_peaks_between_acquisitions(
         const size_t module_index,
         const NDView<uint32_t, 2> frames_with_base_peak_overlap,
-        const std::vector<double> &detector_angles_with_base_peak_overlap,
+        const NDView<double, 1> detector_angles_with_base_peak_overlap,
         std::shared_ptr<PlotCalibrationProcess> plot = nullptr);
 
     /**
@@ -477,12 +477,12 @@ class AngleCalibration {
      * @param frames_with_base_peak_overlap_module vector of frames from
      * acquisitions for which the base peak ROI is covered by the respective
      * module region
-     * @param detector_angles_with_base_peak_overlap_module vector of monitor
+     * @param detector_angles_with_base_peak_overlap_module 1D NDView of monitor
      * positions for acquisitions for the module
      * @param frames_with_base_peak_overlap_prev_module vector of frames from
      * acquisitions for which the base peak ROI is covered by the respective
      * previous module region
-     * @param detector_angles_with_base_peak_overlap_prev_module vector of
+     * @param detector_angles_with_base_peak_overlap_prev_module 1D NDView of
      * monitor positions for acquisitions for the previous module
      * @brief plot wrapper to visualize calibration process
      * (default nullptr)
@@ -492,11 +492,10 @@ class AngleCalibration {
     double calculate_similarity_of_peaks_between_modules(
         const size_t module_index,
         const NDView<uint32_t, 2> frames_with_base_peak_overlap_module,
-        const std::vector<double>
-            &detector_angles_with_base_peak_overlap_module,
+        const NDView<double, 1> detector_angles_with_base_peak_overlap_module,
         const NDView<uint32_t, 2> frames_with_base_peak_overlap_prev_module,
-        const std::vector<double>
-            &detector_angles_with_base_peak_overlap_prev_module,
+        const NDView<double, 1>
+            detector_angles_with_base_peak_overlap_prev_module,
         std::shared_ptr<PlotCalibrationProcess> plot = nullptr);
 
     /**
@@ -536,8 +535,8 @@ class AngleCalibration {
      * @param frames_with_base_peak_overlap vector of frames from
      * acquisitions for which the base peak ROI is covered by the respective
      * module region
-     * @param detector_angles_with_base_peak_overlap vector of monitor positions
-     * for acquisitions
+     * @param detector_angles_with_base_peak_overlap 1D NDView of monitor
+     * positions for acquisitions
      * @param plot plot wrapper to visualize calibration process
      * (default nullptr)
      * @param delta_parameter1 parameter step for parameter module center
@@ -548,7 +547,7 @@ class AngleCalibration {
     void optimize_coupled_parameters(
         const size_t module_index,
         const NDView<uint32_t, 2> frames_with_base_peak_overlap,
-        const std::vector<double> &detector_angles_with_base_peak_overlap,
+        const NDView<double, 1> detector_angles_with_base_peak_overlap,
         std::shared_ptr<PlotCalibrationProcess> plot = nullptr,
         const double delta_parameter1 = 0.5,
         const double delta_parameter2 = 1.0e-6);
@@ -560,11 +559,11 @@ class AngleCalibration {
      * @param module_index index of module to be calibrated
      * @param frames_with_base_peak_overlap vector of frames with base peak
      * overlap for module
-     * @param detector_angles_with_base_peak_overlap vector of monitor positions
-     * for acquisitions for the module
+     * @param detector_angles_with_base_peak_overlap 1D NDView of monitor
+     * positions for acquisitions for the module
      * @param frames_with_base_peak_overlap_prev_module vector of frames with
      * base peak overlap for previous module
-     * @param detector_angles_with_base_peak_overlap_prev_module vector of
+     * @param detector_angles_with_base_peak_overlap_prev_module 1D NDView of
      * monitor positions for acquisitions for the previous module
      * @param plot plot wrapper to visualize calibration process
      * (default nullptr)
@@ -574,10 +573,10 @@ class AngleCalibration {
     void optimize_offset_parameter(
         const size_t module_index,
         const NDView<uint32_t, 2> frames_with_base_peak_overlap,
-        const std::vector<double> &detector_angles_with_base_peak_overlap,
+        const NDView<double, 1> detector_angles_with_base_peak_overlap,
         const NDView<uint32_t, 2> frames_with_base_peak_overlap_prev_module,
-        const std::vector<double>
-            &detector_angles_with_base_peak_overlap_prev_module,
+        const NDView<double, 1>
+            detector_angles_with_base_peak_overlap_prev_module,
         std::shared_ptr<PlotCalibrationProcess> plot = nullptr,
         double delta_parameter = 0.005);
 
@@ -707,7 +706,7 @@ template <bool visualize_calibration>
 double AngleCalibration::calculate_similarity_of_peaks_between_acquisitions(
     const size_t module_index,
     const NDView<uint32_t, 2> frames_with_base_peak_overlap,
-    const std::vector<double> &detector_angles_bp_overlap,
+    const NDView<double, 1> detector_angles_bp_overlap,
     std::shared_ptr<PlotCalibrationProcess> plot) {
 
     ssize_t num_bins_in_ROI = get_base_peak_ROI_num_bins();
@@ -821,9 +820,9 @@ template <bool visualize_calibration>
 double AngleCalibration::calculate_similarity_of_peaks_between_modules(
     const size_t module_index,
     const NDView<uint32_t, 2> frames_bp_overlap_module,
-    const std::vector<double> &detector_angles_bp_overlap_module,
+    const NDView<double, 1> detector_angles_bp_overlap_module,
     const NDView<uint32_t, 2> frames_bp_overlap_prev_module,
-    const std::vector<double> &detector_angles_bp_overlap_prev_module,
+    const NDView<double, 1> detector_angles_bp_overlap_prev_module,
     std::shared_ptr<PlotCalibrationProcess> plot) {
 
     if (module_index == 0) {
@@ -1168,9 +1167,9 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
 template <bool visualize_calibration>
 void AngleCalibration::calibrate_offset(
     const size_t module_index, const NDView<uint32_t, 2> frames_bp_overlap,
-    const std::vector<double> &detector_angles_bp_overlap,
+    const NDView<double, 1> detector_angles_bp_overlap,
     const NDView<uint32_t, 2> frames_bp_overlap_prev_module,
-    const std::vector<double> &detector_angles_bp_overlap_prev_module) {
+    const NDView<double, 1> detector_angles_bp_overlap_prev_module) {
 
     if (module_index == 0) {
         throw std::runtime_error(LOCATION +
@@ -1214,7 +1213,7 @@ void AngleCalibration::calibrate_offset(
 template <bool visualize_calibration>
 void AngleCalibration::calibrate_coupled_parameters(
     const size_t module_index, const NDView<uint32_t, 2> frames,
-    const std::vector<double> &detector_angles) {
+    const NDView<double, 1> detector_angles) {
 
     // skip if module is not connected
 
@@ -1245,8 +1244,8 @@ void AngleCalibration::calibrate_coupled_parameters(
 
 template <bool visualize_calibration>
 void AngleCalibration::calibrate(
-    const NDView<uint32_t, 2> frames,
-    const std::vector<double> &detector_angles, const double base_peak_angle_,
+    const NDView<uint32_t, 2> frames, const NDView<double, 1> detector_angles,
+    const double base_peak_angle_,
     std::optional<std::filesystem::path> output_file) {
 
     base_peak_angle = base_peak_angle_;
@@ -1262,9 +1261,9 @@ void AngleCalibration::calibrate(
     }
 
     NDView<uint32_t, 2> prev_frames_bp_overlap;
-    std::vector<double> prev_detector_angles_bp_overlap;
+    NDView<double, 1> prev_detector_angles_bp_overlap;
     NDView<uint32_t, 2> frames_bp_overlap;
-    std::vector<double> detector_angles_bp_overlap;
+    NDView<double, 1> detector_angles_bp_overlap;
 
     try {
         std::tie(prev_frames_bp_overlap, prev_detector_angles_bp_overlap) =
@@ -1329,7 +1328,7 @@ void AngleCalibration::calibrate(
 
 template <bool visualize_calibration>
 void AngleCalibration::calibrate(const NDView<uint32_t, 2> frames,
-                                 const std::vector<double> &detector_angles,
+                                 const NDView<double, 1> detector_angles,
                                  const double base_peak_angle_,
                                  const size_t module_index) {
 
@@ -1345,9 +1344,9 @@ void AngleCalibration::calibrate(const NDView<uint32_t, 2> frames,
     base_peak_angle = base_peak_angle_;
 
     NDView<uint32_t, 2> frames_with_base_peak_overlap;
-    std::vector<double> detector_angles_with_base_peak_overlap;
+    NDView<double, 1> detector_angles_with_base_peak_overlap;
     NDView<uint32_t, 2> frames_with_base_peak_overlap_prev_module;
-    std::vector<double> detector_angles_with_base_peak_overlap_prev_module;
+    NDView<double, 1> detector_angles_with_base_peak_overlap_prev_module;
 
     try {
         std::tie(frames_with_base_peak_overlap,

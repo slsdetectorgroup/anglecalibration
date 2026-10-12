@@ -41,11 +41,19 @@ anglecalibration.read_bad_channels_from_file(str(my_path / "bc2025_001_RING.chan
 
 file_prefix = "ang1up_22keV_MIX_0p5mm_48M_a_"
 num_files = 1501
-file_list = [str(my_path / file_prefix)+f"{i:04d}.h5" for i in range(0,num_files)] 
 
 #set scale factor to get reasonable scales 
-first_frame = mythenfilereader.read_frame(file_list[0])
+first_frame = mythenfilereader.read_frame(str(my_path / file_prefix)+f"{0:04d}.h5")
 scale_factor = first_frame.incident_intensity
+
+detector_angles = np.empty(shape = (num_files), dtype = np.double)
+
+frames = np.empty(shape=(num_files, mythendetectorspecifications.num_strips()), dtype=np.uint32)
+
+for frame in range(num_files):
+    file_name = str(my_path / file_prefix)+f"{frame:04d}.h5"
+    detector_angles[frame] = mythenfilereader.read_detector_angle(file_name)
+    mythenfilereader.read_into(frames[frame, :], file_name)
 
 anglecalibration.scale_factor = scale_factor
 
@@ -74,7 +82,7 @@ plotter.plot_diffraction_pattern(module_redistributed_to_fixed_angle_bins[:,0].v
 # plot base peak for one module
 plotter.plot_base_peak(module_redistributed_to_fixed_angle_bins[:,0].view())
 
-anglecalibration.calibrate(file_list, anglecalibration.base_peak_angle, module_index = 1, plot_calibration_process=True) 
+anglecalibration.calibrate(frames, detector_angles, anglecalibration.base_peak_angle, module_index = 1, plot_calibration_process=True) 
 #anglecalibration.calibrate(file_list, anglecalibration.base_peak_angle, output_filename=str(env_data_path() / "angcal_Jul2025_P12_0p0105_new_calibrated3.off"))
 
 print("calibration is done")

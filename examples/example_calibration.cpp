@@ -134,7 +134,8 @@ int main() {
     // read all acquisitions into frames (rows: acquisitions, cols: channels)
     NDArray<uint32_t, 2> frames(std::array<ssize_t, 2>{
         static_cast<ssize_t>(filelist.size()), first_frame.size()});
-    std::vector<double> detector_angles(filelist.size());
+    NDArray<double, 1> detector_angles(
+        std::array<ssize_t, 1>{static_cast<ssize_t>(filelist.size())});
 
     for (size_t frame_index = 0; frame_index < filelist.size(); ++frame_index) {
 
@@ -145,11 +146,11 @@ int main() {
             mythen_file_reader->read_detector_angle(filelist[frame_index]);
     }
 
-    anglecalibration.calibrate<true>(frames.view(), detector_angles,
+    anglecalibration.calibrate<true>(frames.view(), detector_angles.view(),
                                      base_peak_angle, 1);
 
     /*
-    anglecalibration.calibrate<false>(frames.view(), detector_angles,
+    anglecalibration.calibrate<false>(frames.view(), detector_angles.view(),
                                       base_peak_angle);
 
     auto bcparameters = anglecalibration.get_BCparameters();

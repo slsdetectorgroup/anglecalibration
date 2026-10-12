@@ -251,24 +251,30 @@ void define_AngleCalibration_binding(py::module &m) {
         .def(
             "calibrate",
             [](AngleCalibration &self,
-               const std::vector<std::string> &file_list,
+               py::array_t<uint32_t, py::array::c_style> frames,
+               py::array_t<double, py::array::c_style> detector_angles,
                const double base_peak_angle, const size_t module_index,
                const bool plot_calibration_process = false) {
+                auto frames_view = make_view_2d(frames);
+                auto detector_angles_view = make_view_1d(detector_angles);
                 if (plot_calibration_process) {
-                    self.calibrate<true>(file_list, base_peak_angle,
-                                         module_index);
+                    self.calibrate<true>(frames_view, detector_angles_view,
+                                         base_peak_angle, module_index);
                 } else {
-                    self.calibrate(file_list, base_peak_angle, module_index);
+                    self.calibrate(frames_view, detector_angles_view,
+                                   base_peak_angle, module_index);
                 }
             },
-            py::arg("file_list"), py::arg("base_peak_angle"),
-            py::arg("module_index"),
+            py::arg("frames"), py::arg("detector_angles"),
+            py::arg("base_peak_angle"), py::arg("module_index"),
             py::arg("plot_calibration_process") = false,
             R"(
             calibrates BC parameters for respective module
 
-            file_list: list 
-                List of paths to acquisition files.
+            frames: numpy.ndarray of uint32, shape (n_frames, n_channels)
+                Array of photon counts for each acquisition frame and channel. (acquisitions need to be ordered by motor position)
+            detector_angles: numpy.ndarray of double, shape (n_frames,)
+                Array of motor positions corresponding to each frame.
             base_peak_angle: float
                 Angle of base peak center [degree].
             module_index: int
@@ -280,25 +286,32 @@ void define_AngleCalibration_binding(py::module &m) {
         .def(
             "calibrate",
             [](AngleCalibration &self,
-               const std::vector<std::string> &file_list,
+               py::array_t<uint32_t, py::array::c_style> frames,
+               py::array_t<double, py::array::c_style> detector_angles,
                const double base_peak_angle,
                std::optional<std::string> output_filename = std::nullopt,
                const bool plot_calibration_process = false) {
+                auto frames_view = make_view_2d(frames);
+                auto detector_angles_view = make_view_1d(detector_angles);
                 if (plot_calibration_process) {
-                    self.calibrate<true>(file_list, base_peak_angle,
-                                         output_filename);
+                    self.calibrate<true>(frames_view, detector_angles_view,
+                                         base_peak_angle, output_filename);
                 } else {
-                    self.calibrate(file_list, base_peak_angle, output_filename);
+                    self.calibrate(frames_view, detector_angles_view,
+                                   base_peak_angle, output_filename);
                 }
             },
-            py::arg("file_list"), py::arg("base_peak_angle"),
+            py::arg("frames"), py::arg("detector_angles"),
+            py::arg("base_peak_angle"),
             py::arg("output_filename") = std::nullopt,
             py::arg("plot_calibration_process") = false,
             R"(
             calibrates BC parameters for all modules
             
-            file_list : list
-                list of paths to acquisition files
+            frames : numpy.ndarray of uint32, shape (n_frames, n_channels)
+                Array of photon counts for each acquisition frame and channel. (acquisitions need to be ordered by motor position)
+            detector_angles : numpy.ndarray of double, shape (n_frames,)
+                Array of motor positions corresponding to each frame.
             base_peak_angle : double
                 angle of base peak center [degree]
             output_filename : str, optional 

@@ -50,6 +50,11 @@ template <class T, int Flags> auto make_view_1d(py::array_t<T, Flags> &arr) {
     return aare::NDView<T, 1>(arr.mutable_data(), shape);
 }
 
+template <class T, int Flags> auto make_view_2d(py::array_t<T, Flags> &arr) {
+    auto shape = get_checked_shape<2>(arr);
+    return aare::NDView<T, 2>(arr.mutable_data(), shape);
+}
+
 template <typename T, ssize_t Ndim>
 py::array return_view_data(aare::NDView<T, Ndim> array, py::object base) {
 

@@ -420,10 +420,9 @@ bool AngleCalibration::base_peak_is_in_module(
             left_module_boundary_angle < base_peak_angle - base_peak_roi_width);
 }
 
-std::tuple<NDView<uint32_t, 2>, std::vector<double>>
+std::tuple<NDView<uint32_t, 2>, NDView<double, 1>>
 AngleCalibration::get_frames_with_base_peak_overlap(
-    const NDView<uint32_t, 2> frames,
-    const std::vector<double> &detector_angles,
+    const NDView<uint32_t, 2> frames, const NDView<double, 1> detector_angles,
     const size_t module_index) const {
 
     size_t first_frame_index_bp_overlap =
@@ -432,7 +431,7 @@ AngleCalibration::get_frames_with_base_peak_overlap(
 
     const double potential_change_in_diffraction_angle = base_peak_roi_width;
 
-    for (size_t i = 0; i < detector_angles.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(detector_angles.size()); ++i) {
         double detector_angle = detector_angles[i];
         if (base_peak_is_in_module(module_index,
                                    detector_angle -
@@ -452,10 +451,8 @@ AngleCalibration::get_frames_with_base_peak_overlap(
     auto frames_bp_overlap = frames.sub_view(first_frame_index_bp_overlap,
                                              last_frame_index_bp_overlap + 1);
 
-    std::vector<double> detector_angles_bp_overlap(
-        detector_angles.begin() + first_frame_index_bp_overlap,
-        detector_angles.begin() + last_frame_index_bp_overlap +
-            1); // span would be better, copy
+    auto detector_angles_bp_overlap = detector_angles.sub_view(
+        first_frame_index_bp_overlap, last_frame_index_bp_overlap + 1);
 
     return std::make_tuple(frames_bp_overlap, detector_angles_bp_overlap);
 }
@@ -672,7 +669,7 @@ std::pair<double, double> AngleCalibration::photon_count_correction(
 double AngleCalibration::center_base_peak(
     const size_t module_index,
     const NDView<uint32_t, 2> frames_with_base_peak_overlap,
-    const std::vector<double> &detector_angles_with_base_peak_overlap) {
+    const NDView<double, 1> detector_angles_with_base_peak_overlap) {
 
     if (module_is_disconnected(module_index)) {
         throw std::runtime_error(
@@ -878,9 +875,9 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_,
 
 void AngleCalibration::optimize_offset_parameter(
     const size_t module_index, const NDView<uint32_t, 2> frames_bp_overlap,
-    const std::vector<double> &detector_angles_bp_overlap,
+    const NDView<double, 1> detector_angles_bp_overlap,
     const NDView<uint32_t, 2> frames_bp_overlap_prev_module,
-    const std::vector<double> &detector_angles_bp_overlap_prev_module,
+    const NDView<double, 1> detector_angles_bp_overlap_prev_module,
     std::shared_ptr<PlotCalibrationProcess> plot, double delta_parameter) {
 
     // old reference parameters: // parameters can only change +,-
@@ -1170,7 +1167,7 @@ void AngleCalibration::optimize_offset_parameter(
 void AngleCalibration::optimize_coupled_parameters(
     const size_t module_index,
     const NDView<uint32_t, 2> frames_with_base_peak_overlap,
-    const std::vector<double> &detector_angles_bp_overlap,
+    const NDView<double, 1> detector_angles_bp_overlap,
     std::shared_ptr<PlotCalibrationProcess> plot, const double delta_parameter1,
     const double delta_parameter2) {
 
