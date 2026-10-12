@@ -12,17 +12,17 @@ ______________________________
 
 .. code-block:: python
 
-    from angcal import MythenDetectorSpecifications, FlatField, AngleCalibration, EpicsMythenFileReader, MythenFrame
+    from angcal import MythenDetector, FlatField, AngleCalibration, EpicsMythenFileReader, MythenFrame
     from pathlib import Path
     import numpy as np
 
     data_path = Path("/path/to/your/data/files")  # adjust this path
 
     # setup mythen detector specifications - stores all relevant parameters of the detector setup
-    mythendetectorspecifications = MythenDetectorSpecifications(offset=0, num_counters=1) 
+    mythen_detector = MythenDetector() 
 
     # setup flatfield 
-    flatfield = FlatField(mythendetectorspecifications)
+    flatfield = FlatField(mythen_detector)
 
     flatfield.normalized_flatfield = np.loadtxt(data_path / "Flatfield_E17p5keV_T12500eV_up_AUGCAL2_Sep2023_open_WS_C_X_X.raw", dtype=np.double, usecols=[1,2])
 
@@ -30,7 +30,7 @@ ______________________________
     mythenfilereader = EpicsMythenFileReader()
 
     # setup angle calibration - has everything to do conversion and calibration 
-    anglecalibration = AngleCalibration(mythendetectorspecifications, flatfield, mythenfilereader)
+    anglecalibration = AngleCalibration(mythen_detector, flatfield, mythenfilereader)
 
     anglecalibration.read_initial_calibration_from_file(str(data_path / "Angcal_2E_Feb2023_P29.off"))
 

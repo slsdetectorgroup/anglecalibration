@@ -15,14 +15,14 @@ using namespace angcal;
 void define_AngleCalibration_binding(py::module &m) {
 
     py::class_<AngleCalibration>(m, "AngleCalibration")
-        .def(py::init<std::shared_ptr<MythenDetectorSpecifications>,
+        .def(py::init<std::shared_ptr<MythenDetector>,
                       std::shared_ptr<FlatField>,
                       std::shared_ptr<MythenFileReader>>(),
-             py::arg("MythenDetectorSpecifications"), py::arg("FlatField"),
+             py::arg("MythenDetector"), py::arg("FlatField"),
              py::arg("MythenFileReader"), R"(
              Parameters
              ----------
-             MythenDetectorSpecifications: MythenDetectorSpecifications 
+             MythenDetector: MythenDetector 
                 storing all mythen specific parameters
              FlatField: FlatField 
                 class storing inverse normalized flatfield
@@ -175,12 +175,12 @@ void define_AngleCalibration_binding(py::module &m) {
             )")
 
         .def_property_readonly(
-            "MythenDetectorSpecifications",
+            "MythenDetector",
             [](AngleCalibration &self) {
-                return self.get_detector_specifications();
+                return self.get_mythen_detector();
             },
             R"(
-            MythenDetectorSpecifications storing all mythen specific parameters
+            MythenDetector storing all mythen specific parameters
             )")
 
         .def_property_readonly(
@@ -222,9 +222,10 @@ void define_AngleCalibration_binding(py::module &m) {
             [](AngleCalibration &self, const size_t module_index,
                const double detector_angle, const size_t strip_index,
                const double distance_to_strip) {
-                return self.diffraction_angle_from_DG_parameters(
-                    module_index, detector_angle, strip_index,
-                    distance_to_strip);
+                return self.get_mythen_detector()
+                    ->diffraction_angle_from_DG_parameters(
+                        module_index, detector_angle, strip_index,
+                        distance_to_strip);
             },
             py::arg("module_index"), py::arg("detector_angle"),
             py::arg("strip_index"), py::arg("distance_to_strip"),

@@ -179,14 +179,15 @@ set(PUBLICHEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/helpers/ErrorPropagation.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/logger.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenFileReader.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenDetectorSpecifications.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Parameters.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenDetector.hpp
 ) 
 
 set(SourceFiles 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AngleCalibration.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/FlatField.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Parameters.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/MythenDetector.cpp
 )
 
 add_library(angle_calibration STATIC ${SourceFiles})  

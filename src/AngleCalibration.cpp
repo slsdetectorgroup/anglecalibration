@@ -21,17 +21,14 @@ struct SignalHandler {
 */
 
 AngleCalibration::AngleCalibration(
-    std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
+    std::shared_ptr<MythenDetector> mythen_detector_,
     std::shared_ptr<FlatField> flat_field_,
     std::shared_ptr<MythenFileReader> mythen_file_reader_)
-    : mythen_detector(mythen_detector_), flat_field(flat_field_),
+    : m_mythen_detector(mythen_detector_), flat_field(flat_field_),
       mythen_file_reader(mythen_file_reader_) {
 
-    DGparameters = DGParameters(mythen_detector->max_modules);
-    BCparameters = BCParameters(mythen_detector->max_modules);
-
     bad_channels = NDArray<bool, 1>(std::array<ssize_t, 1>{static_cast<ssize_t>(
-                                        mythen_detector->num_strips())},
+                                        m_mythen_detector->num_strips())},
                                     false);
 }
 
@@ -77,11 +74,6 @@ AngleCalibration::get_calibration_files() const {
     return file_list;
 }
 
-std::shared_ptr<MythenDetectorSpecifications>
-AngleCalibration::get_detector_specifications() const {
-    return mythen_detector;
-}
-
 ssize_t AngleCalibration::num_fixed_angle_width_bins() const {
     ssize_t num_fixed_angle_width_bins =
         std::ceil(m_max_angle / histogram_bin_width) -
@@ -90,23 +82,23 @@ ssize_t AngleCalibration::num_fixed_angle_width_bins() const {
 }
 
 const DGParameters &AngleCalibration::get_DGparameters() const {
-    return DGparameters;
+    return m_mythen_detector->get_DGparameters();
 }
 
 const BCParameters &AngleCalibration::get_BCparameters() const {
-    return BCparameters;
+    return m_mythen_detector->get_BCparameters();
 }
 
 // TODO: command is connected - maybe use that
 bool AngleCalibration::module_is_disconnected(const size_t module_index) const {
 
     // all channels in the module are bad
-    return std::all_of(bad_channels.begin() +
-                           module_index * mythen_detector->strips_per_module,
-                       bad_channels.begin() +
-                           (module_index + 1) *
-                               mythen_detector->strips_per_module,
-                       [](const auto &elem) { return elem; });
+    return std::all_of(
+        bad_channels.begin() +
+            module_index * m_mythen_detector->strips_per_module(),
+        bad_channels.begin() +
+            (module_index + 1) * m_mythen_detector->strips_per_module(),
+        [](const auto &elem) { return elem; });
 }
 
 void AngleCalibration::set_scale_factor(const double scale_factor_) {
@@ -130,12 +122,16 @@ void AngleCalibration::read_initial_calibration_from_file(
     const std::shared_ptr<SimpleFileInterface> file_reader) {
 
     file_reader->open(filename);
-    file_reader->read_into(DGparameters.parameters.buffer(), 8);
+
+    DGParameters temp_dg_parameters(m_mythen_detector->num_modules());
+    file_reader->read_into(temp_dg_parameters.parameters.buffer(), 8);
 
     file_reader->close();
 
-    DGparameters.convert_to_BCParameters(
-        BCparameters); // initialize BC parameters
+    temp_dg_parameters.convert_to_BCParameters(
+        m_mythen_detector->get_BCparameters()); // initialize BC parameters
+
+    m_mythen_detector->set_DGparameters(temp_dg_parameters);
 }
 
 void AngleCalibration::read_bad_channels_from_file(
@@ -147,13 +143,11 @@ void AngleCalibration::read_bad_channels_from_file(
 
     // update bad_channels
     std::for_each(
-        mythen_detector->unconnected_modules.begin(),
-        mythen_detector->unconnected_modules.end(),
+        m_mythen_detector->unconnected_modules().begin(),
+        m_mythen_detector->unconnected_modules().end(),
         [this](const auto &module_index) {
-            for (size_t i = module_index *
-                            MythenDetectorSpecifications::strips_per_module;
-                 i < (module_index + 1) *
-                         MythenDetectorSpecifications::strips_per_module;
+            for (ssize_t i = module_index * MythenDetector::strips_per_module();
+                 i < (module_index + 1) * MythenDetector::strips_per_module();
                  ++i)
                 bad_channels[i] = true;
         });
@@ -168,196 +162,14 @@ void AngleCalibration::set_bad_channels(const NDArray<bool, 1> &bad_channels_) {
 
     // update bad_channels
     std::for_each(
-        mythen_detector->unconnected_modules.begin(),
-        mythen_detector->unconnected_modules.end(),
+        m_mythen_detector->unconnected_modules().begin(),
+        m_mythen_detector->unconnected_modules().end(),
         [this](const auto &module_index) {
-            for (size_t i = module_index *
-                            MythenDetectorSpecifications::strips_per_module;
-                 i < (module_index + 1) *
-                         MythenDetectorSpecifications::strips_per_module;
+            for (ssize_t i = module_index * MythenDetector::strips_per_module();
+                 i < (module_index + 1) * MythenDetector::strips_per_module();
                  ++i)
                 this->bad_channels[i] = true;
         });
-}
-
-size_t AngleCalibration::global_to_local_strip_index_conversion(
-    const size_t global_strip_index) const {
-    const size_t module_index =
-        global_strip_index / MythenDetectorSpecifications::strips_per_module;
-    // local strip index in module
-    size_t local_strip_index =
-        global_strip_index -
-        module_index * MythenDetectorSpecifications::strips_per_module;
-    // switch if indexing is in clock-wise direction
-    local_strip_index = std::signbit(DGparameters.conversions(module_index))
-                            ? MythenDetectorSpecifications::strips_per_module -
-                                  1 - local_strip_index
-                            : local_strip_index;
-
-    return local_strip_index;
-}
-
-double AngleCalibration::sample_displacement_correction(
-    const double diffraction_angle) const {
-
-    /*
-    double sample_displacement_correction =
-        std::atan(std::tan(M_PI / 180.0 * diffraction_angle) *
-                  std::sqrt(std::pow(mythen_detector->sample_x_displacement, 2)
-    + std::pow(mythen_detector->sample_y_displacement, 2)) /
-                  mythen_detector->average_distance_sample_pixel);
-    */
-
-    double whatever1 = std::sin(M_PI / 180.0 * diffraction_angle) +
-                       mythen_detector->sample_y_displacement /
-                           mythen_detector->average_distance_sample_pixel;
-
-    double whatever2 = std::cos(M_PI / 180.0 * diffraction_angle) -
-                       mythen_detector->sample_x_displacement /
-                           mythen_detector->average_distance_sample_pixel;
-
-    if (std::abs(whatever2) < std::numeric_limits<double>::epsilon()) {
-        LOG(TLogLevel::logWARNING) << fmt::format(
-            "Sample displacement correction is unstable for diffraction "
-            "angle {} degrees due to small denominator in arctan.",
-            diffraction_angle);
-        return diffraction_angle;
-    }
-
-    double sample_displacement_correction =
-        180.0 / M_PI * std::atan(whatever1 / whatever2);
-
-    // preserve original angle information in range [-180, 180]
-    const bool diffraction_angle_in_second_quadrant =
-        diffraction_angle / 90.0 > 1.0;
-    const bool diffraction_angle_in_third_quadrant =
-        diffraction_angle / 90.0 < -1.0;
-
-    if (diffraction_angle_in_second_quadrant) {
-        return 180.0 + sample_displacement_correction;
-    } else if (diffraction_angle_in_third_quadrant) {
-        return -180.0 + sample_displacement_correction;
-    } else {
-        return sample_displacement_correction;
-    }
-}
-
-double AngleCalibration::elastic_correction(const double detector_angle) const {
-    return detector_angle +
-           mythen_detector->elastic_correction_factor *
-               (-std::sin(M_PI / 180.0 *
-                          (detector_angle -
-                           mythen_detector->detector_vertical_axis_offset)));
-}
-
-double AngleCalibration::diffraction_angle_from_DG_parameters(
-    const size_t module_index, const double detector_angle, size_t strip_index,
-    const double distance_to_strip) const {
-
-    double offset = DGparameters.offsets(module_index);
-    double center = DGparameters.centers(module_index);
-    double conversion = DGparameters.conversions(module_index);
-
-    strip_index =
-        std::signbit(conversion)
-            ? MythenDetectorSpecifications::strips_per_module - strip_index - 1
-            : strip_index; // TODO: are the values sored in reserve?
-
-    double diffraction_angle =
-        offset +
-        180.0 / M_PI *
-            (center * std::abs(conversion) -
-             std::atan((center - (strip_index + distance_to_strip)) *
-                       std::abs(conversion))) +
-        elastic_correction(detector_angle) + mythen_detector->offset +
-        mythen_detector->sample_detector_offset;
-
-    return sample_displacement_correction(diffraction_angle);
-}
-
-double AngleCalibration::diffraction_angle_from_BC_parameters(
-    const size_t module_index, const double detector_angle, size_t strip_index,
-    const double distance_to_strip) const {
-
-    const double angle_module_center_normal =
-        BCparameters.angle_center_module_normal(module_index);
-    const double distance_center_sample =
-        BCparameters.module_center_sample_distances(module_index);
-    const double angle_module_center_beam =
-        BCparameters.angle_center_beam(module_index);
-
-    strip_index =
-        std::signbit(distance_center_sample)
-            ? MythenDetectorSpecifications::strips_per_module - strip_index - 1
-            : strip_index; // TODO: are the values sored in reserve?
-
-    double diffraction_angle =
-        angle_module_center_beam + angle_module_center_normal -
-        180.0 / M_PI *
-            std::atan((std::abs(distance_center_sample) *
-                           std::sin(M_PI / 180.0 * angle_module_center_normal) +
-                       (MythenDetectorSpecifications::strips_per_module * 0.5 -
-                        strip_index - distance_to_strip) *
-                           MythenDetectorSpecifications::pitch) /
-                      (std::abs(distance_center_sample) *
-                       std::cos(M_PI / 180.0 * angle_module_center_normal))) +
-        elastic_correction(detector_angle) + mythen_detector->offset +
-        mythen_detector->sample_detector_offset;
-
-    return sample_displacement_correction(diffraction_angle);
-}
-
-double AngleCalibration::diffraction_angle_from_EE_parameters(
-    const double module_center_distance, const double normal_distance,
-    const double angle, const double detector_angle, size_t strip_index,
-    const double distance_to_strip) const {
-
-    strip_index =
-        std::signbit(normal_distance)
-            ? MythenDetectorSpecifications::strips_per_module - strip_index - 1
-            : strip_index;
-
-    double diffraction_angle =
-        angle -
-        180.0 / M_PI *
-            std::atan((module_center_distance -
-                       MythenDetectorSpecifications::pitch *
-                           (strip_index + distance_to_strip)) /
-                      std::abs(normal_distance)) +
-        elastic_correction(detector_angle) + mythen_detector->offset +
-        mythen_detector->sample_detector_offset;
-
-    return sample_displacement_correction(diffraction_angle);
-}
-
-double AngleCalibration::angular_strip_width_from_DG_parameters(
-    const size_t module_index, const size_t local_strip_index) const {
-
-    return std::abs(diffraction_angle_from_DG_parameters(
-                        module_index, 0.0, local_strip_index, 0.0) -
-                    diffraction_angle_from_DG_parameters(
-                        module_index, 0.0, local_strip_index, 1.0));
-}
-
-double AngleCalibration::angular_strip_width_from_BC_parameters(
-    const size_t module_index, const size_t local_strip_index) const {
-
-    return std::abs(diffraction_angle_from_BC_parameters(
-                        module_index, 0.0, local_strip_index, 0.0) -
-                    diffraction_angle_from_BC_parameters(
-                        module_index, 0.0, local_strip_index, 1.0));
-}
-
-double AngleCalibration::angular_strip_width_from_EE_parameters(
-    const double module_center_distance, const double normal_distance,
-    const double angle, const size_t local_strip_index) const {
-
-    return std::abs(diffraction_angle_from_EE_parameters(
-                        module_center_distance, normal_distance, angle, 0.0,
-                        local_strip_index, 0.0) -
-                    diffraction_angle_from_EE_parameters(
-                        module_center_distance, normal_distance, angle, 0.0,
-                        local_strip_index, 1.0));
 }
 
 double AngleCalibration::chi_similarity_criterion(
@@ -366,13 +178,6 @@ double AngleCalibration::chi_similarity_criterion(
 
     double similarity_criterion = 0;
 
-    /*
-    if (num_runs == 0) {
-        throw std::runtime_error(
-            LOCATION +
-            "Number of runs is zero - cannot calculate similarity criterion!");
-    }
-    */
     for (ssize_t bin_index = 0; bin_index < weighted_sums.shape(0);
          ++bin_index) {
 
@@ -404,9 +209,12 @@ bool AngleCalibration::base_peak_is_in_module(
     const size_t module_index, const double detector_angle) const {
 
     double left_module_boundary_angle =
-        diffraction_angle_from_BC_parameters(module_index, detector_angle, 0);
-    double right_module_boundary_angle = diffraction_angle_from_BC_parameters(
-        module_index, detector_angle, mythen_detector->strips_per_module - 1);
+        m_mythen_detector->diffraction_angle_from_BC_parameters(
+            module_index, detector_angle, 0);
+    double right_module_boundary_angle =
+        m_mythen_detector->diffraction_angle_from_BC_parameters(
+            module_index, detector_angle,
+            MythenDetector::strips_per_module() - 1);
 
     LOG(TLogLevel::logDEBUG2) << fmt::format(
         "module_boundaries_in_angle for module {} [{}, {}]\n", module_index,
@@ -474,15 +282,15 @@ AngleCalibration::rate_correction(const double photon_count,
 
     double photon_counts_per_second = photon_count / exposure_time;
 
-    photon_counts_per_second =
-        std::min(maximum_count_rate,
-                 photon_counts_per_second *
-                     mythen_detector->dead_time); // multiply with dead time -
-                                                  // for numerical algorithm
+    photon_counts_per_second = std::min(
+        maximum_count_rate,
+        photon_counts_per_second *
+            m_mythen_detector->dead_time()); // multiply with dead time -
+                                             // for numerical algorithm
 
     double error_photon_counts_per_second =
         photon_count_error *
-        std::pow(mythen_detector->dead_time / exposure_time, 2);
+        std::pow(m_mythen_detector->dead_time() / exposure_time, 2);
 
     // -actual_count_rate*dead_time = W -> -dead_time*measured_count_rate =
     // We^{W} -> W: Lambert W function
@@ -591,25 +399,8 @@ std::pair<double, double> AngleCalibration::transverse_width_correction(
     const double photon_counts, const double photon_counts_error,
     const size_t module_index, size_t strip_index) const {
 
-    // convert to EE parameters
-    const auto [normal_distance, module_center_distance, angle] =
-        BCparameters.convert_to_EEParameters(module_index);
-
-    strip_index =
-        std::signbit(normal_distance)
-            ? MythenDetectorSpecifications::strips_per_module - 1 - strip_index
-            : strip_index;
-
-    const double distance_sample_pixel = std::sqrt(
-        std::pow(normal_distance, 2) +
-        std::pow(module_center_distance - mythen_detector->pitch * strip_index,
-                 2));
-
     const double transverse_width_correction_factor =
-        (2 * std::atan(mythen_detector->transverse_width /
-                       (2 * mythen_detector->average_distance_sample_pixel))) /
-        (2 * std::atan(mythen_detector->transverse_width /
-                       (2 * distance_sample_pixel)));
+        1.0 / m_mythen_detector->transverse_width(module_index, strip_index);
 
     double transverse_width_normalized_photon_counts =
         photon_counts * transverse_width_correction_factor;
@@ -642,9 +433,9 @@ std::pair<double, double> AngleCalibration::photon_count_correction(
                                       rate_corrected_photon_counts_error, I0);
 
     const size_t module_index =
-        global_strip_index / MythenDetectorSpecifications::strips_per_module;
+        global_strip_index / MythenDetector::strips_per_module();
     const size_t strip_index =
-        global_strip_index % MythenDetectorSpecifications::strips_per_module;
+        global_strip_index % MythenDetector::strips_per_module();
 
     auto [transverse_width_corrected_photon_counts,
           transverse_width_corrected_photon_counts_variance] =
@@ -810,7 +601,7 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
             << fmt::format("redistributing photon counts for file: {}", file);
 
         for (size_t module_index = 0;
-             module_index < mythen_detector->max_modules; ++module_index) {
+             module_index < m_mythen_detector->num_modules(); ++module_index) {
 
             if (module_is_disconnected(module_index)) {
                 continue;
@@ -883,10 +674,12 @@ void AngleCalibration::optimize_offset_parameter(
     // old reference parameters: // parameters can only change +,-
     // base_peak_roi_width
     double old_reference_left_strip_boundary_angle =
-        diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, 0.0);
+        m_mythen_detector->diffraction_angle_from_BC_parameters(module_index,
+                                                                0.0, 0.0, 0.0);
 
     LOG(TLogLevel::logDEBUG) << fmt::format(
-        "initial parameter: {}", BCparameters.angle_center_beam(module_index));
+        "initial parameter: {}",
+        m_mythen_detector->get_BCparameters().angle_center_beam(module_index));
 
     auto objective_function = [this, &module_index, &frames_bp_overlap,
                                &frames_bp_overlap_prev_module,
@@ -894,12 +687,16 @@ void AngleCalibration::optimize_offset_parameter(
                                &detector_angles_bp_overlap_prev_module,
                                &old_reference_left_strip_boundary_angle](
                                   const double x) {
-        const double prev_value = BCparameters.angle_center_beam(module_index);
-        BCparameters.angle_center_beam(module_index) = x;
+        const double prev_value =
+            m_mythen_detector->get_BCparameters().angle_center_beam(
+                module_index);
+        m_mythen_detector->get_BCparameters().angle_center_beam(module_index) =
+            x;
         double similarity_of_peaks{};
 
         double new_reference_left_strip_boundary_angle =
-            diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, 0.0);
+            m_mythen_detector->diffraction_angle_from_BC_parameters(
+                module_index, 0.0, 0.0, 0.0);
 
         if (std::abs(new_reference_left_strip_boundary_angle -
                      old_reference_left_strip_boundary_angle) >
@@ -924,7 +721,7 @@ void AngleCalibration::optimize_offset_parameter(
                                          // in line search
             }
         }
-        BCparameters.angle_center_beam(module_index) =
+        m_mythen_detector->get_BCparameters().angle_center_beam(module_index) =
             prev_value; // revert shift
         return similarity_of_peaks;
     };
@@ -933,22 +730,25 @@ void AngleCalibration::optimize_offset_parameter(
         center_base_peak(module_index - 1, frames_bp_overlap_prev_module,
                          detector_angles_bp_overlap_prev_module);
 
-    auto difference_peak_centers =
-        [this, &module_index, &frames_bp_overlap, &detector_angles_bp_overlap,
-         &detector_angles_bp_overlap_prev_module,
-         &peak_center_reference_module](const double x) {
-            const double prev_value =
-                BCparameters.angle_center_beam(module_index);
-            BCparameters.angle_center_beam(module_index) = x;
+    auto difference_peak_centers = [this, &module_index, &frames_bp_overlap,
+                                    &detector_angles_bp_overlap,
+                                    &detector_angles_bp_overlap_prev_module,
+                                    &peak_center_reference_module](
+                                       const double x) {
+        const double prev_value =
+            m_mythen_detector->get_BCparameters().angle_center_beam(
+                module_index);
+        m_mythen_detector->get_BCparameters().angle_center_beam(module_index) =
+            x;
 
-            double peak_center_current_module = center_base_peak(
-                module_index, frames_bp_overlap, detector_angles_bp_overlap);
+        double peak_center_current_module = center_base_peak(
+            module_index, frames_bp_overlap, detector_angles_bp_overlap);
 
-            BCparameters.angle_center_beam(module_index) =
-                prev_value; // revert shift
+        m_mythen_detector->get_BCparameters().angle_center_beam(module_index) =
+            prev_value; // revert shift
 
-            return peak_center_current_module - peak_center_reference_module;
-        };
+        return peak_center_current_module - peak_center_reference_module;
+    };
 
     double previous_similarity_of_peaks =
         calculate_similarity_of_peaks_between_modules<false>(
@@ -970,8 +770,8 @@ void AngleCalibration::optimize_offset_parameter(
     double next_similarity_of_peaks{};
 
     // define search direction
-    double diff_peak_centers =
-        difference_peak_centers(BCparameters.angle_center_beam(module_index));
+    double diff_peak_centers = difference_peak_centers(
+        m_mythen_detector->get_BCparameters().angle_center_beam(module_index));
 
     double previous_difference_in_peaks = diff_peak_centers;
 
@@ -986,7 +786,9 @@ void AngleCalibration::optimize_offset_parameter(
         LOG(TLogLevel::logDEBUG) << "moving peak to the right: ";
 
         next_difference_in_peaks = difference_peak_centers(
-            BCparameters.angle_center_beam(module_index) + delta_parameter);
+            m_mythen_detector->get_BCparameters().angle_center_beam(
+                module_index) +
+            delta_parameter);
 
         // reduce step size if overshoot reference peak
         while (next_difference_in_peaks > 0.0) {
@@ -994,7 +796,9 @@ void AngleCalibration::optimize_offset_parameter(
 
             delta_parameter *= 0.5; // reduce step size
             next_difference_in_peaks = difference_peak_centers(
-                BCparameters.angle_center_beam(module_index) + delta_parameter);
+                m_mythen_detector->get_BCparameters().angle_center_beam(
+                    module_index) +
+                delta_parameter);
 
             relative_change_difference_in_peaks =
                 std::abs(std::abs(next_difference_in_peaks) -
@@ -1004,7 +808,9 @@ void AngleCalibration::optimize_offset_parameter(
         }
 
         next_similarity_of_peaks = objective_function(
-            BCparameters.angle_center_beam(module_index) + delta_parameter);
+            m_mythen_detector->get_BCparameters().angle_center_beam(
+                module_index) +
+            delta_parameter);
 
         relative_change_difference_in_peaks =
             std::abs(next_difference_in_peaks - previous_difference_in_peaks) /
@@ -1016,7 +822,8 @@ void AngleCalibration::optimize_offset_parameter(
                  std::abs(previous_difference_in_peaks)) &&
                 (relative_change_difference_in_peaks > 1e-4) &&
                 (std::abs(next_difference_in_peaks) > 1e-10))) {
-            BCparameters.angle_center_beam(module_index) += delta_parameter;
+            m_mythen_detector->get_BCparameters().angle_center_beam(
+                module_index) += delta_parameter;
 
             LOG(TLogLevel::logDEBUG)
                 << fmt::format("Iteration {} with peak similarity of {}, "
@@ -1038,7 +845,9 @@ void AngleCalibration::optimize_offset_parameter(
             previous_difference_in_peaks = next_difference_in_peaks;
 
             next_difference_in_peaks = difference_peak_centers(
-                BCparameters.angle_center_beam(module_index) + delta_parameter);
+                m_mythen_detector->get_BCparameters().angle_center_beam(
+                    module_index) +
+                delta_parameter);
 
             relative_change_difference_in_peaks =
                 std::abs(next_difference_in_peaks -
@@ -1051,12 +860,15 @@ void AngleCalibration::optimize_offset_parameter(
                 LOG(TLogLevel::logDEBUG) << fmt::format("reducing step size");
                 delta_parameter *= 0.5; // reduce step size
                 next_difference_in_peaks = difference_peak_centers(
-                    BCparameters.angle_center_beam(module_index) +
+                    m_mythen_detector->get_BCparameters().angle_center_beam(
+                        module_index) +
                     delta_parameter);
             }
 
             next_similarity_of_peaks = objective_function(
-                BCparameters.angle_center_beam(module_index) + delta_parameter);
+                m_mythen_detector->get_BCparameters().angle_center_beam(
+                    module_index) +
+                delta_parameter);
 
             LOG(TLogLevel::logDEBUG1) << fmt::format(
                 "previous difference peak centers: {}, next differnce peak "
@@ -1078,14 +890,18 @@ void AngleCalibration::optimize_offset_parameter(
         LOG(TLogLevel::logDEBUG) << "moving peak to the left: ";
 
         next_difference_in_peaks = difference_peak_centers(
-            BCparameters.angle_center_beam(module_index) - delta_parameter);
+            m_mythen_detector->get_BCparameters().angle_center_beam(
+                module_index) -
+            delta_parameter);
 
         // reduce step size if overshoot reference peak
         while (next_difference_in_peaks < 0.0) {
             LOG(TLogLevel::logDEBUG) << fmt::format("reducing step size");
             delta_parameter *= 0.5; // reduce step size
             next_difference_in_peaks = difference_peak_centers(
-                BCparameters.angle_center_beam(module_index) - delta_parameter);
+                m_mythen_detector->get_BCparameters().angle_center_beam(
+                    module_index) -
+                delta_parameter);
 
             relative_change_difference_in_peaks =
                 std::abs(std::abs(next_difference_in_peaks) -
@@ -1095,7 +911,9 @@ void AngleCalibration::optimize_offset_parameter(
         }
 
         next_similarity_of_peaks = objective_function(
-            BCparameters.angle_center_beam(module_index) - delta_parameter);
+            m_mythen_detector->get_BCparameters().angle_center_beam(
+                module_index) -
+            delta_parameter);
 
         relative_change_difference_in_peaks =
             std::abs(next_difference_in_peaks - previous_difference_in_peaks) /
@@ -1107,7 +925,8 @@ void AngleCalibration::optimize_offset_parameter(
                     std::abs(previous_difference_in_peaks) &&
                 relative_change_difference_in_peaks > 1e-4 &&
                 (std::abs(next_difference_in_peaks) > 1e-10))) {
-            BCparameters.angle_center_beam(module_index) -= delta_parameter;
+            m_mythen_detector->get_BCparameters().angle_center_beam(
+                module_index) -= delta_parameter;
 
             LOG(TLogLevel::logDEBUG)
                 << fmt::format("Iteration {} with peak similarity of {}, "
@@ -1129,7 +948,9 @@ void AngleCalibration::optimize_offset_parameter(
             previous_difference_in_peaks = next_difference_in_peaks;
 
             next_difference_in_peaks = difference_peak_centers(
-                BCparameters.angle_center_beam(module_index) - delta_parameter);
+                m_mythen_detector->get_BCparameters().angle_center_beam(
+                    module_index) -
+                delta_parameter);
 
             // reduce step size if overshoot reference peak
             while (next_difference_in_peaks < 0.0) {
@@ -1137,12 +958,15 @@ void AngleCalibration::optimize_offset_parameter(
                 delta_parameter *= 0.5; // reduce step size
 
                 next_difference_in_peaks = difference_peak_centers(
-                    BCparameters.angle_center_beam(module_index) -
+                    m_mythen_detector->get_BCparameters().angle_center_beam(
+                        module_index) -
                     delta_parameter);
             }
 
             next_similarity_of_peaks = objective_function(
-                BCparameters.angle_center_beam(module_index) - delta_parameter);
+                m_mythen_detector->get_BCparameters().angle_center_beam(
+                    module_index) -
+                delta_parameter);
 
             LOG(TLogLevel::logDEBUG1) << fmt::format(
                 "previous difference peak centers: {}, next differnce peak "
@@ -1180,14 +1004,18 @@ void AngleCalibration::optimize_coupled_parameters(
         "parameters: center_sample_distance: {}, "
         "angle_center_module_normal: "
         "{}, angle_center_beam: {}",
-        module_index, BCparameters.module_center_sample_distances(module_index),
-        BCparameters.angle_center_module_normal(module_index),
-        BCparameters.angle_center_beam(module_index));
+        module_index,
+        m_mythen_detector->get_BCparameters().module_center_sample_distances(
+            module_index),
+        m_mythen_detector->get_BCparameters().angle_center_module_normal(
+            module_index),
+        m_mythen_detector->get_BCparameters().angle_center_beam(module_index));
 
     // old reference parameters: // parameters can only change +,-
     // base_peak_roi_width
     double old_reference_left_strip_boundary_angle =
-        diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, 0.0);
+        m_mythen_detector->diffraction_angle_from_BC_parameters(module_index,
+                                                                0.0, 0.0, 0.0);
 
     double next_similarity_of_peaks{};
 
@@ -1205,16 +1033,20 @@ void AngleCalibration::optimize_coupled_parameters(
                                 &old_reference_left_strip_boundary_angle](
                                    const std::array<double, 2> &parameters) {
         const double prev_parameter1 =
-            BCparameters.module_center_sample_distances(module_index);
+            m_mythen_detector->get_BCparameters()
+                .module_center_sample_distances(module_index);
         const double prev_parameter2 =
-            BCparameters.angle_center_module_normal(module_index);
+            m_mythen_detector->get_BCparameters().angle_center_module_normal(
+                module_index);
 
-        BCparameters.module_center_sample_distances(module_index) =
-            parameters[0];
-        BCparameters.angle_center_module_normal(module_index) = parameters[1];
+        m_mythen_detector->get_BCparameters().module_center_sample_distances(
+            module_index) = parameters[0];
+        m_mythen_detector->get_BCparameters().angle_center_module_normal(
+            module_index) = parameters[1];
 
         double new_reference_left_strip_boundary_angle =
-            diffraction_angle_from_BC_parameters(module_index, 0.0, 0.0, 0.0);
+            m_mythen_detector->diffraction_angle_from_BC_parameters(
+                module_index, 0.0, 0.0, 0.0);
 
         double similarity_of_peaks{};
 
@@ -1240,10 +1072,10 @@ void AngleCalibration::optimize_coupled_parameters(
             }
         }
 
-        BCparameters.module_center_sample_distances(module_index) =
-            prev_parameter1; // revert shift
-        BCparameters.angle_center_module_normal(module_index) =
-            prev_parameter2; // revert shift
+        m_mythen_detector->get_BCparameters().module_center_sample_distances(
+            module_index) = prev_parameter1; // revert shift
+        m_mythen_detector->get_BCparameters().angle_center_module_normal(
+            module_index) = prev_parameter2; // revert shift
 
         return similarity_of_peaks;
     };
@@ -1253,11 +1085,12 @@ void AngleCalibration::optimize_coupled_parameters(
         // optimize first two parameters together using newtons method
         auto [optimized_parameters, optimized_similarity,
               optimality_criterion] =
-            newton_method(
-                delta_parameter1, delta_parameter2,
-                {BCparameters.module_center_sample_distances(module_index),
-                 BCparameters.angle_center_module_normal(module_index)},
-                previous_similarity_of_peaks, objective_function1);
+            newton_method(delta_parameter1, delta_parameter2,
+                          {m_mythen_detector->get_BCparameters()
+                               .module_center_sample_distances(module_index),
+                           m_mythen_detector->get_BCparameters()
+                               .angle_center_module_normal(module_index)},
+                          previous_similarity_of_peaks, objective_function1);
 
         LOG(TLogLevel::logDEBUG)
             << fmt::format("Iteration {} with peak similarity of {}",
@@ -1275,20 +1108,21 @@ void AngleCalibration::optimize_coupled_parameters(
             previous_similarity_of_peaks;
 
         double relative_change_in_parameters = std::max(
-            std::abs(
-                optimized_parameters[0] -
-                BCparameters.module_center_sample_distances(module_index)) /
-                std::abs(
-                    BCparameters.module_center_sample_distances(module_index)),
+            std::abs(optimized_parameters[0] -
+                     m_mythen_detector->get_BCparameters()
+                         .module_center_sample_distances(module_index)) /
+                std::abs(m_mythen_detector->get_BCparameters()
+                             .module_center_sample_distances(module_index)),
             std::abs(optimized_parameters[1] -
-                     BCparameters.angle_center_module_normal(module_index)) /
-                std::abs(
-                    BCparameters.angle_center_module_normal(module_index)));
+                     m_mythen_detector->get_BCparameters()
+                         .angle_center_module_normal(module_index)) /
+                std::abs(m_mythen_detector->get_BCparameters()
+                             .angle_center_module_normal(module_index)));
 
-        BCparameters.module_center_sample_distances(module_index) =
-            optimized_parameters[0];
-        BCparameters.angle_center_module_normal(module_index) =
-            optimized_parameters[1];
+        m_mythen_detector->get_BCparameters().module_center_sample_distances(
+            module_index) = optimized_parameters[0];
+        m_mythen_detector->get_BCparameters().angle_center_module_normal(
+            module_index) = optimized_parameters[1];
 
         next_similarity_of_peaks = optimized_similarity;
 

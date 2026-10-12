@@ -1,5 +1,6 @@
 #pragma once
 #include "AngleCalibration.hpp"
+#include "MythenDetector.hpp"
 #include "PlotHelpers.hpp"
 #include "logger.hpp"
 
@@ -14,48 +15,47 @@ inline auto data_path() {
 
 namespace angcal {
 
-std::pair<double, double>
+inline std::pair<double, double>
 get_detector_range(std::shared_ptr<MythenFileReader> mythen_file_reader,
                    const std::vector<std::string> &file_list) {
 
-    auto frame = mythen_file_reader->read_frame(file_list[0]);
-
-    double min_detector_angle =
-        mythen_file_reader->read_frame(file_list[0]).detector_angle;
-    double max_detector_angle =
-        mythen_file_reader->read_frame(file_list[file_list.size() - 1])
-            .detector_angle; // assuming frames are in order
-
     // Files are ordered by angle already
+    double min_detector_angle =
+        mythen_file_reader->read_detector_angle(file_list.front());
+    double max_detector_angle =
+        mythen_file_reader->read_detector_angle(file_list.back());
 
     return std::make_pair(max_detector_angle, min_detector_angle);
 }
 
-void get_angle_range_of_module(
-    std::shared_ptr<MythenFileReader> mythen_file_reader,
-    const std::vector<std::string> &file_list,
-    AngleCalibration &anglecalibration, const size_t module_index) {
+inline void
+get_angle_range_of_module(std::shared_ptr<MythenFileReader> mythen_file_reader,
+                          const std::vector<std::string> &file_list,
+                          const MythenDetector &mythen_detector,
+                          const size_t module_index) {
+
+    constexpr size_t last_strip = MythenDetector::strips_per_module() - 1;
 
     double detector_angle =
-        mythen_file_reader->read_frame(file_list[0]).detector_angle;
+        mythen_file_reader->read_detector_angle(file_list[0]);
     double max_left_module_angle =
-        anglecalibration.diffraction_angle_from_DG_parameters(
+        mythen_detector.diffraction_angle_from_DG_parameters(
             module_index, detector_angle, 0, 0.0);
     double max_right_module_angle =
-        anglecalibration.diffraction_angle_from_DG_parameters(
-            module_index, detector_angle, 1279, +1.0);
+        mythen_detector.diffraction_angle_from_DG_parameters(
+            module_index, detector_angle, last_strip, +1.0);
 
     double min_left_module_angle = max_left_module_angle;
     double min_right_module_angle = max_right_module_angle;
 
     for (auto &frame : file_list) {
-        detector_angle = mythen_file_reader->read_frame(frame).detector_angle;
+        detector_angle = mythen_file_reader->read_detector_angle(frame);
         double left_module_angle =
-            anglecalibration.diffraction_angle_from_DG_parameters(
+            mythen_detector.diffraction_angle_from_DG_parameters(
                 module_index, detector_angle, 0, 0.0);
         double right_module_angle =
-            anglecalibration.diffraction_angle_from_DG_parameters(
-                module_index, detector_angle, 1279, +1.0);
+            mythen_detector.diffraction_angle_from_DG_parameters(
+                module_index, detector_angle, last_strip, +1.0);
 
         if (left_module_angle < min_left_module_angle &&
             right_module_angle < min_right_module_angle) {
@@ -77,14 +77,15 @@ void get_angle_range_of_module(
         max_right_module_angle, module_index);
 }
 
-void get_module_angle_ranges(
-    std::shared_ptr<MythenFileReader> mythen_file_reader,
-    const std::vector<std::string> &file_list,
-    AngleCalibration &anglecalibration, const ssize_t num_modules) {
+inline void
+get_module_angle_ranges(std::shared_ptr<MythenFileReader> mythen_file_reader,
+                        const std::vector<std::string> &file_list,
+                        const MythenDetector &mythen_detector) {
 
-    for (ssize_t module_idx = 0; module_idx < num_modules; ++module_idx) {
+    for (size_t module_idx = 0; module_idx < mythen_detector.num_modules();
+         ++module_idx) {
         get_angle_range_of_module(mythen_file_reader, file_list,
-                                  anglecalibration, module_idx);
+                                  mythen_detector, module_idx);
     }
 }
 
@@ -99,10 +100,11 @@ void get_module_angle_ranges(
  * @param module_index optional module index if only one module contributed to
  * diffraction pattern, default is 0.
  */
-void select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
-                      std::shared_ptr<MythenFileReader> mythen_file_reader,
-                      const std::vector<std::string> &filelist,
-                      const size_t module_index = 0) {
+inline void
+select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
+                 std::shared_ptr<MythenFileReader> mythen_file_reader,
+                 const std::vector<std::string> &filelist,
+                 const size_t module_index = 0) {
     PlotHelper plotter(anglecalibration);
 
     plotter.overwrite_plot();
@@ -111,8 +113,8 @@ void select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
         6.0, 33.0); // TODO: is this absolute to beam source or relative?
 
     double left_module_strip_angle =
-        anglecalibration->diffraction_angle_from_DG_parameters(module_index,
-                                                               0.0, 0, 0.0);
+        anglecalibration->get_mythen_detector()
+            ->diffraction_angle_from_DG_parameters(module_index, 0.0, 0, 0.0);
     LOG(TLogLevel::logDEBUG)
         << fmt::format("strip angle: {}", left_module_strip_angle);
 

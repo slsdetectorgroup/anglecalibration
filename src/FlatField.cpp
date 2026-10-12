@@ -4,10 +4,8 @@
 using namespace aare;
 namespace angcal {
 
-FlatField::FlatField(
-    std::shared_ptr<MythenDetectorSpecifications> mythen_detector_)
-    : mythen_detector(mythen_detector_),
-      DGparameters(mythen_detector->max_modules) {
+FlatField::FlatField(std::shared_ptr<MythenDetector> mythen_detector_)
+    : mythen_detector(mythen_detector_) {
 
     bad_channels =
         NDArray<bool, 1>(std::array<ssize_t, 1>{mythen_detector->num_strips()},
@@ -33,64 +31,6 @@ std::pair<double, double> FlatField::get_soft_window() const {
     return soft_window;
 }
 
-double FlatField::elastic_correction(const double detector_angle) const {
-    return detector_angle +
-           mythen_detector->elastic_correction_factor *
-               (-std::sin(M_PI / 180.0 *
-                          (detector_angle -
-                           mythen_detector->detector_vertical_axis_offset)));
-}
-
-double FlatField::diffraction_angle_from_DG_parameters(
-    const size_t module_index, const double detector_angle, size_t strip_index,
-    const double distance_to_strip) const {
-
-    double offset = DGparameters.offsets(module_index);
-    double center = DGparameters.centers(module_index);
-    double conversion = DGparameters.conversions(module_index);
-
-    strip_index =
-        std::signbit(conversion)
-            ? MythenDetectorSpecifications::strips_per_module - 1 - strip_index
-            : strip_index; // TODO: are the values sored in reserve?
-
-    return offset +
-           180.0 / M_PI *
-               (center * std::abs(conversion) -
-                std::atan((center - (strip_index + distance_to_strip)) *
-                          std::abs(conversion))) +
-           elastic_correction(detector_angle) + mythen_detector->offset +
-           mythen_detector->sample_detector_offset;
-}
-
-double FlatField::solid_angle(const size_t module_index,
-                              size_t strip_index) const {
-
-    // convert to EE parameters
-    const auto [normal_distance, module_center_distance, angle] =
-        DGparameters.convert_to_EEParameters(module_index);
-
-    strip_index =
-        std::signbit(normal_distance)
-            ? MythenDetectorSpecifications::strips_per_module - 1 - strip_index
-            : strip_index;
-
-    const double distance_sample_pixel = std::sqrt(
-        std::pow(normal_distance, 2) +
-        std::pow(module_center_distance - mythen_detector->pitch * strip_index,
-                 2));
-
-    // orthogonal projection of strip area onto plane normal to beam
-    double projection_strip_area =
-        mythen_detector->pitch * mythen_detector->transverse_width *
-        std::abs(normal_distance) /
-        distance_sample_pixel; // normal_distance/distance_sample_pixel is
-                               // the cosine of the angle between the strip
-                               // normal and the diffracted beam
-
-    return projection_strip_area / std::pow(distance_sample_pixel, 2);
-}
-
 /*
 double FlatField::transverse_width_correction_factor(const size_t module_index,
                                                      size_t strip_index) const {
@@ -101,7 +41,7 @@ double FlatField::transverse_width_correction_factor(const size_t module_index,
 
     strip_index =
         std::signbit(normal_distance)
-            ? MythenDetectorSpecifications::strips_per_module - strip_index - 1
+            ? MythenDetector::strips_per_module - strip_index - 1
             : strip_index;
 
     const double distance_sample_pixel = std::sqrt(
@@ -110,7 +50,7 @@ double FlatField::transverse_width_correction_factor(const size_t module_index,
                  2));
 
     const double transverse_width_correction_factor =
-        (2 * std::atan(mythen_detector->transverse_width /
+        (2 * std::atan(mythen_detector->strip_transverse_width /
                        (2 * distance_sample_pixel)));
 
     return transverse_width_correction_factor;
@@ -162,17 +102,17 @@ void FlatField::add_flatfield(const NDView<uint32_t, 1> photon_counts,
         }
 
         const size_t module_index =
-            strip_index / MythenDetectorSpecifications::strips_per_module;
+            strip_index / MythenDetector::strips_per_module();
         const size_t local_strip_index =
-            strip_index % MythenDetectorSpecifications::strips_per_module;
+            strip_index % MythenDetector::strips_per_module();
 
         const double left_strip_boundary_angle =
-            diffraction_angle_from_DG_parameters(
+            mythen_detector->diffraction_angle_from_DG_parameters(
                 module_index, detector_angle, local_strip_index,
                 0.0); // left strip boundary in angles [degrees]
 
         const double right_strip_boundary_angle =
-            diffraction_angle_from_DG_parameters(
+            mythen_detector->diffraction_angle_from_DG_parameters(
                 module_index, detector_angle, local_strip_index,
                 1.0); // right strip boundary in angles [degrees]
 
@@ -207,13 +147,6 @@ void FlatField::add_flatfield(const NDView<uint32_t, 1> photon_counts,
              std::max(left_strip_boundary_angle, soft_window.first)) /
             (right_strip_boundary_angle - left_strip_boundary_angle);
 
-        // StripWidthLogFile.append(
-        //  fmt::format("{}\n", right_strip_boundary_angle -
-        //  left_strip_boundary_angle));
-
-        // CoverageLogFile.append(fmt::format("{}\n",
-        // soft_window_coverage));
-
         LOG(TLogLevel::logDEBUG1)
             << fmt::format("strip {}, soft_window_coverage {}", strip_index,
                            soft_window_coverage);
@@ -245,13 +178,12 @@ void FlatField::normalize_flatfield() {
         } else {
 
             // solid angle correction
-            double solid_angle_ = solid_angle(
-                strip_index / MythenDetectorSpecifications::strips_per_module,
-                strip_index % MythenDetectorSpecifications::strips_per_module);
+            double solid_angle_ = mythen_detector->solid_angle(
+                strip_index / MythenDetector::strips_per_module(),
+                strip_index % MythenDetector::strips_per_module());
 
             double solid_angle_correction =
-                mythen_detector->average_solid_angle / solid_angle_;
-
+                mythen_detector->average_solid_angle() / solid_angle_;
             flat_field(strip_index, 0) *= solid_angle_correction;
 
             flat_field(strip_index, 1) *=
@@ -297,22 +229,13 @@ void FlatField::read_normalized_flatfield_from_file(
     file_reader->close();
 }
 
-void FlatField::read_module_parameters_from_file(
-    const std::filesystem::path &filename,
-    const std::shared_ptr<SimpleFileInterface> file_reader) {
-
-    file_reader->open(filename);
-    file_reader->read_into(DGparameters.parameters.buffer(), 8);
-
-    file_reader->close();
-}
-
 void FlatField::read_bad_channels_from_file(
     const std::filesystem::path &filename,
     const std::shared_ptr<SimpleFileInterface> file_reader) {
 
     file_reader->open(filename);
     file_reader->read_into(reinterpret_cast<std::byte *>(bad_channels.data()));
+    file_reader->close();
 }
 
 void FlatField::set_bad_channels(const NDArray<bool, 1> &bad_channels_) {

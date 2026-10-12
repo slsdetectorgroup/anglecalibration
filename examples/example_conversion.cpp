@@ -31,12 +31,12 @@ int main() {
 
     assert(std::filesystem::exists(initial_angles_filename));
 
-    // cretae MythenDetectorSpecifications with all detector specifications
-    std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
-        std::make_shared<MythenDetectorSpecifications>();
+    // create MythenDetector with all detector specifications and geometry
+    std::shared_ptr<MythenDetector> mythen_detector_ptr =
+        std::make_shared<MythenDetector>();
 
-    mythen_detector_ptr->elastic_correction_factor = 0.0045;
-    mythen_detector_ptr->detector_vertical_axis_offset = 24.8;
+    mythen_detector_ptr->elastic_correction_factor(0.0045);
+    mythen_detector_ptr->detector_vertical_axis_offset(24.8);
 
     // FileaReader to read Mythen Files
     auto mythen_file_reader = std::make_shared<EpicsMythenFileReader>();

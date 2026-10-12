@@ -19,7 +19,7 @@ plot_all_base_peaks(const std::shared_ptr<AngleCalibration> anglecalibration,
         modules_to_plot.push_back(module_index.value());
     } else {
         modules_to_plot.resize(
-            anglecalibration->get_detector_specifications()->max_modules);
+            anglecalibration->get_mythen_detector()->num_modules());
         std::iota(modules_to_plot.begin(), modules_to_plot.end(), 0);
     }
 

@@ -12,13 +12,13 @@ using namespace angcal;
 void define_FlatField_binding(py::module &m) {
 
     py::class_<FlatField, std::shared_ptr<FlatField>>(m, "FlatField")
-        .def(py::init<std::shared_ptr<MythenDetectorSpecifications>>(),
-             py::arg("MythenDetectorSpecifications"), R"(
+        .def(py::init<std::shared_ptr<MythenDetector>>(),
+             py::arg("MythenDetector"), R"(
 
              Parameters
              ----------
 
-             MythenDetectorSpecifications: MythenDetectorSpecifications 
+             MythenDetector: MythenDetector 
                 storing all mythen specific parameters
              )")
 

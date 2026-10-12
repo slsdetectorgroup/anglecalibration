@@ -2,7 +2,6 @@
 #include <cmath>
 #include <cstdint>
 
-#include "MythenDetectorSpecifications.hpp"
 #include "aare/NDArray.hpp"
 
 namespace angcal {
@@ -17,6 +16,14 @@ struct Parameters {
     ~Parameters() = default;
 
     Parameters() = default;
+
+    Parameters(const Parameters &other) = default;
+
+    Parameters(Parameters &&other) noexcept = default;
+
+    Parameters &operator=(const Parameters &other) = default;
+
+    Parameters &operator=(Parameters &&other) noexcept = default;
 
     Parameters(const ssize_t n_modules) {
         parameters =
@@ -50,6 +57,14 @@ struct EEParameters : public Parameters {
     ~EEParameters() = default;
 
     EEParameters() = default;
+
+    EEParameters(const EEParameters &other) = default;
+
+    EEParameters(EEParameters &&other) noexcept = default;
+
+    EEParameters &operator=(const EEParameters &other) = default;
+
+    EEParameters &operator=(EEParameters &&other) noexcept = default;
 
     EEParameters(const ssize_t n_modules) : Parameters(n_modules){};
 
@@ -95,6 +110,14 @@ struct BCParameters : public Parameters {
     ~BCParameters() = default;
 
     BCParameters() = default;
+
+    BCParameters(const BCParameters &other) = default;
+
+    BCParameters(BCParameters &&other) noexcept = default;
+
+    BCParameters &operator=(const BCParameters &other) = default;
+
+    BCParameters &operator=(BCParameters &&other) noexcept = default;
 
     BCParameters(const ssize_t n_modules) : Parameters(n_modules){};
 
@@ -165,6 +188,14 @@ struct DGParameters : public Parameters {
     ~DGParameters() = default;
 
     DGParameters() = default;
+
+    DGParameters(const DGParameters &other) = default;
+
+    DGParameters(DGParameters &&other) noexcept = default;
+
+    DGParameters &operator=(const DGParameters &other) = default;
+
+    DGParameters &operator=(DGParameters &&other) noexcept = default;
 
     DGParameters(const ssize_t n_modules) : Parameters(n_modules){};
 

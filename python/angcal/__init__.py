@@ -10,7 +10,7 @@ from ._angcal import MythenFrame
 
 from ._angcal import FlatField
 
-from ._angcal import MythenDetectorSpecifications
+from ._angcal import MythenDetector
 
 from ._angcal import DGParameters, EEParameters, BCParameters
 

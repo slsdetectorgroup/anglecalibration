@@ -1,10 +1,10 @@
 from numpy import random 
 
-from angcal import AngleCalibration, MythenDetectorSpecifications, FlatField, EpicsMythenFileReader
+from angcal import AngleCalibration, MythenDetector, FlatField, EpicsMythenFileReader
 
 from angcal import DGParameters, BCParameters
 
-anglecalibration = AngleCalibration(MythenDetectorSpecifications(), FlatField(MythenDetectorSpecifications()), EpicsMythenFileReader())
+anglecalibration = AngleCalibration(MythenDetector(), FlatField(MythenDetector()), EpicsMythenFileReader())
 
 anglecalibration.read_initial_calibration_from_file("/home/mazzol_a/ANGCALDATA/angcal22_Jul25/angcal_Jul2025_P12_0p0105_original.off")
 

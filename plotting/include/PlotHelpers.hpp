@@ -40,7 +40,8 @@ class PlotHelper {
      * @param anglecalibration
      */
     PlotHelper(std::shared_ptr<AngleCalibration> anglecalibration)
-        : m_anglecalibration(anglecalibration) {
+        : m_anglecalibration(anglecalibration),
+          m_mythen_detector(anglecalibration->get_mythen_detector()) {
         bin_to_diffraction_angle = [this](const size_t bin_index) {
             return bin_index * m_anglecalibration->get_histogram_bin_width() +
                    m_anglecalibration->get_angular_range()
@@ -144,7 +145,7 @@ class PlotHelper {
         const size_t module_index, const double detector_angle) const {
 
         return static_cast<size_t>(
-            (m_anglecalibration->diffraction_angle_from_DG_parameters(
+            (m_mythen_detector->diffraction_angle_from_DG_parameters(
                  module_index, detector_angle, 0, 0.0) -
              m_anglecalibration->get_angular_range().first) /
             m_anglecalibration->get_histogram_bin_width());
@@ -153,12 +154,11 @@ class PlotHelper {
     inline size_t right_module_boundary_as_fixed_angle_bin_index(
         const size_t module_index, const double detector_angle) const {
 
+        // right edge of last strip (strip index denotes left strip boundary)
         return static_cast<size_t>(
-            (m_anglecalibration->diffraction_angle_from_DG_parameters(
+            (m_mythen_detector->diffraction_angle_from_DG_parameters(
                  module_index, detector_angle,
-                 m_anglecalibration->get_detector_specifications()
-                     ->strips_per_module,
-                 +1.0) -
+                 MythenDetector::strips_per_module() - 1, +1.0) -
              m_anglecalibration->get_angular_range().first) /
             m_anglecalibration->get_histogram_bin_width());
     }
@@ -167,6 +167,10 @@ class PlotHelper {
     /// @brief shared pointer to AngleCalibration class for accessing
     /// calibration specific parameters and functions
     const std::shared_ptr<AngleCalibration> m_anglecalibration{};
+
+    /// @brief shared pointer to detector geometry of m_anglecalibration for
+    /// calculating diffraction angles
+    const std::shared_ptr<MythenDetector> m_mythen_detector{};
 
     /// @brief function to convert bin index to diffraction angle
     std::function<double(const size_t)> bin_to_diffraction_angle{};

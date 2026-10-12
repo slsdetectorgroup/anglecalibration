@@ -13,8 +13,8 @@ _______________________________
 
 .. code-block:: cpp
 
-    std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
-        std::make_shared<MythenDetectorSpecifications>();
+    std::shared_ptr<MythenDetector> mythen_detector_ptr =
+        std::make_shared<MythenDetector>();
 
     mythen_detector_ptr->read_bad_channels_from_file("bad_channels.txt");
 

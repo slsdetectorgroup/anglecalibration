@@ -1,6 +1,6 @@
 
 #include "Parameters.hpp"
-#include "MythenDetectorSpecifications.hpp"
+#include "MythenDetector.hpp"
 #include <cmath>
 #include <tuple>
 
@@ -10,11 +10,11 @@ BCParameters::convert_to_DGParameters(const size_t module_index) const {
     double center =
         std::abs(module_center_sample_distances(module_index)) *
             std::sin(M_PI / 180.0 * angle_center_module_normal(module_index)) /
-            MythenDetectorSpecifications::pitch +
-        (MythenDetectorSpecifications::strips_per_module * 0.5);
+            MythenDetector::pitch() +
+        (MythenDetector::strips_per_module() * 0.5);
 
     double conversion =
-        MythenDetectorSpecifications::pitch /
+        MythenDetector::pitch() /
         (std::abs(module_center_sample_distances(module_index)) *
          std::cos(M_PI / 180.0 * angle_center_module_normal(module_index)));
 
@@ -26,8 +26,7 @@ BCParameters::convert_to_DGParameters(const size_t module_index) const {
         angle_center_module_normal(module_index) -
         180.0 / M_PI *
             (std::tan(M_PI / 180.0 * angle_center_module_normal(module_index)) +
-             MythenDetectorSpecifications::strips_per_module * 0.5 *
-                 std::abs(conversion));
+             MythenDetector::strips_per_module() * 0.5 * std::abs(conversion));
 
     return std::make_tuple(center, conversion, offset);
 }
@@ -51,8 +50,7 @@ BCParameters::convert_to_EEParameters(const ssize_t module_index) const {
     double module_center_distance =
         std::abs(module_center_sample_distances(module_index)) *
             std::sin(M_PI / 180.0 * angle_center_module_normal(module_index)) +
-        (MythenDetectorSpecifications::strips_per_module * 0.5) *
-            MythenDetectorSpecifications::pitch;
+        (MythenDetector::strips_per_module() * 0.5) * MythenDetector::pitch();
 
     double normal_distance =
         std::abs(module_center_sample_distances(module_index)) *
@@ -80,18 +78,15 @@ DGParameters::convert_to_BCParameters(const size_t module_index) const {
     double angle_center_module_normal =
         180.0 / M_PI *
         atan((centers(module_index) -
-              0.5 * MythenDetectorSpecifications::strips_per_module) *
+              0.5 * MythenDetector::strips_per_module()) *
              std::abs(conversions(
                  module_index))); // TODO in Antonios code it is minus?
     double distance_module_center_sample =
-        MythenDetectorSpecifications::pitch /
-        std::abs(conversions(module_index)) *
-        std::sqrt(
-            1 + std::pow(
-                    std::abs(conversions(module_index)) *
-                        (centers(module_index) -
-                         0.5 * MythenDetectorSpecifications::strips_per_module),
-                    2));
+        MythenDetector::pitch() / std::abs(conversions(module_index)) *
+        std::sqrt(1 + std::pow(std::abs(conversions(module_index)) *
+                                   (centers(module_index) -
+                                    0.5 * MythenDetector::strips_per_module()),
+                               2));
 
     distance_module_center_sample = std::signbit(conversions(module_index))
                                         ? -distance_module_center_sample
@@ -125,9 +120,9 @@ std::tuple<double, double, double>
 DGParameters::convert_to_EEParameters(const size_t module_index) const {
 
     const double module_center_distance =
-        centers(module_index) * MythenDetectorSpecifications::pitch;
-    double normal_distance = MythenDetectorSpecifications::pitch /
-                             std::abs(conversions(module_index));
+        centers(module_index) * MythenDetector::pitch();
+    double normal_distance =
+        MythenDetector::pitch() / std::abs(conversions(module_index));
 
     if (std::signbit(conversions(module_index))) {
         normal_distance = -normal_distance;

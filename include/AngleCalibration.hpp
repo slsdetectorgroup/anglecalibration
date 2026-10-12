@@ -15,7 +15,7 @@
 #include <vector>
 
 #include "FlatField.hpp"
-#include "MythenDetectorSpecifications.hpp"
+#include "MythenDetector.hpp"
 #include "MythenFileReader.hpp"
 #include "Parameters.hpp"
 #include "PlotCalibrationProcess.hpp"
@@ -33,16 +33,15 @@ class AngleCalibration {
   public:
     /**
      * @brief Constructor for AngleCalibration class
-     * @param mythen_detector_ ptr to MythenDetectorSpecifications storing all
-     mythen specific parameters
+     * @param mythen_detector_ ptr to MythenDetector storing all mythen specific
+     parameters and methods to calculate diffraction angles
      * @param flat_field_ ptr to FlatField class storing inverse normalized flat
      field
      * @param mythen_file_reader file reader to read mythen acquisition files
      */
-    AngleCalibration(
-        std::shared_ptr<MythenDetectorSpecifications> mythen_detector_,
-        std::shared_ptr<FlatField> flat_field_,
-        std::shared_ptr<MythenFileReader> mythen_file_reader_);
+    AngleCalibration(std::shared_ptr<MythenDetector> mythen_detector_,
+                     std::shared_ptr<FlatField> flat_field_,
+                     std::shared_ptr<MythenFileReader> mythen_file_reader_);
 
     /** @brief set the histogram bin width [degrees]
      * default '0.0036°'
@@ -91,14 +90,16 @@ class AngleCalibration {
     /// @return vector of file names
     const std::vector<std::string> &get_calibration_files() const;
 
-    /// @brief  get detector specifications
-    std::shared_ptr<MythenDetectorSpecifications>
-    get_detector_specifications() const;
-
     /// @brief get file reader to read mythen acquisition files
     /// @return shared pointer to MythenFileReader
     const std::shared_ptr<MythenFileReader> get_file_reader() const {
         return mythen_file_reader;
+    }
+
+    /// @brief get detector geometry used for angular conversion
+    /// @return shared pointer to MythenDetector
+    const std::shared_ptr<MythenDetector> get_mythen_detector() const {
+        return m_mythen_detector;
     }
 
     /** @brief reads the historical Detector Group (DG) parameters from file and
@@ -140,9 +141,9 @@ class AngleCalibration {
     void set_bad_channels(const NDArray<bool, 1> &bad_channels_);
 
     /**
-     * @brief get the histoic DG parameters
+     * @brief get the current DG parameters
      */
-    const DGParameters &get_DGparameters() const; // TODO do I need that?
+    const DGParameters &get_DGparameters() const;
 
     /**
      * @brief get the current BC parameters
@@ -307,40 +308,6 @@ class AngleCalibration {
     NDArray<double, 2> convert(const std::vector<std::string> &file_list,
                                const size_t module_index);
 
-    /** @brief calculates diffraction angle from DG module parameters (used in
-     * Beer's Law)
-     * @param detector_angle detector position [degrees]
-     * @param strip_index local strip index of module e.g. 0-1279
-     * @param distance_to_strip distance to strip [given in strips]
-     * @return diffraction angle [degrees]
-     */
-    double diffraction_angle_from_DG_parameters(
-        const size_t module_index, const double detector_angle,
-        size_t strip_index, const double distance_to_strip = 0) const;
-
-    /** @brief calculates diffraction angle from BC (best computing) module
-     * parameters (used in Beer's Law)
-     * @param detector_angle detector position [degrees]
-     * @param strip_index local strip index of module e.g. 0-1279
-     * @param distance_to_strip distance to strip [given in strips]
-     * @return diffraction angle [degrees]
-     */
-    double diffraction_angle_from_BC_parameters(
-        const size_t module_index, const double detector_angle,
-        size_t strip_index, const double distance_to_strip = 0) const;
-
-    /** @brief calculates diffraction angle from EE module parameters (used in
-     * Beer's Law)
-     * @param detector_angle detector position [degrees]
-     * @param strip_index local strip index of module
-     * @param distance_to_strip distance to strip [given in strips]
-     * @return diffraction angle [degrees]
-     */
-    double diffraction_angle_from_EE_parameters(
-        const double module_center_distance, const double normal_distance,
-        const double angle, const double detector_angle, size_t strip_index,
-        const double distance_to_strip = 0) const;
-
     /** @brief writes DG parameters to file
      * @param filename full path tooutput file
      */
@@ -361,59 +328,7 @@ class AngleCalibration {
                                               const double photon_count_error,
                                               const double exposure_time) const;
 
-    /**
-     * @brief calculates the correction of the diffraction angle due to sample
-     * displacement in the x and y direction of the horizontal sample plane
-     * @param diffraction_angle diffraction angle calculated at center of strip
-     * without sample displacement correction [degrees]
-     * @return correction of diffraction angle due to sample displacement
-     * [degrees]
-     */
-    double sample_displacement_correction(const double diffraction_angle) const;
-
   private:
-    /** @brief calculated the strip width expressed as angle from DG
-     * module parameters
-     * @param moudle_index index of module
-     * @param strip_index local strip index of module e.g. 0-1279
-     * @return strip width in angles [degrees]
-     */
-    double
-    angular_strip_width_from_DG_parameters(const size_t module_index,
-                                           size_t local_strip_index) const;
-
-    /** @brief calculated the strip width expressed as angle from BC
-     * module parameters
-     * @param moudle_index index of module
-     * @param strip_index local strip index of module e.g. 0-1279
-     * @return strip width in angles [degrees]
-     */
-    double angular_strip_width_from_BC_parameters(
-        const size_t module_index, const size_t local_strip_index) const;
-
-    /** @brief calculated the strip width expressed as angle from EE
-     * module parameters
-     * @param moudle_index index of module
-     * @param strip_index local strip index of module e.g. 0-1279
-     * @return strip width in angles [degrees]
-     */
-    double angular_strip_width_from_EE_parameters(
-        const double module_center_distance, const double normal_distance,
-        const double angle, const size_t local_strip_index) const;
-
-    // TODO deprecated
-    /** @brief converts global strip index to local strip index
-     */
-    size_t global_to_local_strip_index_conversion(
-        const size_t global_strip_index) const;
-
-    /**
-     * @brief calculates the elastic correction factor for given detector angle
-     * based on torsional compliance correction model
-     * @param detector_angle detector axis motor position [degrees]
-     */
-    double elastic_correction(const double detector_angle) const;
-
     /**
      * @brief calculates the frames for which the base peak ROI is covered by
      * the respective module region
@@ -646,18 +561,14 @@ class AngleCalibration {
     */
 
   private:
-    DGParameters DGparameters{};
-
-    BCParameters BCparameters{};
-
     /// @brief Array of size strips/channels in detector, stores 'TRUE' if strip
     /// is a bad channel otherwise 'FALSE'
     NDArray<bool, 1> bad_channels{};
 
     /**
-     * detector specifications
+     * detector geometry
      */
-    std::shared_ptr<MythenDetectorSpecifications> mythen_detector{};
+    std::shared_ptr<MythenDetector> m_mythen_detector{};
 
     std::shared_ptr<FlatField> flat_field{};
 
@@ -992,24 +903,23 @@ void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
     }
 
     // iterate over all strips of module
-    for (size_t strip_index = 0;
-         strip_index < MythenDetectorSpecifications::strips_per_module;
-         ++strip_index) {
+    for (ssize_t strip_index = 0;
+         strip_index < MythenDetector::strips_per_module(); ++strip_index) {
 
         size_t global_strip_index =
-            module_index * MythenDetectorSpecifications::strips_per_module +
-            strip_index;
+            module_index * MythenDetector::strips_per_module() + strip_index;
 
         if (bad_channels(global_strip_index)) {
             continue; // skip bad channels
         }
 
-        double left_strip_boundary_angle = diffraction_angle_from_BC_parameters(
-            module_index, detector_angle, strip_index,
-            0.0); // left strip boundary in angles [degrees]
+        double left_strip_boundary_angle =
+            m_mythen_detector->diffraction_angle_from_BC_parameters(
+                module_index, detector_angle, strip_index,
+                0.0); // left strip boundary in angles [degrees]
 
         double right_strip_boundary_angle =
-            diffraction_angle_from_BC_parameters(
+            m_mythen_detector->diffraction_angle_from_BC_parameters(
                 module_index, detector_angle, strip_index,
                 +1.0); // right strip boundary in angles [degrees]
 
@@ -1250,16 +1160,6 @@ void AngleCalibration::calibrate(
 
     base_peak_angle = base_peak_angle_;
 
-    std::ofstream file;
-    if (output_file.has_value()) {
-        file.open(output_file.value(), std::ios::out | std::ios::app);
-        if (file.tellp() == 0) {
-            file << "module,center,conversion,offset\n"; // only write
-                                                         // header if
-                                                         // file is empty
-        }
-    }
-
     NDView<uint32_t, 2> prev_frames_bp_overlap;
     NDView<double, 1> prev_detector_angles_bp_overlap;
     NDView<uint32_t, 2> frames_bp_overlap;
@@ -1270,10 +1170,6 @@ void AngleCalibration::calibrate(
             get_frames_with_base_peak_overlap(frames, detector_angles, 0);
     } catch (std::runtime_error &e) {
 
-        if (output_file.has_value()) {
-            file.close();
-        }
-
         throw std::runtime_error(
             std::string(e.what()) +
             fmt::format(" No base peak overlap for module {}.", 0));
@@ -1282,7 +1178,7 @@ void AngleCalibration::calibrate(
     calibrate_coupled_parameters<visualize_calibration>(
         0, prev_frames_bp_overlap, prev_detector_angles_bp_overlap);
 
-    for (size_t module_idx = 1; module_idx < mythen_detector->max_modules;
+    for (size_t module_idx = 1; module_idx < m_mythen_detector->num_modules();
          ++module_idx) {
 
         try {
@@ -1301,25 +1197,28 @@ void AngleCalibration::calibrate(
         calibrate_coupled_parameters<visualize_calibration>(
             module_idx, frames_bp_overlap, detector_angles_bp_overlap);
 
-        if (output_file.has_value()) {
-            BCparameters.convert_to_DGParameters(DGparameters);
-            write_DG_parameters_to_file(output_file.value(), DGparameters);
-        }
-
         calibrate_offset<visualize_calibration>(
             module_idx, frames_bp_overlap, detector_angles_bp_overlap,
             prev_frames_bp_overlap, prev_detector_angles_bp_overlap);
-
-        if (output_file.has_value()) {
-            BCparameters.convert_to_DGParameters(DGparameters);
-            write_DG_parameters_to_file(output_file.value(), DGparameters);
-        }
 
         prev_frames_bp_overlap = frames_bp_overlap;
         prev_detector_angles_bp_overlap = detector_angles_bp_overlap;
     }
 
+    std::ofstream file;
     if (output_file.has_value()) {
+        file.open(output_file.value(), std::ios::out | std::ios::app);
+        if (file.tellp() == 0) {
+            file << "module,center,conversion,offset\n"; // only write
+                                                         // header if
+                                                         // file is empty
+        }
+
+        DGParameters DGparameters;
+        m_mythen_detector->get_BCparameters().convert_to_DGParameters(
+            DGparameters);
+        write_DG_parameters_to_file(output_file.value(), DGparameters);
+
         file.close();
     }
 

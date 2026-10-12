@@ -17,7 +17,7 @@
 #include <string>
 
 #include "CustomFiles.hpp"
-#include "MythenDetectorSpecifications.hpp"
+#include "MythenDetector.hpp"
 #include "MythenFileReader.hpp"
 #include "Parameters.hpp"
 #include "aare/File.hpp"
@@ -33,10 +33,10 @@ class FlatField {
   public:
     /**
      * @brief Constructor for FlatField class
-     * @param mythen_detector_ ptr to MythenDetectorSpecifications storing all
+     * @param mythen_detector_ ptr to MythenDetector storing all
      mythen specific parameters
      */
-    FlatField(std::shared_ptr<MythenDetectorSpecifications> mythen_detector_);
+    FlatField(std::shared_ptr<MythenDetector> mythen_detector_);
 
     /**
      * @brief set scale factor to scale incident intensity to reasonable values
@@ -59,14 +59,6 @@ class FlatField {
      * @brief get soft window bounds [degrees]
      */
     std::pair<double, double> get_soft_window() const;
-
-    /**
-     * @brief calculates solid angle of strip
-     * @param module_index index of module
-     * @param strip_index local strip index of module e.g. 0-1279
-     * @return solid angle of strip
-     */
-    double solid_angle(const size_t module_index, size_t strip_index) const;
 
     /**
      * @brief adds flatfield from single acquisition to the accumulated
@@ -99,19 +91,6 @@ class FlatField {
             std::make_shared<CustomFlatFieldFile>());
 
     /**
-     * @brief reads DG calibration parameters from file
-     * @param filename name of file
-     * @param file_reader custom file_reader to read DG parameters file
-     * (default InitialAngCalParametersFile:
-     * following format module [module_index] center [center] +- [error]
-     * conversion [conversion] +- [error] offset [offset] +- [error])
-     */
-    void read_module_parameters_from_file(
-        const std::filesystem::path &filename,
-        const std::shared_ptr<SimpleFileInterface> file_reader =
-            std::make_shared<InitialAngCalParametersFile>());
-
-    /**
      * @brief reads bad channels from file
      * @param filename bad channels filename
      * @param file_reader file_reader to read bad channels file (default:
@@ -139,37 +118,12 @@ class FlatField {
 
     NDView<const double, 2> get_normalized_flatfield_view() const;
 
-    /**
-     * @brief calculates diffraction angle from DG module parameters (used in
-     * Beer's Law)
-     * @param detector_angle detector position [degrees]
-     * @param strip_index local strip index of module e.g. 0-1279
-     * @param distance_to_strip distance to strip (if 0.0 calculates diffraction
-     * angle at center of strip) [given in strips]
-     * @return diffraction angle [degrees]
-     */
-    double diffraction_angle_from_DG_parameters(
-        const size_t module_index, const double detector_angle,
-        size_t strip_index, const double distance_to_strip) const;
-
-  private:
-    /**
-     * @brief elastic correction to diffraction angle
-     * @param detector_angle detector angle [degrees]
-     * @return elastic correction to diffraction angle [degrees]
-     */
-    double elastic_correction(const double detector_angle) const;
-
   private:
     /// @brief scale_factor is used to scale incident intensity to ~ one
     double scale_factor{1.0};
 
     /// @brief detector specifications of Mythen detector
-    std::shared_ptr<MythenDetectorSpecifications> mythen_detector;
-
-    /// @brief DG module parameters stored as 2D array of shape (num_modules, 3)
-    /// where the three parameters are center, conversion and offset
-    DGParameters DGparameters{};
+    std::shared_ptr<MythenDetector> mythen_detector;
 
     /// @brief normalized flatfield stored as 2D array of shape (num_strips, 2)
     /// where the two values are normalized flatfield value and standard

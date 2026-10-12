@@ -35,8 +35,8 @@ int main() {
     auto output_filename =
         file_path / "angcal_Jul2025_P12_0p0105_new_calibrated.off";
 
-    std::shared_ptr<MythenDetectorSpecifications> mythen_detector_ptr =
-        std::make_shared<MythenDetectorSpecifications>();
+    std::shared_ptr<MythenDetector> mythen_detector_ptr =
+        std::make_shared<MythenDetector>();
 
     assert(std::filesystem::exists(bad_channels_filename));
 
@@ -87,9 +87,10 @@ int main() {
 
     LOG(TLogLevel::logINFO) << fmt::format(
         "range of detector [degrees]: {}",
-        anglecalibration.diffraction_angle_from_DG_parameters(0, 0.0, 0, 0.0) -
-            anglecalibration.diffraction_angle_from_DG_parameters(23, 0.0, 1279,
-                                                                  +1.0));
+        mythen_detector_ptr->diffraction_angle_from_DG_parameters(0, 0.0, 0,
+                                                                  0.0) -
+            mythen_detector_ptr->diffraction_angle_from_DG_parameters(
+                23, 0.0, 1279, +1.0));
 
     auto first_frame = mythen_file_reader->read_frame(filelist[0]);
     LOG(TLogLevel::logINFO)

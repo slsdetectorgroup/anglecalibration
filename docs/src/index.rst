@@ -21,7 +21,7 @@ Library for angle calibration of CPS Mythen detector.
     :maxdepth: 1
     :caption: Python API 
 
-    pyMythenDetectorSpecifications 
+    pyMythenDetector 
     pyMythenFileReader
     pyFlatField
     pyAngleCalibration
@@ -35,7 +35,7 @@ Library for angle calibration of CPS Mythen detector.
 
     MythenFileReader
     SimpleFileInterface
-    MythenDetectorSpecifications
+    MythenDetector
     FlatField
     AngleCalibration
     Parameters

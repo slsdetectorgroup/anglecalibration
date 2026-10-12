@@ -1,6 +1,6 @@
 #include "bind_AngleCalibration.hpp"
 #include "bind_FlatField.hpp"
-#include "bind_MythenDetectorSpecifications.hpp"
+#include "bind_MythenDetector.hpp"
 #include "bind_MythenFileReader.hpp"
 #include "bind_Parameters.hpp"
 #include "bind_SimpleFileInterface.hpp"
@@ -13,7 +13,7 @@ namespace py = pybind11;
 
 PYBIND11_MODULE(_angcal, m) {
     define_AngleCalibration_binding(m);
-    define_MythenDetectorSpecifications_binding(m);
+    define_MythenDetector_binding(m);
     define_FlatField_binding(m);
     define_SimpleFileInterface_binding(m);
     define_MythenFrame_bindings(m);
