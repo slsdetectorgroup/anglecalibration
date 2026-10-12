@@ -420,6 +420,46 @@ bool AngleCalibration::base_peak_is_in_module(
             left_module_boundary_angle < base_peak_angle - base_peak_roi_width);
 }
 
+std::tuple<NDView<uint32_t, 2>, std::vector<double>>
+AngleCalibration::get_frames_with_base_peak_overlap(
+    const NDView<uint32_t, 2> frames,
+    const std::vector<double> &detector_angles,
+    const size_t module_index) const {
+
+    size_t first_frame_index_bp_overlap =
+        frames.shape(0); // initialize to max value
+    size_t last_frame_index_bp_overlap = 0;
+
+    const double potential_change_in_diffraction_angle = base_peak_roi_width;
+
+    for (size_t i = 0; i < detector_angles.size(); ++i) {
+        double detector_angle = detector_angles[i];
+        if (base_peak_is_in_module(module_index,
+                                   detector_angle -
+                                       potential_change_in_diffraction_angle) ||
+            base_peak_is_in_module(module_index,
+                                   detector_angle +
+                                       potential_change_in_diffraction_angle) ||
+            base_peak_is_in_module(module_index, detector_angle)) {
+
+            first_frame_index_bp_overlap =
+                std::min(first_frame_index_bp_overlap, i);
+            last_frame_index_bp_overlap =
+                std::max(last_frame_index_bp_overlap, i);
+        }
+    }
+
+    auto frames_bp_overlap = frames.sub_view(first_frame_index_bp_overlap,
+                                             last_frame_index_bp_overlap + 1);
+
+    std::vector<double> detector_angles_bp_overlap(
+        detector_angles.begin() + first_frame_index_bp_overlap,
+        detector_angles.begin() + last_frame_index_bp_overlap +
+            1); // span would be better, copy
+
+    return std::make_tuple(frames_bp_overlap, detector_angles_bp_overlap);
+}
+
 std::pair<double, double>
 AngleCalibration::rate_correction(const double photon_count,
                                   const double photon_count_error,
@@ -631,7 +671,8 @@ std::pair<double, double> AngleCalibration::photon_count_correction(
 
 double AngleCalibration::center_base_peak(
     const size_t module_index,
-    const std::vector<MythenFrame> &frames_with_base_peak_overlap) {
+    const NDView<uint32_t, 2> frames_with_base_peak_overlap,
+    const std::vector<double> &detector_angles_with_base_peak_overlap) {
 
     if (module_is_disconnected(module_index)) {
         throw std::runtime_error(
@@ -645,13 +686,19 @@ double AngleCalibration::center_base_peak(
 
     double average_peak_center{};
 
-    for (const auto &frame : frames_with_base_peak_overlap) {
+    const double dummy_exposure_time = 1.0;
+    const uint64_t dummy_incident_intensity = get_scale_factor();
+
+    for (ssize_t frame_index = 0;
+         frame_index < frames_with_base_peak_overlap.shape(0); ++frame_index) {
 
         double sum_intensities_in_ROI = 0.0;
         double weighted_sum = 0.0;
 
         // base peak angle is in module
-        if (base_peak_is_in_module(module_index, frame.detector_angle)) {
+        if (base_peak_is_in_module(
+                module_index,
+                detector_angles_with_base_peak_overlap[frame_index])) {
 
             NDArray<double, 2> weighted_sums(
                 std::array<ssize_t, 2>{num_bins_in_ROI, 3},
@@ -665,8 +712,11 @@ double AngleCalibration::center_base_peak(
             // photon_count_variance for ROI around base_peak and
             // redistributes to fixed angle width bins
             redistribute_photon_counts_to_fixed_angle_width_bins<true>(
-                module_index, frame, weighted_sums.view(),
-                num_contributing_photons.view());
+                module_index,
+                frames_with_base_peak_overlap.sub_view(frame_index),
+                detector_angles_with_base_peak_overlap[frame_index],
+                dummy_exposure_time, dummy_incident_intensity,
+                weighted_sums.view(), num_contributing_photons.view());
 
             for (ssize_t i = 0; i < weighted_sums.shape(0); ++i) {
                 if (weighted_sums(i, 0) == -1.0) {
@@ -770,8 +820,9 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_) {
             }
 
             redistribute_photon_counts_to_fixed_angle_width_bins<false>(
-                module_index, frame, weighted_moments.view(),
-                num_contributing_photons.view());
+                module_index, frame.photon_counts(), frame.detector_angle,
+                frame.exposure_time, frame.incident_intensity,
+                weighted_moments.view(), num_contributing_photons.view());
         }
 
         LOG(TLogLevel::logDEBUG) << fmt::format(
@@ -816,8 +867,9 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_,
         MythenFrame frame = mythen_file_reader->read_frame(file);
 
         redistribute_photon_counts_to_fixed_angle_width_bins<false>(
-            module_index, frame, weighted_moments.view(),
-            num_contributing_photons.view());
+            module_index, frame.photon_counts(), frame.detector_angle,
+            frame.exposure_time, frame.incident_intensity,
+            weighted_moments.view(), num_contributing_photons.view());
     }
 
     return computeErrorandMean(weighted_moments.view(),
@@ -825,9 +877,10 @@ AngleCalibration::convert(const std::vector<std::string> &file_list_,
 }
 
 void AngleCalibration::optimize_offset_parameter(
-    const size_t module_index,
-    const std::vector<MythenFrame> &frames_with_base_peak_overlap,
-    const std::vector<MythenFrame> &frames_with_base_peak_overlap_prev_module,
+    const size_t module_index, const NDView<uint32_t, 2> frames_bp_overlap,
+    const std::vector<double> &detector_angles_bp_overlap,
+    const NDView<uint32_t, 2> frames_bp_overlap_prev_module,
+    const std::vector<double> &detector_angles_bp_overlap_prev_module,
     std::shared_ptr<PlotCalibrationProcess> plot, double delta_parameter) {
 
     // old reference parameters: // parameters can only change +,-
@@ -838,9 +891,10 @@ void AngleCalibration::optimize_offset_parameter(
     LOG(TLogLevel::logDEBUG) << fmt::format(
         "initial parameter: {}", BCparameters.angle_center_beam(module_index));
 
-    auto objective_function = [this, &module_index,
-                               &frames_with_base_peak_overlap,
-                               &frames_with_base_peak_overlap_prev_module,
+    auto objective_function = [this, &module_index, &frames_bp_overlap,
+                               &frames_bp_overlap_prev_module,
+                               &detector_angles_bp_overlap,
+                               &detector_angles_bp_overlap_prev_module,
                                &old_reference_left_strip_boundary_angle](
                                   const double x) {
         const double prev_value = BCparameters.angle_center_beam(module_index);
@@ -859,8 +913,10 @@ void AngleCalibration::optimize_offset_parameter(
             try {
                 similarity_of_peaks =
                     calculate_similarity_of_peaks_between_modules(
-                        module_index, frames_with_base_peak_overlap,
-                        frames_with_base_peak_overlap_prev_module, nullptr);
+                        module_index, frames_bp_overlap,
+                        detector_angles_bp_overlap,
+                        frames_bp_overlap_prev_module,
+                        detector_angles_bp_overlap_prev_module, nullptr);
             } catch (const NoBasePeakOverLapError &e) {
                 similarity_of_peaks = std::numeric_limits<
                     double>::infinity(); // if there is no overlap of base
@@ -876,18 +932,20 @@ void AngleCalibration::optimize_offset_parameter(
         return similarity_of_peaks;
     };
 
-    const double peak_center_reference_module = center_base_peak(
-        module_index - 1, frames_with_base_peak_overlap_prev_module);
+    const double peak_center_reference_module =
+        center_base_peak(module_index - 1, frames_bp_overlap_prev_module,
+                         detector_angles_bp_overlap_prev_module);
 
     auto difference_peak_centers =
-        [this, &module_index, &frames_with_base_peak_overlap,
+        [this, &module_index, &frames_bp_overlap, &detector_angles_bp_overlap,
+         &detector_angles_bp_overlap_prev_module,
          &peak_center_reference_module](const double x) {
             const double prev_value =
                 BCparameters.angle_center_beam(module_index);
             BCparameters.angle_center_beam(module_index) = x;
 
-            double peak_center_current_module =
-                center_base_peak(module_index, frames_with_base_peak_overlap);
+            double peak_center_current_module = center_base_peak(
+                module_index, frames_bp_overlap, detector_angles_bp_overlap);
 
             BCparameters.angle_center_beam(module_index) =
                 prev_value; // revert shift
@@ -897,15 +955,17 @@ void AngleCalibration::optimize_offset_parameter(
 
     double previous_similarity_of_peaks =
         calculate_similarity_of_peaks_between_modules<false>(
-            module_index, frames_with_base_peak_overlap,
-            frames_with_base_peak_overlap_prev_module, nullptr);
+            module_index, frames_bp_overlap, detector_angles_bp_overlap,
+            frames_bp_overlap_prev_module,
+            detector_angles_bp_overlap_prev_module, nullptr);
 
     LOG(TLogLevel::logDEBUG) << fmt::format("initial similarity of peaks: {}",
                                             previous_similarity_of_peaks);
     if (plot) {
         calculate_similarity_of_peaks_between_modules<true>(
-            module_index, frames_with_base_peak_overlap,
-            frames_with_base_peak_overlap_prev_module, plot);
+            module_index, frames_bp_overlap, detector_angles_bp_overlap,
+            frames_bp_overlap_prev_module,
+            detector_angles_bp_overlap_prev_module, plot);
 
         plot->show();
     }
@@ -971,8 +1031,9 @@ void AngleCalibration::optimize_offset_parameter(
 
             if (plot) {
                 calculate_similarity_of_peaks_between_modules<true>(
-                    module_index, frames_with_base_peak_overlap,
-                    frames_with_base_peak_overlap_prev_module, plot);
+                    module_index, frames_bp_overlap, detector_angles_bp_overlap,
+                    frames_bp_overlap_prev_module,
+                    detector_angles_bp_overlap_prev_module, plot);
                 plot->show();
             }
 
@@ -1061,8 +1122,9 @@ void AngleCalibration::optimize_offset_parameter(
 
             if (plot) {
                 calculate_similarity_of_peaks_between_modules<true>(
-                    module_index, frames_with_base_peak_overlap,
-                    frames_with_base_peak_overlap_prev_module, plot);
+                    module_index, frames_bp_overlap, detector_angles_bp_overlap,
+                    frames_bp_overlap_prev_module,
+                    detector_angles_bp_overlap_prev_module, plot);
                 plot->show();
             }
 
@@ -1107,7 +1169,8 @@ void AngleCalibration::optimize_offset_parameter(
 // optimize Lm second parameter used to optimize phi
 void AngleCalibration::optimize_coupled_parameters(
     const size_t module_index,
-    const std::vector<MythenFrame> &frames_with_base_peak_overlap,
+    const NDView<uint32_t, 2> frames_with_base_peak_overlap,
+    const std::vector<double> &detector_angles_bp_overlap,
     std::shared_ptr<PlotCalibrationProcess> plot, const double delta_parameter1,
     const double delta_parameter2) {
 
@@ -1133,13 +1196,15 @@ void AngleCalibration::optimize_coupled_parameters(
 
     double previous_similarity_of_peaks =
         calculate_similarity_of_peaks_between_acquisitions(
-            module_index, frames_with_base_peak_overlap, plot);
+            module_index, frames_with_base_peak_overlap,
+            detector_angles_bp_overlap, plot);
 
     LOG(logDEBUG) << fmt::format("initial similarity of peaks: {}",
                                  previous_similarity_of_peaks);
 
     auto objective_function1 = [this, &module_index,
                                 &frames_with_base_peak_overlap,
+                                &detector_angles_bp_overlap, &plot,
                                 &old_reference_left_strip_boundary_angle](
                                    const std::array<double, 2> &parameters) {
         const double prev_parameter1 =
@@ -1164,7 +1229,8 @@ void AngleCalibration::optimize_coupled_parameters(
             try {
                 similarity_of_peaks =
                     calculate_similarity_of_peaks_between_acquisitions(
-                        module_index, frames_with_base_peak_overlap, nullptr);
+                        module_index, frames_with_base_peak_overlap,
+                        detector_angles_bp_overlap, plot);
             } catch (const NoBasePeakOverLapError &e) {
 
                 similarity_of_peaks = std::numeric_limits<
@@ -1202,7 +1268,8 @@ void AngleCalibration::optimize_coupled_parameters(
 
         if (plot) {
             calculate_similarity_of_peaks_between_acquisitions<true>(
-                module_index, frames_with_base_peak_overlap, plot);
+                module_index, frames_with_base_peak_overlap,
+                detector_angles_bp_overlap, plot);
             plot->show();
         }
 

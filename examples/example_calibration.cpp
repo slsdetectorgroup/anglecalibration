@@ -131,10 +131,26 @@ int main() {
     // plot base peak for one module
     plotter.plot_base_peak(module_redistributed_to_fixed_angle_bins.view());
 
-    anglecalibration.calibrate<true>(filelist, base_peak_angle, 1);
+    // read all acquisitions into frames (rows: acquisitions, cols: channels)
+    NDArray<uint32_t, 2> frames(std::array<ssize_t, 2>{
+        static_cast<ssize_t>(filelist.size()), first_frame.size()});
+    std::vector<double> detector_angles(filelist.size());
+
+    for (size_t frame_index = 0; frame_index < filelist.size(); ++frame_index) {
+
+        mythen_file_reader->read_into(
+            frames.buffer() + frame_index * frames.byte_strides()[0],
+            filelist[frame_index]);
+        detector_angles[frame_index] =
+            mythen_file_reader->read_detector_angle(filelist[frame_index]);
+    }
+
+    anglecalibration.calibrate<true>(frames.view(), detector_angles,
+                                     base_peak_angle, 1);
 
     /*
-    anglecalibration.calibrate<false>(filelist, base_peak_angle);
+    anglecalibration.calibrate<false>(frames.view(), detector_angles,
+                                      base_peak_angle);
 
     auto bcparameters = anglecalibration.get_BCparameters();
     auto dgparameters = anglecalibration.get_DGparameters();

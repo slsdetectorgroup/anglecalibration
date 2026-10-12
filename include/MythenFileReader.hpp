@@ -290,6 +290,23 @@ class EpicsMythenFileReader : public HDF5FileReader, public MythenFileReader {
         return detector_angle;
     }
 
+    void read_into(std::byte *buffer, const std::filesystem::path &file_name) {
+
+        if (!std::filesystem::exists(file_name)) {
+            throw std::runtime_error(
+                fmt::format("File {} does not exist\n", file_name.string()));
+        }
+
+        open_file(file_name);
+
+        auto dataset_photon_count =
+            get_dataset("/entry/instrument/detector/data");
+
+        dataset_photon_count.read_into_buffer(buffer);
+
+        close_file();
+    }
+
     /**
      * @brief read acquisition file from hdf5
      * @return MythenFrame storing the photon counts, channel mask,
