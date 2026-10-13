@@ -6,12 +6,13 @@
 namespace angcal {
 
 MythenDetector::MythenDetector(const size_t num_modules_)
-    : m_num_modules(num_modules_), DGparameters(num_modules_),
-      BCparameters(num_modules_) {}
+    : m_num_modules(num_modules_) {}
 
 const DGParameters &MythenDetector::get_DGparameters() const {
     return DGparameters;
 }
+
+DGParameters &MythenDetector::get_DGparameters() { return DGparameters; }
 
 void MythenDetector::set_DGparameters(const DGParameters &dgparameters) {
     DGparameters = dgparameters;
@@ -20,6 +21,8 @@ void MythenDetector::set_DGparameters(const DGParameters &dgparameters) {
 const BCParameters &MythenDetector::get_BCparameters() const {
     return BCparameters;
 }
+
+BCParameters &MythenDetector::get_BCparameters() { return BCparameters; }
 
 void MythenDetector::set_BCparameters(const BCParameters &bcparameters) {
     BCparameters = bcparameters;

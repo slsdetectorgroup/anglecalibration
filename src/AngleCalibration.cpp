@@ -30,6 +30,11 @@ AngleCalibration::AngleCalibration(
     bad_channels = NDArray<bool, 1>(std::array<ssize_t, 1>{static_cast<ssize_t>(
                                         m_mythen_detector->num_strips())},
                                     false);
+
+    BCParameters temp_bc_parameters(m_mythen_detector->num_modules());
+    m_mythen_detector->get_DGparameters().convert_to_BCParameters(
+        temp_bc_parameters); // initialize BC parameters
+    m_mythen_detector->set_BCparameters(temp_bc_parameters);
 }
 
 void AngleCalibration::set_histogram_bin_width(double bin_width) {
@@ -82,6 +87,8 @@ ssize_t AngleCalibration::num_fixed_angle_width_bins() const {
 }
 
 const DGParameters &AngleCalibration::get_DGparameters() const {
+    m_mythen_detector->get_BCparameters().convert_to_DGParameters(
+        m_mythen_detector->get_DGparameters());
     return m_mythen_detector->get_DGparameters();
 }
 
@@ -115,23 +122,6 @@ void AngleCalibration::set_angular_range(const double min_angle,
 
 std::pair<double, double> AngleCalibration::get_angular_range() const {
     return {m_min_angle, m_max_angle};
-}
-
-void AngleCalibration::read_initial_calibration_from_file(
-    const std::string &filename,
-    const std::shared_ptr<SimpleFileInterface> file_reader) {
-
-    file_reader->open(filename);
-
-    DGParameters temp_dg_parameters(m_mythen_detector->num_modules());
-    file_reader->read_into(temp_dg_parameters.parameters.buffer(), 8);
-
-    file_reader->close();
-
-    temp_dg_parameters.convert_to_BCParameters(
-        m_mythen_detector->get_BCparameters()); // initialize BC parameters
-
-    m_mythen_detector->set_DGparameters(temp_dg_parameters);
 }
 
 void AngleCalibration::read_bad_channels_from_file(
@@ -1137,50 +1127,5 @@ void AngleCalibration::optimize_coupled_parameters(
 }
 
 // maybe better L-BFGS !!!!
-
-// TODO: it just writes to a csv/txt file maybe consider using same file
-// format as in m_custom_file_ptr but then user needs to implement more
-// e.g. custom append
-void AngleCalibration::write_DG_parameters_to_file(
-    const std::filesystem::path &filename, const DGParameters &parameters) {
-
-    std::ofstream output_file(filename);
-
-    if (!output_file) {
-        LOG(angcal::TLogLevel::logERROR) << "Error opening file!" << std::endl;
-    }
-
-    output_file.precision(15);
-
-    // output_file << "module, center, conversion, offset" << std::endl;
-    // // header
-
-    for (ssize_t module_index = 0; module_index < parameters.num_modules();
-         ++module_index) {
-        /*
-        if constexpr (std::is_same_v<decltype(parameters),
-        DGParameters>) { auto [center, conversion, offset] =
-                parameters.convert_to_DGParameters(module_index);
-        }
-        */
-        append_to_file(output_file, module_index,
-                       parameters.centers(module_index),
-                       parameters.conversions(module_index),
-                       parameters.offsets(module_index));
-    }
-
-    output_file.close();
-}
-
-void AngleCalibration::append_to_file(std::ofstream &os,
-                                      const size_t module_index,
-                                      const double center,
-                                      const double conversion,
-                                      const double offset) {
-    os << "module " << module_index << " center " << center << " +- 0.0000"
-       << " conversion " << conversion << " +- 0.0000"
-       << " offset " << offset << " +- 0.0000"
-       << std::endl; // dummy errors for now
-}
 
 } // namespace angcal

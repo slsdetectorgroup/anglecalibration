@@ -16,5 +16,4 @@ from ._angcal import DGParameters, EEParameters, BCParameters
 
 from .PlotHelper import PlotHelper
 
-from .utils import select_base_peak
-
+from . import utils 

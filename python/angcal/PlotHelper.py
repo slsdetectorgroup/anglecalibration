@@ -5,7 +5,7 @@ class PlotHelper:
 
     """ Helper class for plotting diffraction patterns. """
     
-    def __init__(self, anglecalibration): 
+    def __init__(self, mythendetector, angular_range, histogram_bin_width, base_peak_angle, base_peak_ROI_width): 
         """
         Create a plotting helper.
 
@@ -18,14 +18,25 @@ class PlotHelper:
         self._overwrite_plot = False
 
         # maybe add freeze 
-        self._anglecalibration = anglecalibration
-        self._left_module_boundary_as_bin_index = lambda module_index, detector_angle : int((self._anglecalibration.diffraction_angle_from_DG_parameters( module_index, detector_angle, 0, 0.0) -  self._anglecalibration.angular_range[0]) // self._anglecalibration.histogram_bin_width)
+        self._mythendetector = mythendetector
+        self._angular_range = angular_range
+        self._histogram_bin_width = histogram_bin_width
+        self._base_peak_angle = base_peak_angle
+        self._base_peak_ROI_width = base_peak_ROI_width
 
-        self._right_module_boundary_as_bin_index = lambda module_index, detector_angle : int((self._anglecalibration.diffraction_angle_from_DG_parameters( module_index, detector_angle, self._anglecalibration.MythenDetector.strips_per_module, 1.0) -  self._anglecalibration.angular_range[0]) // self._anglecalibration.histogram_bin_width)
+        self._num_fixed_angle_width_bins = int(np.ceil(self._angular_range[1] / self._histogram_bin_width) - np.floor(self._angular_range[0] / self._histogram_bin_width))
+
+        self._base_peak_ROI_num_bins = int((base_peak_angle + base_peak_ROI_width) /
+                                histogram_bin_width) - int((base_peak_angle - base_peak_ROI_width) /
+                                histogram_bin_width) + 1
+
+        self._left_module_boundary_as_bin_index = lambda module_index, detector_angle : int((self._mythendetector.diffraction_angle_from_DG_parameters( module_index, detector_angle, 0, 0.0) -  self._angular_range[0]) // self._histogram_bin_width)
+
+        self._right_module_boundary_as_bin_index = lambda module_index, detector_angle : int((self._mythendetector.diffraction_angle_from_DG_parameters( module_index, detector_angle, self._mythendetector.strips_per_module, 1.0) -  self._angular_range[0]) // self._histogram_bin_width)
         
-        self._bin_to_diffraction_angle = lambda bin_index : bin_index * self._anglecalibration.histogram_bin_width + self._anglecalibration.angular_range[0]
+        self._bin_to_diffraction_angle = lambda bin_index : bin_index * self._histogram_bin_width + self._angular_range[0]
     
-        self._bin_to_diffraction_angle_base_peak_ROI_only = lambda bin_index : (bin_index * self._anglecalibration.histogram_bin_width - self._anglecalibration.base_peak_ROI_width + self._anglecalibration.base_peak_angle)
+        self._bin_to_diffraction_angle_base_peak_ROI_only = lambda bin_index : (bin_index * self._histogram_bin_width - self._base_peak_ROI_width + self._base_peak_angle)
 
     @property 
     def overwrite_plot(self): 
@@ -69,7 +80,7 @@ class PlotHelper:
 
         left_bin_boundary = 0
         right_bin_boundary = photon_counts.size
-        if module_index is not None and (self._anglecalibration.num_fixed_angle_width_bins == photon_counts.size):
+        if module_index is not None and (self._num_fixed_angle_width_bins == photon_counts.size):
             left_bin_boundary = self._left_module_boundary_as_bin_index(
                 module_index, motor_position)
             right_bin_boundary = self._right_module_boundary_as_bin_index(
@@ -119,14 +130,14 @@ class PlotHelper:
             axis.set_ylabel("Photon Counts")
             axis.set_title(plot_title)
 
-        left_bin_boundary = int((self._anglecalibration.base_peak_angle -
-                                self._anglecalibration.base_peak_ROI_width -
-                                self._anglecalibration.angular_range[0]) // self._anglecalibration.histogram_bin_width)
-        right_bin_boundary = int((self._anglecalibration.base_peak_angle +
-                                self._anglecalibration.base_peak_ROI_width -
-                                self._anglecalibration.angular_range[0]) // self._anglecalibration.histogram_bin_width + 1)
+        left_bin_boundary = int((self._base_peak_angle -
+                                self._base_peak_ROI_width -
+                                self._angular_range[0]) // self._histogram_bin_width)
+        right_bin_boundary = int((self._base_peak_angle +
+                                self._base_peak_ROI_width -
+                                self._angular_range[0]) // self._histogram_bin_width + 1)
 
-        bins = np.arange(0, self._anglecalibration.base_peak_ROI_num_bins) 
+        bins = np.arange(0, self._base_peak_ROI_num_bins) 
         bins = np.vectorize(self._bin_to_diffraction_angle_base_peak_ROI_only)(bins)
 
         if axis is None:

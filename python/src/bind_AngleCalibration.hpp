@@ -71,13 +71,20 @@ void define_AngleCalibration_binding(py::module &m) {
                 (min_angle, max_angle)
             )")
 
-        .def(
-            "read_initial_calibration_from_file",
-            [](AngleCalibration &self, const std::string &filename) {
-                self.read_initial_calibration_from_file(filename);
+        .def_property_readonly(
+            "DGparameters",
+            [](AngleCalibration &self) {
+                auto DGparameters =
+                    new NDArray<double, 2>(self.get_DGparameters().parameters);
+                return return_image_data(DGparameters);
             },
-            R"(reads the historical Detector Group (DG) parameters from file and
-     transforms them to Best Computing parameters)")
+            R"(Best Computing parameters for each module
+            Returns
+            -------
+            numpy.ndarray of float, shape (n_modules, 3)
+                Each row corresponds to a module and contains the parameters:
+                [center, conversion, offset]
+            )")
 
         .def(
             "read_bad_channels_from_file",
@@ -163,33 +170,6 @@ void define_AngleCalibration_binding(py::module &m) {
             
             )")
 
-        .def_property_readonly(
-            "DGparameters",
-            [](AngleCalibration &self) {
-                return self.get_DGparameters(); // TODO: in c++ actually returns
-                                                // a const reference, what
-                                                // return value policy to use?
-            },
-            R"(
-            historic DG parameters 
-            )")
-
-        .def_property_readonly(
-            "MythenDetector",
-            [](AngleCalibration &self) {
-                return self.get_mythen_detector();
-            },
-            R"(
-            MythenDetector storing all mythen specific parameters
-            )")
-
-        .def_property_readonly(
-            "BCparameters",
-            [](AngleCalibration &self) { return self.get_BCparameters(); },
-            R"(
-            current "Best Computing" BC parameters 
-            )")
-
         .def_property(
             "bad_channels",
             [](AngleCalibration &self) {
@@ -215,38 +195,6 @@ void define_AngleCalibration_binding(py::module &m) {
             bad_channels : numpy.ndarray of bool, shape (n_channels,)
                 Expected size: number of channels/strips in the detector.
                 Each element is ``True`` if the channel is bad, otherwise ``False``.
-            )")
-
-        .def(
-            "diffraction_angle_from_DG_parameters",
-            [](AngleCalibration &self, const size_t module_index,
-               const double detector_angle, const size_t strip_index,
-               const double distance_to_strip) {
-                return self.get_mythen_detector()
-                    ->diffraction_angle_from_DG_parameters(
-                        module_index, detector_angle, strip_index,
-                        distance_to_strip);
-            },
-            py::arg("module_index"), py::arg("detector_angle"),
-            py::arg("strip_index"), py::arg("distance_to_strip"),
-            R"(
-            calculates diffraction angle from DG parameters for given strip
-
-            Parameters
-            ----------
-            module_index : int
-                index of module
-            detector_angle : double
-                detector position, measured as the offset of the first strip from the default detector position [degrees]
-            strip_index : int
-                index of strip in module
-            distance_to_strip : double
-                distance to strip [given in strips]
-
-            Returns
-            -------
-            double
-                diffraction angle for given strip [degrees]
             )")
 
         .def(
@@ -290,21 +238,19 @@ void define_AngleCalibration_binding(py::module &m) {
                py::array_t<uint32_t, py::array::c_style> frames,
                py::array_t<double, py::array::c_style> detector_angles,
                const double base_peak_angle,
-               std::optional<std::string> output_filename = std::nullopt,
                const bool plot_calibration_process = false) {
                 auto frames_view = make_view_2d(frames);
                 auto detector_angles_view = make_view_1d(detector_angles);
                 if (plot_calibration_process) {
                     self.calibrate<true>(frames_view, detector_angles_view,
-                                         base_peak_angle, output_filename);
+                                         base_peak_angle);
                 } else {
                     self.calibrate(frames_view, detector_angles_view,
-                                   base_peak_angle, output_filename);
+                                   base_peak_angle);
                 }
             },
             py::arg("frames"), py::arg("detector_angles"),
             py::arg("base_peak_angle"),
-            py::arg("output_filename") = std::nullopt,
             py::arg("plot_calibration_process") = false,
             R"(
             calibrates BC parameters for all modules
@@ -315,8 +261,6 @@ void define_AngleCalibration_binding(py::module &m) {
                 Array of motor positions corresponding to each frame.
             base_peak_angle : double
                 angle of base peak center [degree]
-            output_filename : str, optional 
-                if given, writes calibrated DG parameters to file with given name
             plot_calibration_process: bool, default: false
                 Whether to plot the calibration process
             )")
@@ -354,23 +298,5 @@ void define_AngleCalibration_binding(py::module &m) {
                     self.convert(file_list, module_index));
                 return return_image_data(result);
             },
-            py::arg("file_list"), py::arg("module_index"))
-
-        .def(
-            "write_DG_parameters_to_file",
-            [](AngleCalibration &self, const std::string &filename,
-               const DGParameters &parameters) {
-                self.write_DG_parameters_to_file(filename, parameters);
-            },
-            py::arg("filename"), py::arg("parameters"),
-            R"(
-            writes DG parameters to file
-
-             Parameters
-             ----------
-             filename: str
-                path to output file
-             parameters: DGParameters
-                DGParameters object containing the parameters to write to file
-             )");
+            py::arg("file_list"), py::arg("module_index"));
 }

@@ -26,7 +26,7 @@ int main() {
         file_path /
         "Flatfield_EkeV22p0_T11000eV_up_TESTFF1_clean_Jun2025_open_WS.raw";
 
-    auto initial_angles_filename = file_path / "angcal_Jul2025_P12_0p0105.off";
+    auto initial_angles_filename = file_path / "angcal_Jul2025_P12_0p0105.csv";
 
     std::string acquisition_fileprefix = "ang1up_22keV_MIX_0p5mm_48M_a_";
 
@@ -35,8 +35,16 @@ int main() {
     auto output_filename =
         file_path / "angcal_Jul2025_P12_0p0105_new_calibrated.off";
 
+    const size_t num_modules = 48;
     std::shared_ptr<MythenDetector> mythen_detector_ptr =
-        std::make_shared<MythenDetector>();
+        std::make_shared<MythenDetector>(num_modules);
+
+    DGParameters dgparameters(mythen_detector_ptr->num_modules());
+
+    read_csv(initial_angles_filename, dgparameters.parameters.view(), true);
+
+    mythen_detector_ptr->set_DGparameters(
+        dgparameters); // set initial parameters
 
     assert(std::filesystem::exists(bad_channels_filename));
 
@@ -60,9 +68,6 @@ int main() {
 
     AngleCalibration anglecalibration(mythen_detector_ptr, flat_field_ptr,
                                       mythen_file_reader);
-
-    anglecalibration.read_initial_calibration_from_file(
-        initial_angles_filename);
 
     LOG(TLogLevel::logINFO) << "read initial parameters from file";
 
@@ -157,7 +162,5 @@ int main() {
     auto bcparameters = anglecalibration.get_BCparameters();
     auto dgparameters = anglecalibration.get_DGparameters();
     bcparameters.convert_to_DGParameters(dgparameters);
-
-    anglecalibration.write_DG_parameters_to_file(output_filename, dgparameters);
     */
 }

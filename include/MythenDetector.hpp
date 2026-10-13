@@ -183,6 +183,8 @@ class MythenDetector {
      */
     const DGParameters &get_DGparameters() const; // TODO do I need that?
 
+    DGParameters &get_DGparameters();
+
     /**
      * @brief set the histoic DG parameters
      */
@@ -193,7 +195,7 @@ class MythenDetector {
      */
     const BCParameters &get_BCparameters() const;
 
-    BCParameters &get_BCparameters() { return BCparameters; }
+    BCParameters &get_BCparameters();
 
     /**
      * @brief set the current BC parameters

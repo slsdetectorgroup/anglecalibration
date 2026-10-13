@@ -102,19 +102,6 @@ class AngleCalibration {
         return m_mythen_detector;
     }
 
-    /** @brief reads the historical Detector Group (DG) parameters from file and
-     * transforms them to Best Computing parameters
-     * @param filename name of file
-     * @param file_reader filereader to read file (default
-     InitialAngCalParametersFile:
-     * following format module [module_index] center [center] +- [error]
-     conversion [conversion] +- [error] offset [offset] +- [error])
-     */
-    void read_initial_calibration_from_file(
-        const std::string &filename,
-        const std::shared_ptr<SimpleFileInterface> file_reader =
-            std::make_shared<InitialAngCalParametersFile>());
-
     /**
      * @brief read bad channels from file
      * @param filename bad channels filename
@@ -158,16 +145,11 @@ class AngleCalibration {
      * need to be sorted by detector angle
      * @param detector_angles 1D NDView of monitor positions for acquisitions
      * @param base_peak_angle angle of the selcted base peak [degrees]
-     * @param output_file optional, if provided the optimized BC parameters are
-     * converted back to DG parameters and are appended to the file (given as
-     * full file path)
      */
     template <bool visualize_calibration = false>
-    void
-    calibrate(const NDView<uint32_t, 2> frames,
-              const NDView<double, 1> detector_angles,
-              const double base_peak_angle,
-              std::optional<std::filesystem::path> output_file = std::nullopt);
+    void calibrate(const NDView<uint32_t, 2> frames,
+                   const NDView<double, 1> detector_angles,
+                   const double base_peak_angle);
 
     /**
      * @brief calibrates the BC (best computing) parameters for one module
@@ -307,13 +289,6 @@ class AngleCalibration {
      */
     NDArray<double, 2> convert(const std::vector<std::string> &file_list,
                                const size_t module_index);
-
-    /** @brief writes DG parameters to file
-     * @param filename full path tooutput file
-     */
-    static void
-    write_DG_parameters_to_file(const std::filesystem::path &filename,
-                                const DGParameters &parameters);
 
     /**
      * @brief calculate the rate corrected photon counts taking into account the
@@ -1153,10 +1128,9 @@ void AngleCalibration::calibrate_coupled_parameters(
 }
 
 template <bool visualize_calibration>
-void AngleCalibration::calibrate(
-    const NDView<uint32_t, 2> frames, const NDView<double, 1> detector_angles,
-    const double base_peak_angle_,
-    std::optional<std::filesystem::path> output_file) {
+void AngleCalibration::calibrate(const NDView<uint32_t, 2> frames,
+                                 const NDView<double, 1> detector_angles,
+                                 const double base_peak_angle_) {
 
     base_peak_angle = base_peak_angle_;
 
@@ -1203,23 +1177,6 @@ void AngleCalibration::calibrate(
 
         prev_frames_bp_overlap = frames_bp_overlap;
         prev_detector_angles_bp_overlap = detector_angles_bp_overlap;
-    }
-
-    std::ofstream file;
-    if (output_file.has_value()) {
-        file.open(output_file.value(), std::ios::out | std::ios::app);
-        if (file.tellp() == 0) {
-            file << "module,center,conversion,offset\n"; // only write
-                                                         // header if
-                                                         // file is empty
-        }
-
-        DGParameters DGparameters;
-        m_mythen_detector->get_BCparameters().convert_to_DGParameters(
-            DGparameters);
-        write_DG_parameters_to_file(output_file.value(), DGparameters);
-
-        file.close();
     }
 
     PlotCalibrationProcess::kill_python_interpreter();

@@ -150,4 +150,68 @@ select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
     }
 }
 
+/**
+ * @brief reads a comma separated file into a 2D buffer (rows x cols)
+ * e.g. DG parameters with header "center,conversion,offset" and one row per
+ * module
+ * @param filename path to csv file
+ * @param buffer view of buffer to fill, shape must match the csv data
+ * @param skip_header if true the first line is skipped
+ */
+inline void read_csv(const std::filesystem::path &filename,
+                     aare::NDView<double, 2> buffer,
+                     const bool skip_header = true) {
+
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open file: " + filename.string());
+    }
+
+    std::string line;
+    if (skip_header) {
+        std::getline(file, line);
+    }
+
+    ssize_t row = 0;
+    while (std::getline(file, line)) {
+        if (line.empty() || line == "\r")
+            continue;
+
+        if (row >= buffer.shape(0)) {
+            throw std::runtime_error("More rows in " + filename.string() +
+                                     " than expected (" +
+                                     std::to_string(buffer.shape(0)) + ")");
+        }
+
+        std::stringstream line_stream(line);
+        std::string value;
+        ssize_t col = 0;
+
+        while (std::getline(line_stream, value, ',')) {
+            if (col >= buffer.shape(1)) {
+                throw std::runtime_error(
+                    "More columns in row " + std::to_string(row) + " of " +
+                    filename.string() + " than expected (" +
+                    std::to_string(buffer.shape(1)) + ")");
+            }
+            buffer(row, col) = std::stod(value);
+            ++col;
+        }
+
+        if (col != buffer.shape(1)) {
+            throw std::runtime_error(
+                "Expected " + std::to_string(buffer.shape(1)) +
+                " columns in row " + std::to_string(row) + " of " +
+                filename.string() + " but got " + std::to_string(col));
+        }
+        ++row;
+    }
+
+    if (row != buffer.shape(0)) {
+        throw std::runtime_error("Expected " + std::to_string(buffer.shape(0)) +
+                                 " rows in " + filename.string() + " but got " +
+                                 std::to_string(row));
+    }
+}
+
 } // namespace angcal

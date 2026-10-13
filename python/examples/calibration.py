@@ -1,5 +1,7 @@
 
-from angcal import MythenDetectorSpecifications, FlatField, AngleCalibration, EpicsMythenFileReader, MythenFrame, PlotHelper, select_base_peak
+from angcal import MythenDetector, FlatField, AngleCalibration, EpicsMythenFileReader, MythenFrame, PlotHelper
+
+from angcal.utils import select_base_peak
 
 from pathlib import Path
 import os
@@ -18,14 +20,16 @@ def env_data_path():
 my_path = env_data_path()
 
 # setup mythen detector specifications - stores all relevant parameters of the detector setup
-mythendetectorspecifications = MythenDetectorSpecifications() 
+mythen_detector = MythenDetector() 
 
-mythendetectorspecifications.elastic_correction_factor =  0.0 
-mythendetectorspecifications.detector_vertical_axis_offset = 0.0
-mythendetectorspecifications.offset = 0.0 # additional offset to sample detector offset 
+mythen_detector.elastic_correction_factor =  0.0 
+mythen_detector.detector_vertical_axis_offset = 0.0
+mythen_detector.offset = 0.0 # additional offset to sample detector offset 
+
+mythen_detector.DGparameters = np.loadtxt(my_path / "angcal_Jul2025_P12_0p0105.csv", delimiter=",", dtype=np.float64, skiprows=1) # initial DG parameters for calibration
 
 # setup flatfield 
-flatfield = FlatField(mythendetectorspecifications)
+flatfield = FlatField(mythen_detector)
 
 flatfield.normalized_flatfield = np.loadtxt(my_path / "Flatfield_EkeV22p0_T11000eV_up_TESTFF1_clean_Jun2025_open_WS.raw", dtype=np.double, usecols=[1,2])
 
@@ -33,9 +37,7 @@ flatfield.normalized_flatfield = np.loadtxt(my_path / "Flatfield_EkeV22p0_T11000
 mythenfilereader = EpicsMythenFileReader()
 
 # setup angle calibration - has everything to do conversion and calibration 
-anglecalibration = AngleCalibration(mythendetectorspecifications, flatfield, mythenfilereader)
-
-anglecalibration.read_initial_calibration_from_file(str(my_path / "angcal_Jul2025_P12_0p0105.off"))
+anglecalibration = AngleCalibration(mythen_detector, flatfield, mythenfilereader)
 
 anglecalibration.read_bad_channels_from_file(str(my_path / "bc2025_001_RING.chans"))
 
@@ -48,7 +50,7 @@ scale_factor = first_frame.incident_intensity
 
 detector_angles = np.empty(shape = (num_files), dtype = np.double)
 
-frames = np.empty(shape=(num_files, mythendetectorspecifications.num_strips()), dtype=np.uint32)
+frames = np.empty(shape=(num_files, mythen_detector.num_strips), dtype=np.uint32)
 
 for frame in range(num_files):
     file_name = str(my_path / file_prefix)+f"{frame:04d}.h5"
@@ -68,7 +70,7 @@ anglecalibration.base_peak_ROI_width = 0.18 # in degrees width of base peak ROI
 
 anglecalibration.base_peak_angle = 19.0678
 
-plotter = PlotHelper(anglecalibration)
+plotter = PlotHelper(mythen_detector, anglecalibration.angular_range, anglecalibration.histogram_bin_width, anglecalibration.base_peak_angle, anglecalibration.base_peak_ROI_width)
 
 test_frame_name = str(my_path / (file_prefix + "0209.h5"))
 
@@ -83,7 +85,12 @@ plotter.plot_diffraction_pattern(module_redistributed_to_fixed_angle_bins[:,0].v
 plotter.plot_base_peak(module_redistributed_to_fixed_angle_bins[:,0].view())
 
 anglecalibration.calibrate(frames, detector_angles, anglecalibration.base_peak_angle, module_index = 1, plot_calibration_process=True) 
-#anglecalibration.calibrate(file_list, anglecalibration.base_peak_angle, output_filename=str(env_data_path() / "angcal_Jul2025_P12_0p0105_new_calibrated3.off"))
+#anglecalibration.calibrate(frames, detector_angles, anglecalibration.base_peak_angle)
+
+#calibrated_parameters = anglecalibration.DGparameters
+
+#np.savetxt(my_path / "angcal_Jul2025_P12_0p0105_calibrated.csv", calibrated_parameters, delimiter=",", header="center, conversion, offset", comments="", fmt="%.6f")
+
 
 print("calibration is done")
 

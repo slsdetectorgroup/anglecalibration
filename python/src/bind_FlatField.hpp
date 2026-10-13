@@ -62,56 +62,6 @@ void define_FlatField_binding(py::module &m) {
              })
         */
 
-        .def(
-            "diffraction_angle_from_DG_parameters",
-            [](FlatField &self, const size_t module_index,
-               const double detector_angle, size_t strip_index,
-               const double distance_to_strip) {
-                return self.diffraction_angle_from_DG_parameters(
-                    module_index, detector_angle, strip_index,
-                    distance_to_strip);
-            },
-            py::arg("module_index"), py::arg("detector_angle"),
-            py::arg("strip_index"), py::arg("distance_to_strip"), R"(
-            Calculate diffraction angle from DG module parameters (used in Beer's Law)
-
-            Parameters
-            ----------
-            module_index: int
-                Index of the DG module
-            detector_angle: float
-                Detector position [degrees]
-            strip_index: int
-                Local strip index of module e.g. 0-1279
-            distance_to_strip: float
-                Distance to strip [given in strips]
-            Returns
-            -------
-            float
-                Diffraction angle [degrees]
-            )")
-
-        .def(
-            "solid_angle",
-            [](FlatField &self, const size_t module_index, size_t strip_index) {
-                return self.solid_angle(module_index, strip_index);
-            },
-            py::arg("module_index"), py::arg("strip_index"), R"(
-             Calculate solid angle of strip
-
-             Parameters
-             ----------
-             module_index: int
-                Index of the DG module
-             strip_index: int
-                Local strip index of module e.g. 0-1279
-
-             Returns
-             -------
-             float
-                Solid angle of strip
-             )")
-
         .def_property(
             "normalized_flatfield",
             [](FlatField &self) {
@@ -171,22 +121,6 @@ void define_FlatField_binding(py::module &m) {
             R"(
             numpy.ndarray of bool, shape (n_channels,) : Each element is ``True`` if the channel is bad, otherwise ``False``.
             )")
-
-        .def(
-            "read_module_parameters_from_file",
-            [](FlatField &self, const std::filesystem::path &filename) {
-                self.read_module_parameters_from_file(filename);
-            },
-            R"(
-             read module parameters from file
-             (expects following format module [module_index] center [center] +- [error] conversion [conversion] +- [error] offset [offset] +- [error])
-
-             Parameters
-             ----------
-             
-             filename: str
-                path to file containing module parameters
-                )")
 
         .def(
             "read_bad_channels_from_file",
