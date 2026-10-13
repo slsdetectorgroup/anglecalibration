@@ -2,6 +2,7 @@
 #include "Optimization.hpp"
 #include "helpers/ErrorPropagation.hpp"
 // #include "helpers/LogFiles.hpp"
+#include "PhotonCountProcessing.hpp"
 #include "logger.hpp"
 
 #include <csignal>
@@ -255,152 +256,6 @@ AngleCalibration::get_frames_with_base_peak_overlap(
     return std::make_tuple(frames_bp_overlap, detector_angles_bp_overlap);
 }
 
-std::pair<double, double>
-AngleCalibration::rate_correction(const double photon_count,
-                                  const double photon_count_error,
-                                  const double exposure_time) const {
-
-    if (exposure_time == 0) {
-        throw std::runtime_error(LOCATION +
-                                 "Exposure time is zero - cannot perform rate "
-                                 "correction!");
-    }
-
-    const double maximum_count_rate =
-        std::exp(-1); // theoretical maximum count rate for
-                      // dead_time*measured_photon_counts_per_second
-
-    double photon_counts_per_second = photon_count / exposure_time;
-
-    photon_counts_per_second = std::min(
-        maximum_count_rate,
-        photon_counts_per_second *
-            m_mythen_detector->dead_time()); // multiply with dead time -
-                                             // for numerical algorithm
-
-    double error_photon_counts_per_second =
-        photon_count_error *
-        std::pow(m_mythen_detector->dead_time() / exposure_time, 2);
-
-    // -actual_count_rate*dead_time = W -> -dead_time*measured_count_rate =
-    // We^{W} -> W: Lambert W function
-
-    // numerical calculation of inverse of Lambart W - function
-    // actually calculate dead_time*count_rate =
-    // dead_time*actual_count_rate*exp(-dead_time*actual_count_rate)
-    double W_prev_iter = photon_counts_per_second; // initial guess
-    double W_next_iter{};
-    double propagated_error = error_photon_counts_per_second;
-    bool method_converged = false;
-    while (!method_converged) {
-        W_next_iter = photon_counts_per_second * std::exp(W_prev_iter);
-        method_converged = std::abs(1 - W_next_iter / W_prev_iter) <
-                           10 * std::numeric_limits<double>::epsilon();
-        W_prev_iter = W_next_iter;
-        propagated_error =
-            error_propagation(std::exp(W_prev_iter),
-                              photon_counts_per_second * std::exp(W_prev_iter),
-                              error_photon_counts_per_second, propagated_error);
-    }
-
-    double actual_count_rate = W_prev_iter; // actual count rate * dead_time
-
-    double rate_correction_factor =
-        actual_count_rate / photon_counts_per_second;
-
-    /*
-    double error_rate_correction_factor = error_propagation(
-        1. / photon_counts_per_second,
-        -actual_count_rate / std::pow(photon_counts_per_second, 2),
-        propagated_error, error_photon_counts_per_second);
-    */
-
-    double rate_corrected_photon_counts = photon_count * rate_correction_factor;
-
-    // double rate_corrected_photon_counts_error =
-    // error_propagation(rate_correction_factor, photon_count,
-    // photon_count_error, error_rate_correction_factor);
-
-    double rate_corrected_photon_counts_error =
-        photon_count_error *
-        std::pow(rate_correction_factor, 2); // TODO: In Antonios code like this
-
-    return std::pair<double, double>{rate_corrected_photon_counts,
-                                     rate_corrected_photon_counts_error};
-}
-
-std::pair<double, double> AngleCalibration::incident_intensity_correction(
-    const double photon_counts, const double photon_count_error,
-    const uint64_t incident_intensity) const {
-
-    if (incident_intensity == 0) {
-        throw std::runtime_error(LOCATION +
-                                 "Incident intensity is zero - cannot perform "
-                                 "incident intensity correction");
-    }
-
-    double I0_correction_factor = get_scale_factor() / (incident_intensity);
-
-    double I0_corrected_photon_counts = photon_counts * I0_correction_factor;
-    double I0_corrected_photon_counts_error =
-        photon_count_error * std::pow(I0_correction_factor, 2);
-
-    return std::pair<double, double>{I0_corrected_photon_counts,
-                                     I0_corrected_photon_counts_error};
-}
-
-std::pair<double, double>
-AngleCalibration::flatfield_correction(const double photon_counts,
-                                       const double photon_counts_error,
-                                       const size_t global_strip_index) const {
-
-    if ((flat_field->get_normalized_flatfield_view()(global_strip_index, 0)) <=
-        0.1) { // std::numeric_limits<double>::epsilon() in Antonios code 0.1
-
-        LOG(TLogLevel::logDEBUG)
-            << fmt::format("Flatfield value for strip {}", global_strip_index);
-        return std::pair(0.0, 0.0);
-    }
-
-    // flatfield normalization
-    const double flatfield_normalized_photon_counts =
-        photon_counts /
-        flat_field->get_normalized_flatfield_view()(global_strip_index, 0);
-
-    const double normalized_flatfield_variance = std::pow(
-        flat_field->get_normalized_flatfield_view()(global_strip_index, 1), 2);
-
-    const double flatfield_normalized_photon_counts_error = error_propagation(
-        1. / flat_field->get_normalized_flatfield_view()(global_strip_index, 0),
-        -1.0 * photon_counts /
-            std::pow(flat_field->get_normalized_flatfield_view()(
-                         global_strip_index, 0),
-                     2),
-        photon_counts_error,
-        normalized_flatfield_variance); // Variance // TODO: change should be
-                                        // squared per default always talk about
-                                        // variance error
-
-    return std::pair(flatfield_normalized_photon_counts,
-                     flatfield_normalized_photon_counts_error);
-}
-
-std::pair<double, double> AngleCalibration::transverse_width_correction(
-    const double photon_counts, const double photon_counts_error,
-    const size_t module_index, size_t strip_index) const {
-
-    const double transverse_width_correction_factor =
-        1.0 / m_mythen_detector->transverse_width(module_index, strip_index);
-
-    double transverse_width_normalized_photon_counts =
-        photon_counts * transverse_width_correction_factor;
-    double transverse_width_normalized_photon_counts_error =
-        photon_counts_error * std::pow(transverse_width_correction_factor, 2);
-
-    return std::pair(transverse_width_normalized_photon_counts,
-                     transverse_width_normalized_photon_counts_error);
-}
-
 std::pair<double, double> AngleCalibration::photon_count_correction(
     double photon_counts, const size_t global_strip_index, const uint64_t I0,
     const double exposure_time) const {
@@ -528,6 +383,82 @@ double AngleCalibration::center_base_peak(
     }
 
     return average_peak_center / num_runs;
+}
+
+void AngleCalibration::process_photon_counts(
+    const size_t module_index, const NDView<uint32_t, 1> frame,
+    const double detector_angle, NDView<double, 2> weighted_moments,
+    NDView<size_t, 1> num_contributing_photons) {
+
+    double left_boundary_roi_base_peak =
+        base_peak_angle - base_peak_roi_width; //+
+                                               // 0.5 * histogram_bin_width); //
+                                               // in degrees
+    double right_boundary_roi_base_peak =
+        base_peak_angle +
+        base_peak_roi_width; //-0.5 * histogram_bin_width); // in
+                             // degrees
+
+    // iterate over all strips of module
+    for (ssize_t strip_index = 0;
+         strip_index < MythenDetector::strips_per_module(); ++strip_index) {
+
+        size_t global_strip_index =
+            module_index * MythenDetector::strips_per_module() + strip_index;
+
+        if (bad_channels(global_strip_index)) {
+            continue; // skip bad channels
+        }
+
+        double left_strip_boundary_angle =
+            m_mythen_detector->diffraction_angle_from_BC_parameters(
+                module_index, detector_angle, strip_index,
+                0.0); // left strip boundary in angles [degrees]
+
+        double right_strip_boundary_angle =
+            m_mythen_detector->diffraction_angle_from_BC_parameters(
+                module_index, detector_angle, strip_index,
+                +1.0); // right strip boundary in angles [degrees]
+
+        // skip strip if not in ROI
+        if (left_strip_boundary_angle > right_boundary_roi_base_peak ||
+            right_strip_boundary_angle < left_boundary_roi_base_peak) {
+            LOG(TLogLevel::logDEBUG1) << fmt::format(
+                "strip {} of module {} covers an angle of [{}, {}] and is "
+                "outside "
+                "of the given angular range of [{}, "
+                "{}] and will be skipped",
+                strip_index, module_index, left_strip_boundary_angle,
+                right_strip_boundary_angle, left_boundary_roi_base_peak,
+                right_boundary_roi_base_peak);
+            continue;
+        }
+
+        double photon_count =
+            frame(global_strip_index) + 1; // mighells statistics
+
+        // get flatfield corrected photon counts and propagate error
+        auto [corrected_photon_counts, corrected_photon_counts_variance] =
+            flatfield_correction(photon_count, photon_count,
+                                 flat_field->get_normalized_flatfield_view()(
+                                     global_strip_index, 0),
+                                 flat_field->get_normalized_flatfield_view()(
+                                     global_strip_index, 1));
+
+        double inverse_corrected_photon_counts_variance =
+            corrected_photon_counts_variance <
+                    std::numeric_limits<double>::epsilon()
+                ? 0.0
+                : 1.0 / corrected_photon_counts_variance;
+
+        redistribute_photon_count_to_fixed_angle_width_bins(
+            left_strip_boundary_angle, right_strip_boundary_angle,
+            histogram_bin_width,
+            std::make_tuple(left_boundary_roi_base_peak,
+                            right_boundary_roi_base_peak),
+            corrected_photon_counts, inverse_corrected_photon_counts_variance,
+            weighted_moments, num_contributing_photons);
+    }
 }
 
 NDArray<double, 2> AngleCalibration::computeErrorandMean(

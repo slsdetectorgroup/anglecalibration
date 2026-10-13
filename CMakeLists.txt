@@ -181,6 +181,7 @@ set(PUBLICHEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenFileReader.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Parameters.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/MythenDetector.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/PhotonCountProcessing.hpp
 ) 
 
 set(SourceFiles 

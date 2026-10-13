@@ -167,61 +167,6 @@ class AngleCalibration {
                    const NDView<double, 1> detector_angles,
                    const double base_peak_angle_, const size_t module_index);
 
-    /**
-     * @brief calibrates distance to module center and angle of module center
-     * and normal (L and delta) for a specific module
-     * @tparam visualize_calibration if true visualize calibration process
-     * (default: false)
-     * @param module_index index of module to be calibrated
-     * @param frames_width_base_peak_overlap frames with base peak overlap for
-     * the module
-     * @param detector_angles 1D NDView of monitor positions for acquisitions
-     */
-    template <bool visualize_calibration = false>
-    void calibrate_coupled_parameters(
-        const size_t module_index,
-        const NDView<uint32_t, 2> frames_width_base_peak_overlap,
-        const NDView<double, 1> detector_angles);
-
-    /**
-     * @brief calibrates the angle between center of module and beam (phi) for a
-     * specific module
-     * @tparam visualize_calibration if true visualize calibration process
-     * (default: false)
-     * @param module_index index of module to be calibrated
-     * @param frames_with_base_peak_overlap frames with base peak overlap module
-     * to be calibrated
-     * @param detector_angles_with_base_peak_overlap 1D NDView of monitor
-     * positions for acquisitions
-     * @param frames_with_base_peak_overlap_prev_module frames with base peak
-     * overlap prev module
-     * @param detector_angles_with_base_peak_overlap_prev_module 1D NDView of
-     * monitor positions for acquisitions for the previous module
-     */
-    template <bool visualize_calibration = false>
-    void calibrate_offset(
-        const size_t module_index,
-        const NDView<uint32_t, 2> frames_with_base_peak_overlap,
-        const NDView<double, 1> detector_angles_with_base_peak_overlap,
-        const NDView<uint32_t, 2> frames_with_base_peak_overlap_prev_module,
-        const NDView<double, 1>
-            detector_angles_with_base_peak_overlap_prev_module);
-
-    /**
-     * @brief calculates the average angle of the base peak center over several
-     * acquisitions for a given module index
-     * @param module_index index of module to calculate base peak center for
-     * @param frames_with_base_peak_overlap frames with base peak overlap for
-     * the given module index
-     * @param detector_angles_with_base_peak_overlap 1D NDView of monitor
-     * positions for acquisitions
-     * @return average angle of base peak center [degrees]
-     */
-    double center_base_peak(
-        const size_t module_index,
-        const NDView<uint32_t, 2> frames_with_base_peak_overlap,
-        const NDView<double, 1> detector_angles_with_base_peak_overlap);
-
     /** @brief check if base peak ROI is contained within module region
      * @param detector_angle: detector position (offset of first strip from
      * default detector position) [degrees]
@@ -290,19 +235,6 @@ class AngleCalibration {
     NDArray<double, 2> convert(const std::vector<std::string> &file_list,
                                const size_t module_index);
 
-    /**
-     * @brief calculate the rate corrected photon counts taking into account the
-     * dead time
-     * @param photon_counts photon counts
-     * @param photon_count_error error of photon counts (generally variance
-     * error is used)
-     * @param exposure_time exposure time of acquisition [s]
-     * @return pair {corrected photon counts, propagated_error}
-     */
-    std::pair<double, double> rate_correction(const double photon_counts,
-                                              const double photon_count_error,
-                                              const double exposure_time) const;
-
   private:
     /**
      * @brief calculates the frames for which the base peak ROI is covered by
@@ -340,6 +272,25 @@ class AngleCalibration {
         const double detector_angle, const double exposure_time,
         const double incident_intensity, NDView<double, 2> weighted_moments,
         NDView<size_t, 1> num_contributing_photons);
+
+    /**
+     * @brief applies flatfield correction for a given module and redistributes
+     * them to fixed angle width bins
+     * @param module_index index of module
+     * @param frame data from acquisition (storing detector position and photon
+     * counts)
+     * @param weighted_moments weighted photon counts of order 0-2 eg. order k:
+     * sum of photon_count_i^k*weight_i counts for fixed angle width bin and the
+     * corresponding variance
+     * @param num_contributing_photons number of photons contributing to the
+     * fixed angle width bin
+     * @param detector_angle detector axis motor position [degrees]
+     */
+    void process_photon_counts(const size_t module_index,
+                               const NDView<uint32_t, 1> frame,
+                               const double detector_angle,
+                               NDView<double, 2> weighted_moments,
+                               NDView<size_t, 1> num_contributing_photons);
 
     /**
      * @brief redistributes photon counts to fixed angle width bins around base
@@ -387,6 +338,61 @@ class AngleCalibration {
         const NDView<double, 1>
             detector_angles_with_base_peak_overlap_prev_module,
         std::shared_ptr<PlotCalibrationProcess> plot = nullptr);
+
+    /**
+     * @brief calibrates distance to module center and angle of module center
+     * and normal (L and delta) for a specific module
+     * @tparam visualize_calibration if true visualize calibration process
+     * (default: false)
+     * @param module_index index of module to be calibrated
+     * @param frames_width_base_peak_overlap frames with base peak overlap for
+     * the module
+     * @param detector_angles 1D NDView of monitor positions for acquisitions
+     */
+    template <bool visualize_calibration = false>
+    void calibrate_coupled_parameters(
+        const size_t module_index,
+        const NDView<uint32_t, 2> frames_width_base_peak_overlap,
+        const NDView<double, 1> detector_angles);
+
+    /**
+     * @brief calibrates the angle between center of module and beam (phi) for a
+     * specific module
+     * @tparam visualize_calibration if true visualize calibration process
+     * (default: false)
+     * @param module_index index of module to be calibrated
+     * @param frames_with_base_peak_overlap frames with base peak overlap module
+     * to be calibrated
+     * @param detector_angles_with_base_peak_overlap 1D NDView of monitor
+     * positions for acquisitions
+     * @param frames_with_base_peak_overlap_prev_module frames with base peak
+     * overlap prev module
+     * @param detector_angles_with_base_peak_overlap_prev_module 1D NDView of
+     * monitor positions for acquisitions for the previous module
+     */
+    template <bool visualize_calibration = false>
+    void calibrate_offset(
+        const size_t module_index,
+        const NDView<uint32_t, 2> frames_with_base_peak_overlap,
+        const NDView<double, 1> detector_angles_with_base_peak_overlap,
+        const NDView<uint32_t, 2> frames_with_base_peak_overlap_prev_module,
+        const NDView<double, 1>
+            detector_angles_with_base_peak_overlap_prev_module);
+
+    /**
+     * @brief calculates the average angle of the base peak center over several
+     * acquisitions for a given module index
+     * @param module_index index of module to calculate base peak center for
+     * @param frames_with_base_peak_overlap frames with base peak overlap for
+     * the given module index
+     * @param detector_angles_with_base_peak_overlap 1D NDView of monitor
+     * positions for acquisitions
+     * @return average angle of base peak center [degrees]
+     */
+    double center_base_peak(
+        const size_t module_index,
+        const NDView<uint32_t, 2> frames_with_base_peak_overlap,
+        const NDView<double, 1> detector_angles_with_base_peak_overlap);
 
     /**
      * @brief compares multiple base peak ROIS from different acquisitions and
@@ -470,55 +476,6 @@ class AngleCalibration {
         std::shared_ptr<PlotCalibrationProcess> plot = nullptr,
         double delta_parameter = 0.005);
 
-    /**
-     * @brief calculated the flatfield corrected photon counts and the error
-     * @param photon_counts photon counts
-     * @param photon_counts_error error of photon counts (generally variance
-     * error is used)
-     * @param global_strip_index strip index of photon counts
-     * @return pair {corrected photon counts, propagated_error}
-     */
-    std::pair<double, double>
-    flatfield_correction(const double photon_counts,
-                         const double photon_counts_error,
-                         const size_t global_strip_index) const;
-
-    /** @brief calculate the incident intensity corrected photon counts
-     * @param photon_counts photon counts
-     * @param photon_counts_error error of photon counts (generally variance
-     * error is used)
-     * @param incident_intensity incident intensity
-     * @return pair {corrected photon counts, propagated_error}
-     */
-    std::pair<double, double>
-    incident_intensity_correction(const double photon_counts,
-                                  const double photon_counts_error,
-                                  const uint64_t incident_intensity) const;
-
-    std::pair<double, double> transverse_width_correction(
-        const double photon_counts, const double photon_counts_error,
-        const size_t module_index, const size_t strip_index) const;
-
-    /** @brief calculate the corrected photon counts (flatfield, rate,
-     * incident intensity)
-     * @param photon_counts photon counts
-     * @param global_strip_index strip index of photon counts
-     * @param I0 incident intensity
-     * @param exposure_time exposure time of acquisition [s]
-     * @return pair {corrected photon counts, propagated_error}
-     */
-    std::pair<double, double>
-    photon_count_correction(double photon_counts,
-                            const size_t global_strip_index, const uint64_t I0,
-                            const double exposure_time) const;
-
-    /**
-     * @brief appends given parameters to file
-     */
-    static void append_to_file(std::ofstream &file, const size_t module_index,
-                               const double center, const double conversion,
-                               const double offset);
-
     /*
     void plot_calibration_step_coupled_parameters(
         const size_t module_index,
@@ -578,11 +535,6 @@ class AngleCalibration {
     double m_max_angle = 180.0;
 
     /**
-     * list of acquisition files used for calibration
-     */
-    std::vector<std::string> file_list{};
-
-    /**
      * file reader to read mythen acquisition files
      */
     std::shared_ptr<MythenFileReader> mythen_file_reader{};
@@ -605,9 +557,6 @@ double AngleCalibration::calculate_similarity_of_peaks_between_acquisitions(
         std::array<ssize_t, 1>{num_bins_in_ROI},
         0); // number of contributing photons for each bin
 
-    const double dummy_incident_intensity = get_scale_factor();
-    const double dummy_exposure_time = 1.0;
-
     size_t num_runs{};
     for (ssize_t frame_index = 0;
          frame_index < frames_with_base_peak_overlap.shape(0); ++frame_index) {
@@ -627,11 +576,10 @@ double AngleCalibration::calculate_similarity_of_peaks_between_acquisitions(
                 NDArray<double, 2> fixed_angle_width_bins_photon_counts(
                     std::array<ssize_t, 2>{num_bins_in_ROI, 2}, -1.0);
 
-                redistribute_photon_counts_to_fixed_angle_width_bins<true>(
+                process_photon_counts(
                     module_index,
                     frames_with_base_peak_overlap.sub_view(frame_index),
                     detector_angles_bp_overlap[frame_index],
-                    dummy_exposure_time, dummy_incident_intensity,
                     weighted_sums.view(), num_contributing_photons.view());
 
                 for (ssize_t i = 0; i < weighted_sums.shape(0); ++i) {
@@ -664,11 +612,10 @@ double AngleCalibration::calculate_similarity_of_peaks_between_acquisitions(
                 plot->add_curve(fixed_angle_width_bins_photon_counts.view());
             } else {
 
-                redistribute_photon_counts_to_fixed_angle_width_bins<true>(
+                process_photon_counts(
                     module_index,
                     frames_with_base_peak_overlap.sub_view(frame_index),
                     detector_angles_bp_overlap[frame_index],
-                    dummy_exposure_time, dummy_incident_intensity,
                     total_weighted_sums.view(),
                     num_contributing_photons.view());
             }
@@ -729,9 +676,6 @@ double AngleCalibration::calculate_similarity_of_peaks_between_modules(
 
     size_t num_modules_with_base_peak_overlap = 2;
 
-    const double dummy_incident_intensity = get_scale_factor();
-    const double dummy_exposure_time = 1.0;
-
     for (const size_t mod_index : {module_index - 1, module_index}) {
 
         size_t num_runs{};
@@ -763,12 +707,10 @@ double AngleCalibration::calculate_similarity_of_peaks_between_modules(
                         NDArray<double, 2> fixed_angle_width_bins_photon_counts(
                             std::array<ssize_t, 2>{num_bins_in_ROI, 2}, -1.0);
 
-                        redistribute_photon_counts_to_fixed_angle_width_bins<
-                            true>(
+                        process_photon_counts(
                             mod_index,
                             frames_with_base_peak_overlap.sub_view(frame_index),
                             detector_angles_with_base_peak_overlap[frame_index],
-                            dummy_exposure_time, dummy_incident_intensity,
                             weighted_sums.view(),
                             num_contributing_photons.view());
 
@@ -806,12 +748,10 @@ double AngleCalibration::calculate_similarity_of_peaks_between_modules(
                         plot->add_curve(
                             fixed_angle_width_bins_photon_counts.view());
                     } else {
-                        redistribute_photon_counts_to_fixed_angle_width_bins<
-                            true>(
+                        process_photon_counts(
                             mod_index,
                             frames_with_base_peak_overlap.sub_view(frame_index),
                             detector_angles_with_base_peak_overlap[frame_index],
-                            dummy_exposure_time, dummy_incident_intensity,
                             total_weighted_sums.view(),
                             num_contributing_photons.view());
                     }
