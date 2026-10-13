@@ -1,4 +1,4 @@
-#include "AngleCalibration.hpp"
+#include "AngularConversion.hpp"
 #include "aare/File.hpp"
 #include "logger.hpp"
 #include "utils.hpp"
@@ -27,7 +27,7 @@ int main() {
 
     assert(std::filesystem::exists(flatfield_filename));
 
-    auto initial_angles_filename = file_path / "Angcal_2E_Feb2023_P29.off";
+    auto initial_angles_filename = file_path / "Angcal_2E_Feb2023_P29.csv";
 
     assert(std::filesystem::exists(initial_angles_filename));
 
@@ -38,26 +38,29 @@ int main() {
     mythen_detector_ptr->elastic_correction_factor(0.0045);
     mythen_detector_ptr->detector_vertical_axis_offset(24.8);
 
+    DGParameters dgparameters(mythen_detector_ptr->num_modules());
+    read_csv(initial_angles_filename, dgparameters.parameters.view(), true);
+    mythen_detector_ptr->set_DGparameters(
+        dgparameters); // set detector parameters
+
     // FileaReader to read Mythen Files
     auto mythen_file_reader = std::make_shared<EpicsMythenFileReader>();
 
-    // create FlatField
-    std::shared_ptr<FlatField> flat_field_ptr =
-        std::make_shared<FlatField>(mythen_detector_ptr);
+    NDArray<double, 2> flatfield =
+        read_flatfield(flatfield_filename, mythen_detector_ptr->num_modules());
 
-    flat_field_ptr->read_normalized_flatfield_from_file(flatfield_filename);
-
-    LOG(TLogLevel::logINFO) << "normalized flatfield calculated";
+    LOG(TLogLevel::logINFO) << "read normalized flatfield from file";
 
     // create AngleCalibration class
-    AngleCalibration anglecalibration(mythen_detector_ptr, flat_field_ptr,
-                                      mythen_file_reader);
+    AngularConversion angularconversion(mythen_detector_ptr, 0.0036,
+                                        std::make_tuple(0.0, 90.5)); // 130
 
-    // read initial parameters from file
-    anglecalibration.read_initial_calibration_from_file(
-        initial_angles_filename);
+    NDArray<bool, 1> bad_channels = read_bad_channels(
+        bad_channels_filename, mythen_detector_ptr->num_strips());
 
-    anglecalibration.read_bad_channels_from_file(bad_channels_filename);
+    angularconversion.set_bad_channels(bad_channels.view());
+
+    angularconversion.set_scale_factor(5050880.0);
 
     LOG(TLogLevel::logINFO) << "read bad channels";
 
@@ -69,15 +72,41 @@ int main() {
                       return (file_path / filename).string();
                   });
 
-    anglecalibration.set_scale_factor(5050880.0);
+    const ssize_t num_frames = file_list.size();
 
-    anglecalibration.set_angular_range(0.0, 90.5); // 130
+    NDArray<uint32_t, 2> photon_counts(std::array<ssize_t, 2>{
+        num_frames, static_cast<ssize_t>(mythen_detector_ptr->num_strips())});
+    NDArray<double, 1> detector_angles(std::array<ssize_t, 1>{num_frames});
+    NDArray<uint64_t, 1> incident_intensities(
+        std::array<ssize_t, 1>{num_frames});
 
-    auto redistributed_photon_counts = anglecalibration.convert(
-        file_list); // redistributes and applies pixel wise correction
+    double exposure_time =
+        mythen_file_reader->read_frame(file_list[0]).exposure_time;
+
+    for (ssize_t frame_index = 0; frame_index < num_frames; ++frame_index) {
+
+        mythen_file_reader->read_into(photon_counts.buffer() +
+                                          frame_index *
+                                              photon_counts.byte_strides()[0],
+                                      file_list[frame_index]);
+
+        detector_angles[frame_index] =
+            mythen_file_reader->read_detector_angle(file_list[frame_index]);
+
+        incident_intensities(frame_index) =
+            mythen_file_reader->read_incident_intensity(file_list[frame_index]);
+    }
+
+    angularconversion.set_scale_factor(incident_intensities[0]);
+
+    auto redistributed_photon_counts =
+        angularconversion.convert(photon_counts.view(), detector_angles.view(),
+                                  incident_intensities.view(), exposure_time);
 
     // plot
-    PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
+    PlotHelper plotter(mythen_detector_ptr,
+                       angularconversion.get_angular_range(),
+                       angularconversion.get_histogram_bin_width());
 
     plotter.plot_diffraction_pattern(redistributed_photon_counts.view());
 }

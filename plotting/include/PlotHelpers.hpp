@@ -39,22 +39,16 @@ class PlotHelper {
      * @brief constructor for PlotHelper class
      * @param anglecalibration
      */
-    PlotHelper(std::shared_ptr<AngleCalibration> anglecalibration)
-        : m_anglecalibration(anglecalibration),
-          m_mythen_detector(anglecalibration->get_mythen_detector()) {
-        bin_to_diffraction_angle = [this](const size_t bin_index) {
-            return bin_index * m_anglecalibration->get_histogram_bin_width() +
-                   m_anglecalibration->get_angular_range()
-                       .first; // m_min_angle;
-        };
+    PlotHelper(std::shared_ptr<MythenDetector> mythen_detector,
+               const std::tuple<double, double> angular_range,
+               const double histogram_bin_width)
+        : m_mythen_detector(mythen_detector), m_angular_range(angular_range),
+          m_histogram_bin_width(histogram_bin_width) {
 
-        bin_to_diffraction_angle_base_peak_ROI_only =
-            [this](const ssize_t bin_index) {
-                return (bin_index *
-                            m_anglecalibration->get_histogram_bin_width() -
-                        m_anglecalibration->get_base_peak_ROI_width() +
-                        m_anglecalibration->get_base_peak_angle());
-            };
+        bin_to_diffraction_angle = [this](const size_t bin_index) {
+            return bin_index * m_histogram_bin_width +
+                   std::get<0>(m_angular_range); // m_min_angle;
+        };
 
         // matplotlibcpp::backend("TkAgg");
         matplotlibcpp::ion();
@@ -126,7 +120,7 @@ class PlotHelper {
      * module region
      */
     void plot_diffraction_pattern(
-        const NDView<double, 2> &photon_counts,
+        const NDView<double, 2> photon_counts,
         std::optional<size_t> module_index = std::nullopt,
         std::optional<double> motor_position = std::nullopt) const;
 
@@ -137,7 +131,8 @@ class PlotHelper {
      * to diffraction pattern
      */
     void plot_base_peak(
-        const NDView<double, 2> photon_counts,
+        const NDView<double, 2> photon_counts, const double base_peak_angle,
+        const double base_peak_roi_width,
         const std::optional<size_t> module_index = std::nullopt) const;
 
   private:
@@ -147,8 +142,8 @@ class PlotHelper {
         return static_cast<size_t>(
             (m_mythen_detector->diffraction_angle_from_DG_parameters(
                  module_index, detector_angle, 0, 0.0) -
-             m_anglecalibration->get_angular_range().first) /
-            m_anglecalibration->get_histogram_bin_width());
+             std::get<0>(m_angular_range)) /
+            m_histogram_bin_width);
     }
 
     inline size_t right_module_boundary_as_fixed_angle_bin_index(
@@ -159,26 +154,23 @@ class PlotHelper {
             (m_mythen_detector->diffraction_angle_from_DG_parameters(
                  module_index, detector_angle,
                  MythenDetector::strips_per_module() - 1, +1.0) -
-             m_anglecalibration->get_angular_range().first) /
-            m_anglecalibration->get_histogram_bin_width());
+             std::get<0>(m_angular_range)) /
+            m_histogram_bin_width);
     }
 
   private:
-    /// @brief shared pointer to AngleCalibration class for accessing
-    /// calibration specific parameters and functions
-    const std::shared_ptr<AngleCalibration> m_anglecalibration{};
-
     /// @brief shared pointer to detector geometry of m_anglecalibration for
     /// calculating diffraction angles
     const std::shared_ptr<MythenDetector> m_mythen_detector{};
 
+    /// @brief angular range of diffraction pattern [degrees]
+    const std::tuple<double, double> m_angular_range{};
+
+    /// @brief histogram bin width [degrees]
+    const double m_histogram_bin_width{};
+
     /// @brief function to convert bin index to diffraction angle
     std::function<double(const size_t)> bin_to_diffraction_angle{};
-
-    /// @brief function to convert bin index to diffraction angle for base peak
-    /// ROI only
-    std::function<double(const size_t)>
-        bin_to_diffraction_angle_base_peak_ROI_only{};
 
     bool m_overwrite_plot = false;
 
@@ -187,6 +179,8 @@ class PlotHelper {
 
 inline void
 PlotHelper::plot_base_peak(const NDView<double, 2> photon_counts,
+                           const double base_peak_angle,
+                           const double base_peak_roi_width,
                            const std::optional<size_t> module_index) const {
 
     std::string plot_title{};
@@ -207,21 +201,36 @@ PlotHelper::plot_base_peak(const NDView<double, 2> photon_counts,
 
     initialize_axis(plot_title);
 
-    std::vector<double> bins(m_anglecalibration->get_base_peak_ROI_num_bins());
+    /*
+    auto bin_to_diffraction_angle_base_peak_ROI_only =
+        [this, base_peak_angle, base_peak_roi_width](const ssize_t bin_index) {
+            return (bin_index * m_histogram_bin_width - base_peak_roi_width +
+                    base_peak_angle);
+        };
+    */
 
-    std::generate(bins.begin(), bins.end(), [this, n = size_t{0}]() mutable {
-        return bin_to_diffraction_angle_base_peak_ROI_only(n++);
-    });
+    ssize_t num_bins_base_peak_ROI =
+        static_cast<ssize_t>((base_peak_angle + base_peak_roi_width) /
+                             m_histogram_bin_width) -
+        static_cast<ssize_t>((base_peak_angle - base_peak_roi_width) /
+                             m_histogram_bin_width) +
+        1;
 
-    size_t left_boundary_bin = (m_anglecalibration->get_base_peak_angle() -
-                                m_anglecalibration->get_base_peak_ROI_width() -
-                                m_anglecalibration->get_angular_range().first) /
-                               m_anglecalibration->get_histogram_bin_width();
+    std::vector<double> bins(num_bins_base_peak_ROI);
+
+    std::generate(
+        bins.begin(), bins.end(),
+        [this, n = size_t{0}, base_peak_angle, base_peak_roi_width]() mutable {
+            return (n++) * m_histogram_bin_width - base_peak_roi_width +
+                   base_peak_angle;
+        });
+
+    size_t left_boundary_bin =
+        (base_peak_angle - base_peak_roi_width - std::get<0>(m_angular_range)) /
+        m_histogram_bin_width;
     size_t right_boundary_bin =
-        (m_anglecalibration->get_base_peak_angle() +
-         m_anglecalibration->get_base_peak_ROI_width() -
-         m_anglecalibration->get_angular_range().first) /
-            m_anglecalibration->get_histogram_bin_width() +
+        (base_peak_angle + base_peak_roi_width - std::get<0>(m_angular_range)) /
+            m_histogram_bin_width +
         1;
 
     std::vector<double> photon_counts_vec(right_boundary_bin -
@@ -241,7 +250,7 @@ PlotHelper::plot_base_peak(const NDView<double, 2> photon_counts,
 // defined in hpp file otherwise random seg faults as singleton _interpreter of
 // matplotlibcpp is not properly initialized - not sure why
 inline void PlotHelper::plot_diffraction_pattern(
-    const NDView<double, 2> &photon_counts, std::optional<size_t> module_index,
+    const NDView<double, 2> photon_counts, std::optional<size_t> module_index,
     std::optional<double> motor_position) const {
 
     std::string plot_title{};
@@ -271,9 +280,13 @@ inline void PlotHelper::plot_diffraction_pattern(
 
     size_t left_bin_boundary = 0;
     size_t right_bin_boundary = photon_counts.shape(0);
+
+    const ssize_t num_fixed_angle_width_bins =
+        std::ceil(std::get<1>(m_angular_range) / m_histogram_bin_width) -
+        std::floor(std::get<0>(m_angular_range) / m_histogram_bin_width);
+
     if (module_index.has_value() &&
-        (photon_counts.shape(0) ==
-         m_anglecalibration->num_fixed_angle_width_bins())) {
+        (photon_counts.shape(0) == num_fixed_angle_width_bins)) {
         left_bin_boundary = left_module_boundary_as_fixed_angle_bin_index(
             module_index.value(), motor_position.value());
         right_bin_boundary = right_module_boundary_as_fixed_angle_bin_index(

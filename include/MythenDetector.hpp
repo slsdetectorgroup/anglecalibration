@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "Parameters.hpp"
+#include "aare/NDArray.hpp"
 
 namespace angcal {
 
@@ -172,14 +173,14 @@ class MythenDetector {
     void dead_time(const double dead_time_) { m_dead_time = dead_time_; }
 
     /**
-     * @brief get the unconnected modules
+     * @brief get the disconnected modules
      */
-    std::vector<ssize_t> &unconnected_modules() {
-        return m_unconnected_modules;
+    aare::NDView<bool, 1> disconnected_modules() {
+        return m_disconnected_modules.view();
     }
 
     /**
-     * @brief get the histoic DG parameters
+     * @brief get the historic DG parameters
      */
     const DGParameters &get_DGparameters() const; // TODO do I need that?
 
@@ -277,11 +278,13 @@ class MythenDetector {
      * plane
      * @param module_index index of module
      * @param strip_index local strip index of module e.g. 0-1279
+     * @param from_BC_parameters whether to use BC parameters (true) or DG
+     * parameters (false)
      * @return transverse width of strip projected onto a plane [mm] // TODO: is
      * it mm
      */
-    double transverse_width(const size_t module_index,
-                            size_t strip_index) const;
+    double transverse_width(const size_t module_index, size_t strip_index,
+                            bool from_BC_parameters = true) const;
 
     /**
      * @brief calculates the solid angle of a strip
@@ -356,8 +359,9 @@ class MythenDetector {
         76.08e-9; // measured dead-time 31.8E-9_DP, 95.E-9_DP other beam
                   // settings ! TODO: should it be configurable?
 
-    /// @brief list of module indices which are unconnected
-    std::vector<ssize_t> m_unconnected_modules{};
+    /// @brief boolean mask of disconnected modules (true if module is
+    /// disconnected)
+    aare::NDArray<bool, 1> m_disconnected_modules{};
 
     DGParameters DGparameters;
 

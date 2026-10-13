@@ -2,6 +2,8 @@ from . import _angcal
 
 from ._angcal import AngleCalibration
 
+from ._angcal import AngularConversion
+
 from ._angcal import RawMythenFileReader 
 
 from ._angcal import EpicsMythenFileReader 

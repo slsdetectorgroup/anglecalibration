@@ -170,6 +170,7 @@ endif()
 
 set(PUBLICHEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/AngleCalibration.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/AngularConversion.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CustomFiles.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Flatfield.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/helpers/FileInterface.hpp
@@ -186,6 +187,7 @@ set(PUBLICHEADERS
 
 set(SourceFiles 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AngleCalibration.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/AngularConversion.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/FlatField.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Parameters.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MythenDetector.cpp

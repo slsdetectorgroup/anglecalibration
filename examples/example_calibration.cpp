@@ -1,7 +1,7 @@
 #include "AngleCalibration.hpp"
+#include "AngularConversion.hpp"
 #include "PlotHelpers.hpp"
 #include "aare/File.hpp"
-#include "additional_plots.hpp"
 #include "logger.hpp"
 #include "utils.hpp"
 #include <filesystem>
@@ -101,7 +101,6 @@ int main() {
     LOG(TLogLevel::logINFO)
         << fmt::format("incident intensity of first frame: {}",
                        first_frame.incident_intensity);
-    anglecalibration.set_scale_factor(first_frame.incident_intensity);
 
     LOG(TLogLevel::logDEBUG) << "selecting base peak";
 
@@ -119,23 +118,42 @@ int main() {
     anglecalibration.set_base_peak_ROI_width(0.18);
 
     // plot everything redistributed to fixed angle width bins
-    PlotHelper plotter(std::make_shared<AngleCalibration>(anglecalibration));
+    PlotHelper plotter(mythen_detector_ptr,
+                       anglecalibration.get_angular_range(),
+                       anglecalibration.get_histogram_bin_width());
 
     auto test_frame_name = file_path / (acquisition_fileprefix + "0209.h5");
 
+    auto test_frame = mythen_file_reader->read_frame(test_frame_name);
+
     // plot some stuff
     double test_frame_angle =
-        mythen_file_reader->read_detector_angle(test_frame_name);
+        test_frame
+            .detector_angle; // mythen_file_reader->read_detector_angle(test_frame_name);
+
+    AngularConversion angularconversion(
+        mythen_detector_ptr, anglecalibration.get_histogram_bin_width(),
+        anglecalibration.get_angular_range());
+
+    angularconversion.set_FlatField(
+        flat_field_ptr->get_normalized_flatfield_view());
+
+    angularconversion.set_bad_channels(anglecalibration.get_bad_channels());
+
+    angularconversion.set_scale_factor(first_frame.incident_intensity);
 
     // plot one module for fixed angle width bins
-    auto module_redistributed_to_fixed_angle_bins =
-        anglecalibration.convert({test_frame_name}, 1);
+    auto module_redistributed_to_fixed_angle_bins = angularconversion.convert(
+        test_frame.photon_counts(), test_frame.detector_angle,
+        test_frame.incident_intensity, test_frame.exposure_time);
 
     plotter.plot_diffraction_pattern(
         module_redistributed_to_fixed_angle_bins.view(), 1, test_frame_angle);
 
     // plot base peak for one module
-    plotter.plot_base_peak(module_redistributed_to_fixed_angle_bins.view());
+    plotter.plot_base_peak(module_redistributed_to_fixed_angle_bins.view(),
+                           base_peak_angle,
+                           anglecalibration.get_base_peak_ROI_width());
 
     // read all acquisitions into frames (rows: acquisitions, cols: channels)
     NDArray<uint32_t, 2> frames(std::array<ssize_t, 2>{

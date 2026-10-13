@@ -70,16 +70,6 @@ void AngleCalibration::set_base_peak_angle(const double base_peak_angle_) {
     base_peak_angle = base_peak_angle_;
 }
 
-void AngleCalibration::set_calibration_files(
-    const std::vector<std::string> &file_list_) {
-    file_list = file_list_;
-}
-
-const std::vector<std::string> &
-AngleCalibration::get_calibration_files() const {
-    return file_list;
-}
-
 ssize_t AngleCalibration::num_fixed_angle_width_bins() const {
     ssize_t num_fixed_angle_width_bins =
         std::ceil(m_max_angle / histogram_bin_width) -
@@ -97,24 +87,6 @@ const BCParameters &AngleCalibration::get_BCparameters() const {
     return m_mythen_detector->get_BCparameters();
 }
 
-// TODO: command is connected - maybe use that
-bool AngleCalibration::module_is_disconnected(const size_t module_index) const {
-
-    // all channels in the module are bad
-    return std::all_of(
-        bad_channels.begin() +
-            module_index * m_mythen_detector->strips_per_module(),
-        bad_channels.begin() +
-            (module_index + 1) * m_mythen_detector->strips_per_module(),
-        [](const auto &elem) { return elem; });
-}
-
-void AngleCalibration::set_scale_factor(const double scale_factor_) {
-    m_scale_factor = scale_factor_;
-}
-
-double AngleCalibration::get_scale_factor() const { return m_scale_factor; }
-
 void AngleCalibration::set_angular_range(const double min_angle,
                                          const double max_angle) {
     m_min_angle = min_angle;
@@ -125,6 +97,10 @@ std::pair<double, double> AngleCalibration::get_angular_range() const {
     return {m_min_angle, m_max_angle};
 }
 
+bool AngleCalibration::module_is_disconnected(const size_t module_index) const {
+    return m_mythen_detector->disconnected_modules()(module_index);
+}
+
 void AngleCalibration::read_bad_channels_from_file(
     const std::string &filename,
     std::shared_ptr<SimpleFileInterface> file_reader) {
@@ -132,35 +108,41 @@ void AngleCalibration::read_bad_channels_from_file(
     file_reader->open(filename);
     file_reader->read_into(reinterpret_cast<std::byte *>(bad_channels.data()));
 
-    // update bad_channels
-    std::for_each(
-        m_mythen_detector->unconnected_modules().begin(),
-        m_mythen_detector->unconnected_modules().end(),
-        [this](const auto &module_index) {
-            for (ssize_t i = module_index * MythenDetector::strips_per_module();
-                 i < (module_index + 1) * MythenDetector::strips_per_module();
-                 ++i)
-                bad_channels[i] = true;
-        });
+    // update unconnected module
+
+    for (size_t module_index = 0;
+         module_index < m_mythen_detector->num_modules(); ++module_index) {
+
+        if (std::all_of(
+                bad_channels.begin() +
+                    module_index * m_mythen_detector->strips_per_module(),
+                bad_channels.begin() +
+                    (module_index + 1) * m_mythen_detector->strips_per_module(),
+                [](const auto &elem) { return elem; })) {
+            m_mythen_detector->disconnected_modules()(module_index) = true;
+        }
+    }
 }
 
-NDView<const bool, 1> AngleCalibration::get_bad_channels() const {
+NDView<bool, 1> AngleCalibration::get_bad_channels() {
     return bad_channels.view();
 }
 
-void AngleCalibration::set_bad_channels(const NDArray<bool, 1> &bad_channels_) {
+void AngleCalibration::set_bad_channels(const NDView<bool, 1> bad_channels_) {
     bad_channels = bad_channels_;
 
-    // update bad_channels
-    std::for_each(
-        m_mythen_detector->unconnected_modules().begin(),
-        m_mythen_detector->unconnected_modules().end(),
-        [this](const auto &module_index) {
-            for (ssize_t i = module_index * MythenDetector::strips_per_module();
-                 i < (module_index + 1) * MythenDetector::strips_per_module();
-                 ++i)
-                this->bad_channels[i] = true;
-        });
+    // update unconnected module
+    for (size_t module_index = 0;
+         module_index < m_mythen_detector->num_modules(); ++module_index) {
+        if (std::all_of(
+                bad_channels.begin() +
+                    module_index * m_mythen_detector->strips_per_module(),
+                bad_channels.begin() +
+                    (module_index + 1) * m_mythen_detector->strips_per_module(),
+                [](const auto &elem) { return elem; })) {
+            m_mythen_detector->disconnected_modules()(module_index) = true;
+        }
+    }
 }
 
 double AngleCalibration::chi_similarity_criterion(
@@ -256,58 +238,12 @@ AngleCalibration::get_frames_with_base_peak_overlap(
     return std::make_tuple(frames_bp_overlap, detector_angles_bp_overlap);
 }
 
-std::pair<double, double> AngleCalibration::photon_count_correction(
-    double photon_counts, const size_t global_strip_index, const uint64_t I0,
-    const double exposure_time) const {
-
-    if (photon_counts < std::numeric_limits<double>::epsilon()) {
-        return std::pair(0.0, 0.0); // sanity check
-    }
-
-    // mighells statistics
-    photon_counts += 1;
-
-    auto [rate_corrected_photon_counts, rate_corrected_photon_counts_error] =
-        rate_correction(photon_counts, photon_counts,
-                        exposure_time); // same variance as poisson distributed
-                                        // - maybe sqaured?
-
-    auto [incident_intensity_corrected_photon_counts,
-          incident_intensity_corrected_photon_counts_variance] =
-        incident_intensity_correction(rate_corrected_photon_counts,
-                                      rate_corrected_photon_counts_error, I0);
-
-    const size_t module_index =
-        global_strip_index / MythenDetector::strips_per_module();
-    const size_t strip_index =
-        global_strip_index % MythenDetector::strips_per_module();
-
-    auto [transverse_width_corrected_photon_counts,
-          transverse_width_corrected_photon_counts_variance] =
-        transverse_width_correction(
-            incident_intensity_corrected_photon_counts,
-            incident_intensity_corrected_photon_counts_variance, module_index,
-            strip_index);
-
-    auto [flatfield_normalized_photon_counts,
-          flatfield_normalized_photon_counts_variance] =
-        flatfield_correction(
-            transverse_width_corrected_photon_counts,
-            transverse_width_corrected_photon_counts_variance,
-            global_strip_index); // make sure to include bad chanenls of
-                                 // flatfield into bad channel list
-
-    return std::pair<double, double>{
-        flatfield_normalized_photon_counts,
-        flatfield_normalized_photon_counts_variance};
-}
-
 double AngleCalibration::center_base_peak(
     const size_t module_index,
     const NDView<uint32_t, 2> frames_with_base_peak_overlap,
     const NDView<double, 1> detector_angles_with_base_peak_overlap) {
 
-    if (module_is_disconnected(module_index)) {
+    if (m_mythen_detector->disconnected_modules()(module_index)) {
         throw std::runtime_error(
             LOCATION + "Module is disconnected - cannot calculate center base "
                        "peak in module");
@@ -318,9 +254,6 @@ double AngleCalibration::center_base_peak(
     size_t num_runs = 0;
 
     double average_peak_center{};
-
-    const double dummy_exposure_time = 1.0;
-    const uint64_t dummy_incident_intensity = get_scale_factor();
 
     for (ssize_t frame_index = 0;
          frame_index < frames_with_base_peak_overlap.shape(0); ++frame_index) {
@@ -344,11 +277,10 @@ double AngleCalibration::center_base_peak(
             // calculates flatfield normalized photon counts and
             // photon_count_variance for ROI around base_peak and
             // redistributes to fixed angle width bins
-            redistribute_photon_counts_to_fixed_angle_width_bins<true>(
+            process_photon_counts(
                 module_index,
                 frames_with_base_peak_overlap.sub_view(frame_index),
                 detector_angles_with_base_peak_overlap[frame_index],
-                dummy_exposure_time, dummy_incident_intensity,
                 weighted_sums.view(), num_contributing_photons.view());
 
             for (ssize_t i = 0; i < weighted_sums.shape(0); ++i) {
@@ -498,91 +430,6 @@ NDArray<double, 2> AngleCalibration::computeErrorandMean(
     }
 
     return fixed_angle_width_bins_photon_counts;
-}
-
-NDArray<double, 2>
-AngleCalibration::convert(const std::vector<std::string> &file_list_) {
-
-    ssize_t new_num_bins = num_fixed_angle_width_bins();
-
-    LOG(TLogLevel::logDEBUG)
-        << fmt::format("num_fixed_angle_width_bins: {}", new_num_bins);
-
-    NDArray<double, 2> weighted_moments(
-        std::array<ssize_t, 2>{new_num_bins, 3},
-        -1.0); // weighted moments of order 0-2 for each bin
-    NDArray<size_t, 1> num_contributing_photons(
-        std::array<ssize_t, 1>{new_num_bins},
-        0); // number of contributing photons for each bin
-
-    for (const auto &file : file_list_) {
-        MythenFrame frame = mythen_file_reader->read_frame(file);
-
-        LOG(TLogLevel::logDEBUG)
-            << fmt::format("redistributing photon counts for file: {}", file);
-
-        for (size_t module_index = 0;
-             module_index < m_mythen_detector->num_modules(); ++module_index) {
-
-            if (module_is_disconnected(module_index)) {
-                continue;
-            }
-
-            redistribute_photon_counts_to_fixed_angle_width_bins<false>(
-                module_index, frame.photon_counts(), frame.detector_angle,
-                frame.exposure_time, frame.incident_intensity,
-                weighted_moments.view(), num_contributing_photons.view());
-        }
-
-        LOG(TLogLevel::logDEBUG) << fmt::format(
-            "finished redistributing photon counts for file: {}", file);
-    }
-
-    LOG(TLogLevel::logDEBUG)
-        << "redistributed photon counts to fixed angle width bins, now "
-           "normalizing by statistical weight";
-
-    return computeErrorandMean(weighted_moments.view(),
-                               num_contributing_photons.view());
-}
-
-NDArray<double, 2>
-AngleCalibration::convert(const std::vector<std::string> &file_list_,
-                          const size_t module_index) {
-    ssize_t new_num_bins = num_fixed_angle_width_bins();
-
-    LOG(TLogLevel::logDEBUG)
-        << fmt::format("num_fixed_angle_width_bins: {}", new_num_bins);
-
-    NDArray<double, 2> weighted_moments(
-        std::array<ssize_t, 2>{new_num_bins, 3},
-        -1.0); // weighted moments of order 0-2 for each bin
-    NDArray<size_t, 1> num_contributing_photons(
-        std::array<ssize_t, 1>{new_num_bins},
-        0); // number of contributing photons for each bin
-
-    if (module_is_disconnected(module_index)) {
-        LOG(TLogLevel::logINFO)
-            << fmt::format("module {} is disconnected", module_index);
-        return NDArray<double, 2>(std::array<ssize_t, 2>{new_num_bins, 2},
-                                  -1.0);
-    }
-
-    for (const auto &file : file_list_) {
-
-        LOG(TLogLevel::logDEBUG1) << fmt::format(
-            "finished redistributing photon counts for file: {}", file);
-
-        MythenFrame frame = mythen_file_reader->read_frame(file);
-
-        redistribute_photon_counts_to_fixed_angle_width_bins<false>(
-            module_index, frame.photon_counts(), frame.detector_angle,
-            frame.exposure_time, frame.incident_intensity,
-            weighted_moments.view(), num_contributing_photons.view());
-    }
-
-    return computeErrorandMean(weighted_moments.view(),
-                               num_contributing_photons.view());
 }
 
 void AngleCalibration::optimize_offset_parameter(

@@ -1,10 +1,28 @@
 #pragma once
 #include "aare/NDView.hpp"
+#include "helpers/ErrorPropagation.hpp"
+
+#include <cmath>
 
 namespace angcal {
 
 using namespace aare;
 
+/**
+ * @brief redistributes photon counts around designated region to
+ * fixed angle width bins
+ * @param left_strip_boundary_angle left boundary of strip [degrees]
+ * @param right_strip_boundary_angle right boundary of strip [degrees]
+ * @param histogram_bin_width width of fixed angle width bins [degrees]
+ * @param roi region of interest to redistribute photon counts [degrees]
+ * @param corrected_photon_count
+ * @param inverse_corrected_photon_count_variance
+ * @param weighted_moments weighted photon counts of order 0-2 eg. order k:
+ * sum of photon_count_i^k*weight_i counts for fixed angle width bin and the
+ * corresponding variance
+ * @param num_contributing_photons number of photons contributing to the
+ * fixed angle width bin
+ */
 inline void redistribute_photon_count_to_fixed_angle_width_bins(
     const double left_strip_boundary_angle,
     const double right_strip_boundary_angle, const double histogram_bin_width,
@@ -172,7 +190,7 @@ rate_correction(const double photon_count, const double photon_count_error,
  */
 inline std::pair<double, double> incident_intensity_correction(
     const double photon_counts, const double photon_count_error,
-    const uint64_t incident_intensity, const uint64_t scale_factor) {
+    const uint64_t incident_intensity, const double scale_factor) {
 
     if (incident_intensity == 0) {
         throw std::runtime_error(LOCATION +
@@ -180,7 +198,7 @@ inline std::pair<double, double> incident_intensity_correction(
                                  "incident intensity correction");
     }
 
-    double I0_correction_factor = scale_factor / (incident_intensity);
+    double I0_correction_factor = scale_factor / incident_intensity;
 
     double I0_corrected_photon_counts = photon_counts * I0_correction_factor;
     double I0_corrected_photon_counts_error =

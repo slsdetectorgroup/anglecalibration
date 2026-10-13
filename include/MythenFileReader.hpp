@@ -290,6 +290,20 @@ class EpicsMythenFileReader : public HDF5FileReader, public MythenFileReader {
         return detector_angle;
     }
 
+    uint64_t read_incident_intensity(const std::filesystem::path &file_name) {
+        if (!std::filesystem::exists(file_name)) {
+            throw std::runtime_error(
+                fmt::format("File {} does not exist\n", file_name.string()));
+        }
+
+        open_file(file_name);
+
+        uint64_t incident_intensity{};
+        read_incident_intensity_from_hdf5(incident_intensity);
+
+        return incident_intensity;
+    }
+
     void read_into(std::byte *buffer, const std::filesystem::path &file_name) {
 
         if (!std::filesystem::exists(file_name)) {

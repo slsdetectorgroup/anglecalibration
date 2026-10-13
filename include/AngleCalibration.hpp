@@ -117,15 +117,15 @@ class AngleCalibration {
         std::shared_ptr<SimpleFileInterface> file_reader =
             std::make_shared<CustomBadChannelsFile>());
 
-    NDView<const bool, 1> get_bad_channels() const;
+    NDView<bool, 1> get_bad_channels();
 
     /**
      * @brief set bad channels
-     * @param bad_channels_ boolean NDArray of size of total number of
+     * @param bad_channels_ boolean NDView of size of total number of
      * strips/channels in detector, stores 'TRUE' if strip is a bad channel
      * otherwise 'FALSE'
      */
-    void set_bad_channels(const NDArray<bool, 1> &bad_channels_);
+    void set_bad_channels(const NDView<bool, 1> bad_channels_);
 
     /**
      * @brief get the current DG parameters
@@ -182,17 +182,6 @@ class AngleCalibration {
     bool module_is_disconnected(const size_t module_index) const;
 
     /**
-     * @brief set the scale factor to scale everything to a reasonable scale
-     * e.g. can be incident_intensity of first acquisition
-     */
-    void set_scale_factor(const double scale_factor_);
-
-    /**
-     * @brief get the currently configured scale factor (if any)
-     */
-    double get_scale_factor() const;
-
-    /**
      * @brief sets the angular range for the diffraction pattern e.g.
      * diffraction pattern calculated for [min_angle, max_angle]
      * @param min_angle minimum angle [degrees]
@@ -207,34 +196,6 @@ class AngleCalibration {
      */
     std::pair<double, double> get_angular_range() const;
 
-    /**
-     * @brief Performs angular conversion e.g. calculates from raw photon counts
-     * the resulting diffraction pattern
-     * @param file_list vector of file_names of acquisition files
-     * @return flatfield corrected and variance scaled photon counts
-     * redistributed to fixed angle width bins given in the range [min_angle,
-     * max_angle] (values of -1.0 denote bins with insufficient coverage or
-     * which are denoted by a bad channel) (first dimension corresponds to
-     * redistributed photon counts, second dimension corresponds to std of
-     * redistributed photon counts)
-     */
-    NDArray<double, 2> convert(const std::vector<std::string> &file_list);
-
-    /**
-     * @brief Performs angular conversion e.g. calculates from raw photon counts
-     * the resulting diffraction pattern
-     * @param file_list vector of file_names of acquisition files
-     * @param module_index index of module
-     * @return flatfield corrected and variance scaled photon counts
-     * redistributed to fixed angle width bins given in the range [min_angle,
-     * max_angle] (values of -1.0 denote bins with insufficient coverage or
-     * which are denoted by a bad channel) (first dimension corresponds to
-     * redistributed photon counts, second dimension corresponds to std of
-     * redistributed photon counts)
-     */
-    NDArray<double, 2> convert(const std::vector<std::string> &file_list,
-                               const size_t module_index);
-
   private:
     /**
      * @brief calculates the frames for which the base peak ROI is covered by
@@ -248,30 +209,6 @@ class AngleCalibration {
     get_frames_with_base_peak_overlap(const NDView<uint32_t, 2> frames,
                                       const NDView<double, 1> detector_angles,
                                       const size_t module_index) const;
-
-    /**
-     * @brief redistributes photon counts around designated region to
-     * fixed angle width bins
-     * @tparam base_peak_ROI_only: false (redistribute entire module region),
-     * true: (only redistribute base peak ROI)
-     * @param module_index index of module
-     * @param frame data from acquisition (storing detector position and photon
-     * counts)
-     * @param detector_angle detector axis motor position [degrees]
-     * @param exposure_time exposure time [seconds]
-     * @param incident_intensity incident intensity [photons/second]
-     * @param weighted_moments weighted photon counts of order 0-2 eg. order k:
-     * sum of photon_count_i^k*weight_i counts for fixed angle width bin and the
-     * corresponding variance
-     * @param num_contributing_photons number of photons contributing to the
-     * fixed angle width bin
-     */
-    template <bool base_peak_ROI_only = false>
-    void redistribute_photon_counts_to_fixed_angle_width_bins(
-        const size_t module_index, const NDView<uint32_t, 1> frame,
-        const double detector_angle, const double exposure_time,
-        const double incident_intensity, NDView<double, 2> weighted_moments,
-        NDView<size_t, 1> num_contributing_photons);
 
     /**
      * @brief applies flatfield correction for a given module and redistributes
@@ -520,13 +457,6 @@ class AngleCalibration {
      * center of base peak to use for calibration [degrees]
      */
     double base_peak_angle{};
-
-    /**
-     * @brief scale factor to scale everything to a reasonable scale
-     * e.g. can be incident_intensity of first acquisition
-     * @default 1.0
-     */
-    double m_scale_factor{1.0};
 
     /// @brief  @brief minimum angle for angular conversion [degrees]
     double m_min_angle = -180.0;
@@ -786,207 +716,6 @@ double AngleCalibration::calculate_similarity_of_peaks_between_modules(
     }
 
     return similarity_of_peaks;
-}
-
-template <bool base_peak_ROI_only>
-void AngleCalibration::redistribute_photon_counts_to_fixed_angle_width_bins(
-    const size_t module_index, const NDView<uint32_t, 1> frame,
-    const double detector_angle, const double exposure_time,
-    const double incident_intensity, NDView<double, 2> weighted_moments,
-    NDView<size_t, 1> num_contributing_photons) {
-
-    ssize_t number_of_bins{}; // number of bins using fixed angle width bins
-    double left_boundary_roi_base_peak{};  // left boundary of base peak ROI
-                                           // [degrees]
-    double right_boundary_roi_base_peak{}; // right boundary of base peak ROI
-                                           // [degrees]
-
-    if constexpr (base_peak_ROI_only) {
-        number_of_bins = get_base_peak_ROI_num_bins(); // fixed angle width bins
-                                                       // in base peak ROI
-        left_boundary_roi_base_peak =
-            base_peak_angle -
-            base_peak_roi_width; //+
-                                 // 0.5 * histogram_bin_width); // in degrees
-        right_boundary_roi_base_peak =
-            base_peak_angle +
-            base_peak_roi_width; //-0.5 * histogram_bin_width); // in degrees
-    } else {
-        number_of_bins = num_fixed_angle_width_bins();
-        left_boundary_roi_base_peak = m_min_angle;  // dummy values
-        right_boundary_roi_base_peak = m_max_angle; // dummy values
-    }
-
-    // iterate over all strips of module
-    for (ssize_t strip_index = 0;
-         strip_index < MythenDetector::strips_per_module(); ++strip_index) {
-
-        size_t global_strip_index =
-            module_index * MythenDetector::strips_per_module() + strip_index;
-
-        if (bad_channels(global_strip_index)) {
-            continue; // skip bad channels
-        }
-
-        double left_strip_boundary_angle =
-            m_mythen_detector->diffraction_angle_from_BC_parameters(
-                module_index, detector_angle, strip_index,
-                0.0); // left strip boundary in angles [degrees]
-
-        double right_strip_boundary_angle =
-            m_mythen_detector->diffraction_angle_from_BC_parameters(
-                module_index, detector_angle, strip_index,
-                +1.0); // right strip boundary in angles [degrees]
-
-        if (left_strip_boundary_angle < m_min_angle ||
-            right_strip_boundary_angle > m_max_angle) {
-            LOG(TLogLevel::logDEBUG1) << fmt::format(
-                "strip {} of module {} covers an angle of [{}, {}] and is "
-                "outside "
-                "of the given angular range of [{}, "
-                "{}] and will be skipped",
-                strip_index, module_index, left_strip_boundary_angle,
-                right_strip_boundary_angle, m_min_angle, m_max_angle);
-            continue;
-        }
-
-        // skip strip if not in ROI
-        if constexpr (base_peak_ROI_only) {
-            if (left_strip_boundary_angle > right_boundary_roi_base_peak ||
-                right_strip_boundary_angle < left_boundary_roi_base_peak) {
-                continue;
-            }
-        }
-
-        // get corrected photon counts and propagate error
-        auto [corrected_photon_counts, corrected_photon_counts_variance] =
-            photon_count_correction(
-                frame(global_strip_index), global_strip_index,
-                incident_intensity,
-                exposure_time); // TODO: rate correction and incident intensity
-                                // correction is actually not needed for
-                                // calibration
-
-        double inverse_corrected_photon_counts_variance =
-            corrected_photon_counts_variance <
-                    std::numeric_limits<double>::epsilon()
-                ? 0.0
-                : 1.0 / corrected_photon_counts_variance;
-
-        double strip_width_angle =
-            std::abs(right_strip_boundary_angle -
-                     left_strip_boundary_angle); // strip width in angles
-        // angular_strip_width_from_BC_parameters(module_index, strip_index);
-
-        // redistribute to fixed angle width bins
-        double photon_counts_per_bin =
-            corrected_photon_counts * histogram_bin_width / strip_width_angle;
-
-        double inverse_photon_counts_variance_per_bin =
-            inverse_corrected_photon_counts_variance *
-            std::pow(strip_width_angle / histogram_bin_width,
-                     2); // Var(aX) = a^2 Var(X)
-
-        if (photon_counts_per_bin < std::numeric_limits<double>::epsilon() ||
-            inverse_photon_counts_variance_per_bin <
-                std::numeric_limits<double>::epsilon()) {
-
-            // bad_channels(global_strip_index) =
-            // true; // mark channel as bad if no
-
-            continue;
-        }
-
-        ssize_t left_bin_index_covered_by_strip{};
-
-        ssize_t right_bin_index_covered_by_strip{};
-
-        if constexpr (base_peak_ROI_only) {
-            left_bin_index_covered_by_strip =
-                static_cast<ssize_t>((std::max(left_boundary_roi_base_peak,
-                                               left_strip_boundary_angle) /
-                                      histogram_bin_width));
-            right_bin_index_covered_by_strip =
-                static_cast<ssize_t>((std::min(right_boundary_roi_base_peak,
-                                               right_strip_boundary_angle) /
-                                      histogram_bin_width));
-        } else {
-
-            left_bin_index_covered_by_strip = static_cast<ssize_t>(
-                (left_strip_boundary_angle / histogram_bin_width));
-            right_bin_index_covered_by_strip = static_cast<ssize_t>(
-                (right_strip_boundary_angle / histogram_bin_width));
-
-            /*
-            // Antonio stuff
-            left_bin_index_covered_by_strip = std::floor(
-                (left_strip_boundary_angle / histogram_bin_width) + 0.5);
-            right_bin_index_covered_by_strip = std::ceil(
-                (right_strip_boundary_angle / histogram_bin_width) - 0.5);
-            */
-        }
-
-        size_t proper_bin_index =
-            0; // the computed bin indices dont start at zero but are relative
-               // to detector angle and strip index
-
-        for (ssize_t bin_index = left_bin_index_covered_by_strip;
-             bin_index <= right_bin_index_covered_by_strip; ++bin_index) {
-
-            // some strips dont cover an entire bin or extend over multiple bins
-            /*
-            double bin_coverage =
-                std::abs(std::min(right_strip_boundary_angle,
-                                  (bin_index + 0.5) * histogram_bin_width) -
-                         std::max(left_strip_boundary_angle,
-                                  (bin_index - 0.5) * histogram_bin_width));
-            */
-
-            double bin_coverage =
-                std::abs(std::min(right_strip_boundary_angle,
-                                  (bin_index + 1) * histogram_bin_width) -
-                         std::max(left_strip_boundary_angle,
-                                  (bin_index)*histogram_bin_width));
-
-            double bin_coverage_factor =
-                bin_coverage / histogram_bin_width; // how much of the strip is
-                                                    // covered by the bin
-            // convert to bin index
-            if constexpr (base_peak_ROI_only) {
-                proper_bin_index =
-                    bin_index -
-                    (static_cast<ssize_t>(
-                        (base_peak_angle - base_peak_roi_width) /
-                        histogram_bin_width)); // bin index starts at zero
-            } else {
-                proper_bin_index =
-                    bin_index -
-                    static_cast<ssize_t>(
-                        m_min_angle /
-                        histogram_bin_width); // bin index starts at zero
-            }
-
-            double statistical_weight =
-                bin_coverage_factor * inverse_photon_counts_variance_per_bin;
-
-            // set to zero if actually covered by beam
-            if (weighted_moments(proper_bin_index, 0) == -1.0) {
-                weighted_moments(proper_bin_index, 0) = 0.0;
-                weighted_moments(proper_bin_index, 1) = 0.0;
-                weighted_moments(proper_bin_index, 2) = 0.0;
-            }
-
-            weighted_moments(proper_bin_index, 0) += statistical_weight;
-            weighted_moments(proper_bin_index, 1) +=
-                statistical_weight * photon_counts_per_bin;
-            weighted_moments(proper_bin_index, 2) +=
-                statistical_weight * std::pow(photon_counts_per_bin, 2);
-
-            num_contributing_photons(proper_bin_index) +=
-                statistical_weight > 0.0 ? 1.0 : 0.0; // count number of photons
-                                                      // contributing to bin
-        }
-    }
 }
 
 template <bool visualize_calibration>

@@ -1,5 +1,5 @@
 
-from angcal import MythenDetectorSpecifications, FlatField, AngleCalibration, EpicsMythenFileReader, MythenFrame
+from angcal import MythenDetector, FlatField, AngularConversion, EpicsMythenFileReader, MythenFrame
 from angcal import PlotHelper
 
 from pathlib import Path
@@ -18,27 +18,30 @@ def env_data_path():
 
 my_path = env_data_path()
 
+num_modules = 48
 # setup mythen detector specifications - stores all relevant parameters of the detector setup
-mythendetectorspecifications = MythenDetectorSpecifications() 
+mythen_detector = MythenDetector(num_modules) 
 
-mythendetectorspecifications.elastic_correction_factor =  0.0045 
-mythendetectorspecifications.detector_vertical_axis_offset = 24.8 
-mythendetectorspecifications.offset = 0.0 # additional offset to sample detector offset 
+mythen_detector.elastic_correction_factor =  0.0045 
+mythen_detector.detector_vertical_axis_offset = 24.8 
+mythen_detector.offset = 0.0 # additional offset to sample detector offset 
 
-# setup flatfield 
-flatfield = FlatField(mythendetectorspecifications)
+mythen_detector.DGparameters = np.loadtxt(my_path / "Angcal_2E_Feb2023_P29.csv", delimiter=",", dtype=np.float64, skiprows=1) # initial DG parameters for calibration
 
-flatfield.normalized_flatfield = np.loadtxt(my_path / "Flatfield_E17p5keV_T12500eV_up_AUGCAL2_Sep2023_open_WS_C_X_X.raw", dtype=np.double, usecols=[1,2])
+print("mythen detector setup")
+
+angular_range = (0.0, 90.5)  # in degrees
+bin_width = 0.0036  # in degrees (dfeault value)
+angularconversion = AngularConversion(mythen_detector, bin_width, angular_range)
+
+angularconversion.flatfield = np.loadtxt(my_path / "Flatfield_E17p5keV_T12500eV_up_AUGCAL2_Sep2023_open_WS_C_X_X.raw", dtype=np.double, usecols=[1,2])
+
+angularconversion.bad_channels = np.load(str(my_path / "bad_channels.npy"))
 
 # setup mythen data file reader to read EPICS mythen hdf5 files
 mythenfilereader = EpicsMythenFileReader()
 
-# setup angle calibration - has everything to do conversion and calibration 
-anglecalibration = AngleCalibration(mythendetectorspecifications, flatfield, mythenfilereader)
-
-anglecalibration.read_initial_calibration_from_file(str(my_path / "Angcal_2E_Feb2023_P29.off"))
-
-anglecalibration.read_bad_channels_from_file(str(my_path / "bc2023_003_RING.chans"))
+print("mythen file reader setup")
 
 #set scale factor to get reasonable scales 
 frame = mythenfilereader.read_frame(str(my_path / "Fructose_0p2_60_0060.h5"))
@@ -47,22 +50,37 @@ incident_intensity_per_second = frame.incident_intensity / frame.exposure_time
 
 scale_factor = 1280.0*round(incident_intensity_per_second/1280.0) # whatever is the same chosen in Antonios code 
 
-anglecalibration.scale_factor = scale_factor
+print("scale factor: ", scale_factor)
 
-print("scale Factor: " ,anglecalibration.scale_factor)
+angularconversion.scale_factor = scale_factor
+
+print("scale Factor: " ,angularconversion.scale_factor)
 
 file_list = [str(my_path / f"Fructose_0p2_60_006{i}.h5") for i in range(0,4)] 
 
-anglecalibration.histogram_bin_width = 0.0036  # in degrees (dfeault value) 
+num_files = len(file_list)
 
-anglecalibration.angular_range = (0.0, 90.5)  # in degrees 
+detector_angles = np.empty(shape = (num_files), dtype = np.double)
+incident_intensities = np.empty(shape = (num_files), dtype = np.uint64)
 
-redistributed_photon_counts = anglecalibration.convert(file_list)
+frames = np.empty(shape=(num_files, mythen_detector.num_strips), dtype=np.uint32)
+
+exposure_time = frame.exposure_time
+
+for frame in range(num_files):
+    file_name = str(my_path / f"Fructose_0p2_60_006{frame}.h5")
+    detector_angles[frame] = mythenfilereader.read_detector_angle(file_name)
+    incident_intensities[frame] = mythenfilereader.read_incident_intensity(file_name)
+    mythenfilereader.read_into(frames[frame, :], file_name)
+
+print("incident intensities: ", incident_intensities)
+
+redistributed_photon_counts = angularconversion.convert(frames, detector_angles, incident_intensities, exposure_time)
 
 print("conversion is done")
 
 #plot the converted diffraction pattern
-plotter = PlotHelper(anglecalibration)
+plotter = PlotHelper(mythen_detector, angularconversion.angular_range, angularconversion.histogram_bin_width)
 
 plotter.plot_diffraction_pattern(redistributed_photon_counts[:,0].view())
 

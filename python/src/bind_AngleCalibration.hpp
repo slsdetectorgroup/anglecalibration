@@ -53,11 +53,6 @@ void define_AngleCalibration_binding(py::module &m) {
             &AngleCalibration::num_fixed_angle_width_bins,
             R"(number of bins in fixed angle width histogram)")
 
-        .def_property("scale_factor", &AngleCalibration::get_scale_factor,
-                      &AngleCalibration::set_scale_factor,
-                      R"(scale factor to scale correction to reasonable values
-                      )")
-
         .def_property(
             "angular_range",
             [](AngleCalibration &self) { return self.get_angular_range(); },
@@ -142,52 +137,16 @@ void define_AngleCalibration_binding(py::module &m) {
                 True if module is disconnected, False otherwise.
             )")
 
-        .def(
-            "rate_correction",
-            [](const AngleCalibration &self, const double photon_count,
-               const double photon_count_error, const double exposure_time) {
-                return self.rate_correction(photon_count, photon_count_error,
-                                            exposure_time);
-            },
-            py::arg("photon_count"), py::arg("photon_count_error"),
-            py::arg("exposure_time"),
-            R"(
-            performs rate correction
-
-            Parameters
-            ----------
-            photon_count : float
-                measured photon counts
-            photon_count_error : float
-                propagated error of measured photon counts
-            exposure_time : float
-                exposure time of acquisition [s]
-
-            Returns
-            -------
-            tuple of float
-                pair {rate corrected photon counts, propagated_error}
-            
-            )")
-
         .def_property(
             "bad_channels",
             [](AngleCalibration &self) {
                 auto bad_channels =
-                    new NDArray<ssize_t, 1>(self.get_bad_channels());
+                    new NDArray<bool, 1>(self.get_bad_channels());
                 return return_image_data(bad_channels);
             },
             [](AngleCalibration &self,
-               py::array_t<bool, py::array::forcecast> bad_channels) {
-                py::buffer_info info = bad_channels.request();
-                if (info.ndim != 1 ||
-                    info.format != py::format_descriptor<bool>::format()) {
-                    throw std::runtime_error("Expected 1D buffer of type bool");
-                }
-                NDView<bool, 1> temp_array_view(
-                    reinterpret_cast<bool *>(info.ptr),
-                    std::array<ssize_t, 1>{info.shape[0]});
-                NDArray temp_array(temp_array_view); // first copy
+               py::array_t<bool, py::array::c_style> bad_channels) {
+                auto temp_array = make_view_1d(bad_channels);
                 self.set_bad_channels(
                     temp_array); // second copy TODO im copying twice
             },
@@ -263,40 +222,5 @@ void define_AngleCalibration_binding(py::module &m) {
                 angle of base peak center [degree]
             plot_calibration_process: bool, default: false
                 Whether to plot the calibration process
-            )")
-
-        .def(
-            "convert",
-            [](AngleCalibration &self,
-               const std::vector<std::string> &file_list) {
-                auto result = new NDArray<double, 2>(self.convert(file_list));
-                return return_image_data(result);
-            },
-            py::arg("file_list"),
-            R"(
-            performs angular conversion e.g. calculates diffraction pattern from raw photon counts. If module_index is given calculates diffraction pattern for a specific module
-
-            Parameters
-            ----------
-
-            file_list: list 
-                list of paths to acquisition files
-            module_index: int, optional
-                index of module
-
-            Returns
-            -------
-            numpy.ndarray (num_fixed_angle_width_bins, 2)
-                first dimension photon counts redistributed to fixed angle width bins second dimension respective variance , values of -1.0 denote bins with insufficient coverage or which are denoted by a bad channel)")
-
-        .def(
-            "convert",
-            [](AngleCalibration &self,
-               const std::vector<std::string> &file_list,
-               const size_t module_index) {
-                auto result = new NDArray<double, 2>(
-                    self.convert(file_list, module_index));
-                return return_image_data(result);
-            },
-            py::arg("file_list"), py::arg("module_index"));
+            )");
 }

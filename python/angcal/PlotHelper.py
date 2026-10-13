@@ -5,7 +5,7 @@ class PlotHelper:
 
     """ Helper class for plotting diffraction patterns. """
     
-    def __init__(self, mythendetector, angular_range, histogram_bin_width, base_peak_angle, base_peak_ROI_width): 
+    def __init__(self, mythendetector, angular_range, histogram_bin_width): 
         """
         Create a plotting helper.
 
@@ -21,14 +21,9 @@ class PlotHelper:
         self._mythendetector = mythendetector
         self._angular_range = angular_range
         self._histogram_bin_width = histogram_bin_width
-        self._base_peak_angle = base_peak_angle
-        self._base_peak_ROI_width = base_peak_ROI_width
 
         self._num_fixed_angle_width_bins = int(np.ceil(self._angular_range[1] / self._histogram_bin_width) - np.floor(self._angular_range[0] / self._histogram_bin_width))
 
-        self._base_peak_ROI_num_bins = int((base_peak_angle + base_peak_ROI_width) /
-                                histogram_bin_width) - int((base_peak_angle - base_peak_ROI_width) /
-                                histogram_bin_width) + 1
 
         self._left_module_boundary_as_bin_index = lambda module_index, detector_angle : int((self._mythendetector.diffraction_angle_from_DG_parameters( module_index, detector_angle, 0, 0.0) -  self._angular_range[0]) // self._histogram_bin_width)
 
@@ -36,7 +31,6 @@ class PlotHelper:
         
         self._bin_to_diffraction_angle = lambda bin_index : bin_index * self._histogram_bin_width + self._angular_range[0]
     
-        self._bin_to_diffraction_angle_base_peak_ROI_only = lambda bin_index : (bin_index * self._histogram_bin_width - self._base_peak_ROI_width + self._base_peak_angle)
 
     @property 
     def overwrite_plot(self): 
@@ -104,7 +98,7 @@ class PlotHelper:
                 fig.show()  
                 input("Press Enter to continue...")
             
-    def plot_base_peak(self, photon_counts : np.ndarray, module_index=None, axis=None): 
+    def plot_base_peak(self, photon_counts : np.ndarray, base_peak_angle : float, base_peak_width : float, module_index=None, axis=None): 
         """
         Plot the base-peak ROI.
 
@@ -112,6 +106,10 @@ class PlotHelper:
         ----------
         photon_counts : numpy.ndarray
             1D photon-count array.
+        base_peak_angle : float
+            Base peak angle in degrees.
+        base_peak_width : float
+            Base peak width in degrees.
         module_index : int, optional
             Module index for title/selection.
         axis : matplotlib.axes.Axes, optional
@@ -130,15 +128,22 @@ class PlotHelper:
             axis.set_ylabel("Photon Counts")
             axis.set_title(plot_title)
 
-        left_bin_boundary = int((self._base_peak_angle -
-                                self._base_peak_ROI_width -
+        left_bin_boundary = int((base_peak_angle -
+                                base_peak_width -
                                 self._angular_range[0]) // self._histogram_bin_width)
-        right_bin_boundary = int((self._base_peak_angle +
-                                self._base_peak_ROI_width -
+        right_bin_boundary = int((base_peak_angle +
+                                base_peak_width -
                                 self._angular_range[0]) // self._histogram_bin_width + 1)
 
-        bins = np.arange(0, self._base_peak_ROI_num_bins) 
-        bins = np.vectorize(self._bin_to_diffraction_angle_base_peak_ROI_only)(bins)
+        base_peak_ROI_num_bins = int((base_peak_angle + base_peak_width) /
+                                self._histogram_bin_width) - int((base_peak_angle - base_peak_width) /
+                                self._histogram_bin_width) + 1
+        
+
+        bin_to_diffraction_angle_base_peak_ROI_only = lambda bin_index : (bin_index * self._histogram_bin_width - base_peak_width + base_peak_angle)
+
+        bins = np.arange(0, base_peak_ROI_num_bins) 
+        bins = np.vectorize(bin_to_diffraction_angle_base_peak_ROI_only)(bins)
 
         if axis is None:
             plt.plot(bins, photon_counts[left_bin_boundary:right_bin_boundary])

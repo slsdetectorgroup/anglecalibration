@@ -101,20 +101,23 @@ get_module_angle_ranges(std::shared_ptr<MythenFileReader> mythen_file_reader,
  * diffraction pattern, default is 0.
  */
 inline void
-select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
+select_base_peak(std::shared_ptr<MythenDetector> mythen_detector_ptr,
+                 std::shared_ptr<AngularConversion> angularconversion,
                  std::shared_ptr<MythenFileReader> mythen_file_reader,
                  const std::vector<std::string> &filelist,
                  const size_t module_index = 0) {
-    PlotHelper plotter(anglecalibration);
 
+    PlotHelper plotter(mythen_detector_ptr,
+                       angularconversion->get_angular_range(),
+                       angularconversion->get_histogram_bin_width());
     plotter.overwrite_plot();
 
     auto detector_angle_range = std::make_pair(
         6.0, 33.0); // TODO: is this absolute to beam source or relative?
 
     double left_module_strip_angle =
-        anglecalibration->get_mythen_detector()
-            ->diffraction_angle_from_DG_parameters(module_index, 0.0, 0, 0.0);
+        mythen_detector_ptr->diffraction_angle_from_DG_parameters(module_index,
+                                                                  0.0, 0, 0.0);
     LOG(TLogLevel::logDEBUG)
         << fmt::format("strip angle: {}", left_module_strip_angle);
 
@@ -137,11 +140,15 @@ select_base_peak(std::shared_ptr<AngleCalibration> anglecalibration,
                 << fmt::format("plotting file {} with detector angle {}", file,
                                detector_angle);
 
+            auto frame = mythen_file_reader->read_frame(
+                file); // read frame to get photon counts for
             // plot module
             auto module_redistributed_to_fixed_angle_bins =
-                anglecalibration->convert(
-                    {file}, module_index); // always plots diffraction pattern
-                                           // independant of detector location.
+                angularconversion->convert(
+                    frame.photon_counts(), detector_angle,
+                    frame.incident_intensity,
+                    frame.exposure_time); // always plots diffraction pattern
+                                          // independant of detector location.
 
             plotter.plot_diffraction_pattern(
                 module_redistributed_to_fixed_angle_bins.view(), module_index,
@@ -212,6 +219,99 @@ inline void read_csv(const std::filesystem::path &filename,
                                  " rows in " + filename.string() + " but got " +
                                  std::to_string(row));
     }
+}
+
+/**
+ * @brief reads flatfield file (columns: strip_index, flatfield, error, ...)
+ * @return array of shape (num_strips, 2) with flatfield value and error per
+ * strip
+ */
+inline NDArray<double, 2> read_flatfield(const std::filesystem::path &filename,
+                                         const ssize_t num_modules) {
+
+    if (!std::filesystem::exists(filename)) {
+        throw std::runtime_error(
+            fmt::format("File {} does not exist\n", filename.string()));
+    }
+
+    const ssize_t num_strips =
+        num_modules * MythenDetector::strips_per_module();
+
+    NDArray<double, 2> flatfield({num_strips, 2}, 0.0);
+
+    std::ifstream file(filename);
+
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open file: " + filename.string());
+    }
+
+    ssize_t strip_index;
+    double flatfield_value, flatfield_error, val_1, val_2;
+    std::string line;
+
+    std::getline(file, line); // skip header
+    while (file >> strip_index >> flatfield_value >> flatfield_error >> val_1 >>
+           val_2) {
+        if (strip_index < 0 || strip_index >= num_strips) {
+            throw std::runtime_error(
+                fmt::format("strip index {} in {} out of range (num strips {})",
+                            strip_index, filename.string(), num_strips));
+        }
+        flatfield(strip_index, 0) = flatfield_value;
+        flatfield(strip_index, 1) = flatfield_error;
+    }
+
+    return flatfield;
+}
+
+inline NDArray<bool, 1> read_bad_channels(const std::filesystem::path &filename,
+                                          const ssize_t num_strips) {
+
+    if (!std::filesystem::exists(filename)) {
+        throw std::runtime_error(
+            fmt::format("File {} does not exist\n", filename.string()));
+    }
+
+    NDArray<bool, 1> bad_channels({num_strips});
+
+    std::ifstream file(filename);
+
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open file: " + filename.string());
+    }
+
+    const size_t data_type_bytes = sizeof(bool);
+
+    auto buffer = bad_channels.buffer();
+
+    std::string line;
+
+    size_t index = 0;
+    try {
+        while (std::getline(file, line)) {
+
+            std::size_t pos = line.find("-");
+
+            if (pos == std::string::npos) {
+                index = std::stoi(line) * data_type_bytes;
+                buffer[index] = static_cast<std::byte>(true);
+            } else {
+                size_t line_size = line.size();
+                for (int i = std::stoi(line.substr(0, pos));
+                     i <= std::stoi(line.substr(pos + 1, line_size - pos));
+                     ++i) {
+                    index = i * data_type_bytes;
+                    buffer[index] = static_cast<std::byte>(true);
+                }
+            }
+        }
+    } catch (const std::exception &e) {
+        LOG(TLogLevel::logERROR) << e.what();
+    }
+
+    file.close();
+
+    return bad_channels;
 }
 
 } // namespace angcal

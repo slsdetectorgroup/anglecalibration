@@ -105,6 +105,13 @@ void define_MythenFileReader_bindings(py::module &m) {
             py::arg("file_name"), R"(read detector angle from file.)")
 
         .def(
+            "read_incident_intensity",
+            [](EpicsMythenFileReader &self, const std::string &file_name) {
+                return self.read_incident_intensity(file_name);
+            },
+            py::arg("file_name"), R"(read incident intensity from file.)")
+
+        .def(
             "read_into",
             [](EpicsMythenFileReader &self,
                py::array_t<uint32_t, py::array::c_style> buffer,

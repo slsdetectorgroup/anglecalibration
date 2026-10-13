@@ -145,9 +145,6 @@ void define_MythenDetector_binding(py::module &m) {
                 &MythenDetector::average_distance_sample_pixel),
             R"(Average euclidean distance between sample and pixel [mm] (default: 2500.0 / pi mm))")
 
-        .def_property_readonly("unconnected_modules",
-                               &MythenDetector::unconnected_modules)
-
         .def_property_readonly("num_strips", &MythenDetector::num_strips, R"(
             Total number of strips in Mythen detector
         )")
@@ -331,7 +328,8 @@ void define_MythenDetector_binding(py::module &m) {
             )")
 
         .def("transverse_width", &MythenDetector::transverse_width,
-             py::arg("module_index"), py::arg("strip_index"), R"(
+             py::arg("module_index"), py::arg("strip_index"),
+             py::arg("from_BC_parameters"), R"(
              Calculates the transverse width of the strip projected onto a plane
 
              Parameters
@@ -340,6 +338,8 @@ void define_MythenDetector_binding(py::module &m) {
                     Index of the module.
                 strip_index : int
                     Local strip index of module e.g. 0-1279
+                from_BC_parameters : bool
+                    Whether to use BC parameters (true) or DG parameters (false)
 
              Returns
              -------
