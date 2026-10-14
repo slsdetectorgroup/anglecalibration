@@ -11,8 +11,13 @@ class PlotHelper:
 
         Parameters
         ----------
-        anglecalibration : angcal.AngleCalibration
-            Calibrated angle-calibration object used to compute plot axes and limits.
+        mythendetector : angcal.MythenDetector
+            Mythen detector holding the detector geometry parameters, used to
+            compute the module boundaries.
+        angular_range : tuple of float
+            Angular range ``(min_angle, max_angle)`` of the diffraction pattern [degrees].
+        histogram_bin_width : float
+            Width of the fixed angle width bins [degrees].
         """
 
         self._overwrite_plot = False

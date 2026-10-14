@@ -15,7 +15,7 @@ Example
     CounterMask: 3 // binary representation 0 1 1
     channel 1 and 2 are active
 
-.. py::currentmodule:: angcal  
+.. py:currentmodule:: angcal  
     
 .. autoclass:: angcal._angcal.MythenFileReader
     :special-members: __init__

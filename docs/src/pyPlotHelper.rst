@@ -3,7 +3,7 @@ Plot Helpers
 
 Some helper functions for easy plotting. 
 
-.. py::currentmodule:: angcal.PlotHelper
+.. py:currentmodule:: angcal.PlotHelper
 
 .. autoclass:: angcal.PlotHelper
    :members: 

@@ -37,7 +37,11 @@ class PlotHelper {
   public:
     /**
      * @brief constructor for PlotHelper class
-     * @param anglecalibration
+     * @param mythen_detector shared pointer to MythenDetector holding the
+     * detector geometry parameters
+     * @param angular_range angular range {min_angle, max_angle} of the
+     * diffraction pattern [degrees]
+     * @param histogram_bin_width width of the fixed angle width bins [degrees]
      */
     PlotHelper(std::shared_ptr<MythenDetector> mythen_detector,
                const std::tuple<double, double> angular_range,
@@ -127,6 +131,9 @@ class PlotHelper {
     /**
      * @brief plot base peak for given photon counts
      * @param photon_counts resulting photon counts of diffraction pattern
+     * @param base_peak_angle angle of the base peak [degrees]
+     * @param base_peak_roi_width width of the region of interest around the
+     * base peak [degrees]
      * @param module_index optional module index if only one module contributed
      * to diffraction pattern
      */

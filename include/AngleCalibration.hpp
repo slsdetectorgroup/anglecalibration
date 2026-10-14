@@ -143,7 +143,7 @@ class AngleCalibration {
      * need to be sorted by detector angle
      * @param detector_angles 1D NDView of monitor positions for the
      * acquisitions
-     * @param base_peak_angle angle of the selcted base peak given in degrees
+     * @param base_peak_angle_ angle of the selected base peak given in degrees
      * @param module_index index of module to be calibrated
      */
     template <bool visualize_calibration = false>
@@ -152,6 +152,7 @@ class AngleCalibration {
                    const double base_peak_angle_, const size_t module_index);
 
     /** @brief check if base peak ROI is contained within module region
+     * @param module_index index of module
      * @param detector_angle: detector position (offset of first strip from
      * default detector position) [degrees]
      * @return true if [base_peak - base_peak_ROI, base_peak + base_peak_ROI]
@@ -217,11 +218,12 @@ class AngleCalibration {
      * @brief redistributes photon counts to fixed angle width bins around base
      * peak for all acquisitions in passed frames and calculates the similarity
      * between the found base peaks regions
+     * @param module_index index of module
      * @param frames_with_base_peak_overlap vector of frames from acquisitions
      * for which the base peak ROI is covered by the respective module region
      * @param detector_angles_with_base_peak_overlap 1D NDView of monitor
      * positions for acquisitions
-     * @brief plot wrapper to visualize calibration process
+     * @param plot plot wrapper to visualize calibration process
      * (default nullptr)
      * @return similarity of peaks
      */
@@ -236,6 +238,7 @@ class AngleCalibration {
      * @brief redistributes photon counts to fixed angle width bins around base
      * peak for all acquisitions in passed frames and calculates the similarity
      * between the found base peaks regions of two modules
+     * @param module_index index of module
      * @param frames_with_base_peak_overlap_module vector of frames from
      * acquisitions for which the base peak ROI is covered by the respective
      * module region
@@ -246,7 +249,7 @@ class AngleCalibration {
      * previous module region
      * @param detector_angles_with_base_peak_overlap_prev_module 1D NDView of
      * monitor positions for acquisitions for the previous module
-     * @brief plot wrapper to visualize calibration process
+     * @param plot plot wrapper to visualize calibration process
      * (default nullptr)
      * @return similarity of peaks
      */
@@ -370,9 +373,9 @@ class AngleCalibration {
         const double delta_parameter2 = 1.0e-6);
 
     /**
-     * @brief optimizes angle between center of module and beam (\psi) of BC
-     * parameters of given module based on chi similarity criterion and center
-     * of base peak
+     * @brief optimizes angle between center of module and beam (\f$\psi\f$)
+     * of BC parameters of given module based on chi similarity criterion and
+     * center of base peak
      * @param module_index index of module to be calibrated
      * @param frames_with_base_peak_overlap vector of frames with base peak
      * overlap for module

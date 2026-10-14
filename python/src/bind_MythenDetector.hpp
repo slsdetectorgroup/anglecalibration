@@ -42,36 +42,6 @@ void define_MythenDetector_binding(py::module &m) {
 
         strips_per_module: int
             Read-only static. Strips per module for Mythen detector (1280)
-
-        max_modules: int
-            Read-only. Number of modules in detector, set in constructor. Default (48)
-
-        sample_detector_offset: double
-            Offset between sample horizontal plane and detector [degrees] (default: 1.4715°)
-
-        offset: double
-            Additional offset to sample detector offset (can change in experimental setup) [degrees] (default: 0.0°)
-
-        sample_x_displacement: double
-            Displacement of sample in x direction of horizontal sample plane [mm] (default: 0.0 mm)
-        
-        sample_y_displacement: double
-            Displacement of sample in y direction of horizontal sample plane [mm] (default: 0.0 mm)
-
-        elastic_correction_factor: double
-            Elastic correction factor for torsional compliance correction model (default: 0.0)
-        
-        detector_vertical_axis_offset: double
-            Offset of detector to vertical axis (used for elastic correction) [degrees] (default: 0.0°)
-
-        dead_time: double
-            Measured dead-time [s] (default: 76.08e-9 s)
-
-        average_distance_sample_pixel: double
-            average euclidean distance between sample and pixel [mm] (default: 2500.0 / pi mm)
-
-        unconnected_modules: list of int
-            list of unconnected modules
         )")
 
         .def(py::init<size_t>(), py::arg("num_modules") = 48)
@@ -94,12 +64,12 @@ void define_MythenDetector_binding(py::module &m) {
             py::overload_cast<>(&MythenDetector::sample_detector_offset,
                                 py::const_),
             py::overload_cast<double>(&MythenDetector::sample_detector_offset),
-            R"(Offset between sample horizontal plane and detector [degrees])")
+            R"(Offset between sample horizontal plane and detector [degrees] (default: 1.4715°))")
 
         .def_property(
             "offset", py::overload_cast<>(&MythenDetector::offset, py::const_),
             py::overload_cast<double>(&MythenDetector::offset),
-            R"(Additional offset to sample detector offset (can change in experimental setup) [degrees])")
+            R"(Additional offset to sample detector offset (can change in experimental setup) [degrees] (default: 0.0°))")
 
         .def_property(
             "elastic_correction_factor",
@@ -107,7 +77,7 @@ void define_MythenDetector_binding(py::module &m) {
                                 py::const_),
             py::overload_cast<double>(
                 &MythenDetector::elastic_correction_factor),
-            R"(Elastic correction factor for torsional compliance correction model)")
+            R"(Elastic correction factor for torsional compliance correction model) (default: 0.0)")
 
         .def_property(
             "detector_vertical_axis_offset",
@@ -115,27 +85,27 @@ void define_MythenDetector_binding(py::module &m) {
                                 py::const_),
             py::overload_cast<double>(
                 &MythenDetector::detector_vertical_axis_offset),
-            R"(Offset of detector to vertical axis (used for elastic correction) [degrees])")
+            R"(Offset of detector to vertical axis (used for elastic correction) [degrees] (default: 0.0°))")
 
         .def_property(
             "sample_x_displacement",
             py::overload_cast<>(&MythenDetector::sample_x_displacement,
                                 py::const_),
             py::overload_cast<double>(&MythenDetector::sample_x_displacement),
-            R"(Displacement of sample in x direction of horizontal sample plane [mm])")
+            R"(Displacement of sample in x direction of horizontal sample plane [mm] (default: 0.0 mm))")
 
         .def_property(
             "sample_y_displacement",
             py::overload_cast<>(&MythenDetector::sample_y_displacement,
                                 py::const_),
             py::overload_cast<double>(&MythenDetector::sample_y_displacement),
-            R"(Displacement of sample in y direction of horizontal sample plane [mm])")
+            R"(Displacement of sample in y direction of horizontal sample plane [mm] (default: 0.0 mm))")
 
         .def_property(
             "dead_time",
             py::overload_cast<>(&MythenDetector::dead_time, py::const_),
             py::overload_cast<double>(&MythenDetector::dead_time),
-            R"(Measured dead-time [s])")
+            R"(Measured dead-time [s] (default: 76.08e-9 s))")
 
         .def_property(
             "average_distance_sample_pixel",
@@ -171,19 +141,12 @@ void define_MythenDetector_binding(py::module &m) {
 
              Parameters
              ----------
-                dgparameters : DGParameters
-                    DGParameters object
+                dgparameters : DGParameters or numpy.ndarray of float, shape (num_modules, 3)
+                    Each row corresponds to a module, columns are (center, conversion, offset)
              )")
 
         .def("set_DGparameters", &set_DGparameters_from_array,
-             py::arg("dgparameters"), R"(
-             Set the historical DG parameters from a numpy array
-
-             Parameters
-             ----------
-                dgparameters : numpy.ndarray of float, shape (num_modules, 3)
-                    Each row corresponds to a module, columns are (center, conversion, offset)
-             )")
+             py::arg("dgparameters"))
 
         .def("diffraction_angle_from_DG_parameters",
              &MythenDetector::diffraction_angle_from_DG_parameters,
@@ -259,17 +222,17 @@ void define_MythenDetector_binding(py::module &m) {
              Calculated the strip width expressed as angle from DG module parameters
 
              Parameters
-             -----------
+             ----------
                 module_index : int
                     Index of the module.
                 local_strip_index : int
                     Local strip index of module e.g. 0-1279
 
-            Returns
-            -------
+             Returns
+             -------
                 float
                     Strip width in angles [degrees]
-            )")
+             )")
 
         .def("angular_strip_width_from_BC_parameters",
              &MythenDetector::angular_strip_width_from_BC_parameters,
@@ -277,17 +240,17 @@ void define_MythenDetector_binding(py::module &m) {
              Calculated the strip width expressed as angle from BC module parameters
 
              Parameters
-             -----------
+             ----------
                 module_index : int
                     Index of the module.
                 local_strip_index : int
                     Local strip index of module e.g. 0-1279
 
-            Returns
-            -------
-            float
-                Strip width in angles [degrees]
-            )")
+             Returns
+             -------
+                float
+                    Strip width in angles [degrees]
+             )")
 
         .def("angular_strip_width_from_EE_parameters",
              &MythenDetector::angular_strip_width_from_EE_parameters,
@@ -296,7 +259,7 @@ void define_MythenDetector_binding(py::module &m) {
              Calculated the strip width expressed as angle from EE module parameters
 
              Parameters
-             -----------
+             ----------
                 module_center_distance : float
                     Center distance of the module.
                 normal_distance : float
@@ -306,11 +269,11 @@ void define_MythenDetector_binding(py::module &m) {
                 local_strip_index : int
                     Local strip index of module e.g. 0-1279
                     
-            Returns
-            -------
-            float
-                Strip width in angles [degrees]
-            )")
+             Returns
+             -------
+                float
+                    Strip width in angles [degrees]
+             )")
 
         .def("elastic_correction", &MythenDetector::elastic_correction,
              py::arg("detector_angle"), R"(
@@ -321,11 +284,12 @@ void define_MythenDetector_binding(py::module &m) {
              ----------
                 detector_angle : float
                     Detector axis motor position [degrees]
-            Returns
-            -------
+
+             Returns
+             -------
                 float
                     Elastic correction factor for given detector angle [degrees]
-            )")
+             )")
 
         .def("transverse_width", &MythenDetector::transverse_width,
              py::arg("module_index"), py::arg("strip_index"),

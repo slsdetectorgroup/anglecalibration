@@ -62,7 +62,7 @@ class AngularConversion {
      * @param photon_counts photon counts of each frame (num_frames, num_strips)
      * @param detector_angles detector angle of each frame [degrees]
      * @param incident_intensities incident intensity of each frame
-     * @param exposure_times exposure time of each frame [s]
+     * @param exposure_time exposure time of the frames [s]
      * @note the photon counts are corrected for flatfield, rate and incident
      * intensity and solid angle, redistributed to fixed angle width bins and
      * averaged
@@ -142,8 +142,7 @@ class AngularConversion {
 
     /**
      * @brief scale factor to scale everything to a reasonable scale
-     * e.g. can be incident_intensity of first acquisition
-     * @default 1.0
+     * e.g. can be incident_intensity of first acquisition (default: 1.0)
      */
     double m_scale_factor{1.0};
 

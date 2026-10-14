@@ -56,7 +56,9 @@ void define_AngleCalibration_binding(py::module &m) {
             [](AngleCalibration &self, std::pair<double, double> angle_range) {
                 self.set_angular_range(angle_range.first, angle_range.second);
             },
-            R"(angular range for conversion [degrees]
+            R"(
+            angular range for conversion [degrees]
+
             Returns
             -------
             tuple of float
@@ -70,7 +72,9 @@ void define_AngleCalibration_binding(py::module &m) {
                     new NDArray<double, 2>(self.get_DGparameters().parameters);
                 return return_image_data(DGparameters);
             },
-            R"(Best Computing parameters for each module
+            R"(
+            DG parameters for each module
+
             Returns
             -------
             numpy.ndarray of float, shape (n_modules, 3)

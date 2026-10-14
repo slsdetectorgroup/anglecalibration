@@ -3,7 +3,7 @@ Parameters
 
 Struct for all three Parameter sets introduced in Section :ref:`parametersets`. 
 
-.. py::currentmodule:: angcal 
+.. py:currentmodule:: angcal 
 
 
 .. autoclass:: angcal._angcal.Parameters

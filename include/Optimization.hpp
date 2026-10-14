@@ -60,6 +60,9 @@ calculate_gradient(const aare::NDArray<double, 2> &values_at_grid_points,
  * @param values_at_grid_points vector of function values at the grid points
  * values_at_grid_points[0,0] = f_x-delta_x,y-delta_y,
  *values_at_grid_points[0,1] = f_x,y-delta_y etc.
+ * @param delta_x grid spacing in x direction
+ * @param delta_y grid spacing in y direction
+ * @return 2x2 Hessian matrix
  **/
 aare::NDArray<double, 2>
 calculate_Hessian(const aare::NDArray<double, 2> &values_at_grid_points,
@@ -93,6 +96,8 @@ calculate_Hessian(const aare::NDArray<double, 2> &values_at_grid_points,
 /**
  * @brief calculates the regularized inverse of the Hessian matrix
  * @param Hessian Hessian matrix to be inverted
+ * @param regularization_parameter regularization parameter added to the
+ * diagonal of the Hessian before inversion, default is 0.0
  * @return regularized inverse of the Hessian matrix
  */
 aare::NDArray<double, 2> calculate_regularized_inverse_Hessian(

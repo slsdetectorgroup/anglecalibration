@@ -16,9 +16,9 @@
 class SimpleFileInterface {
   public:
     /**
-     * @brief read file into an array
-     * @param array: view of the array
-     * @return void
+     * @brief open file for reading
+     * @param filename: path of the file to open
+     * @throws std::logic_error if file does not exist
      */
     virtual void open(const std::string &filename) {
         m_filename = filename;
@@ -33,6 +33,7 @@ class SimpleFileInterface {
 
     /**
      * @brief read into byte buffer
+     * @param image_buf: pointer to the buffer to read the data into
      * @param data_type_bytes: if buffer from a vector or array provide number
      * of bytes for datatype
      */

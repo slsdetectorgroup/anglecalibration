@@ -92,8 +92,10 @@ get_module_angle_ranges(std::shared_ptr<MythenFileReader> mythen_file_reader,
 /**
  * @brief select base peak by performing angular conversion for a specific
  * module and clicking through frames where module is within range of [6°, 33°]
- * @param anglecalibration shared pointer to AngleCalibration class for
- * accessing calibration specific parameters and functions
+ * @param mythen_detector_ptr shared pointer to MythenDetector holding the
+ * detector geometry parameters
+ * @param angularconversion shared pointer to AngularConversion class for
+ * accessing the angular range and histogram bin width
  * @param mythen_file_reader shared pointer to MythenFileReader for reading
  * mythen acquisition files
  * @param filelist vector of acquisition files to select base peak from

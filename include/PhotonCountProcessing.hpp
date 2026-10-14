@@ -109,7 +109,7 @@ inline void redistribute_photon_count_to_fixed_angle_width_bins(
 /**
  * @brief calculate the rate corrected photon counts taking into account the
  * dead time
- * @param photon_counts photon counts
+ * @param photon_count photon counts
  * @param photon_count_error error of photon counts (generally variance
  * error is used)
  * @param exposure_time exposure time of acquisition [s]
@@ -182,7 +182,7 @@ rate_correction(const double photon_count, const double photon_count_error,
 
 /** @brief calculate the incident intensity corrected photon counts
  * @param photon_counts photon counts
- * @param photon_counts_error error of photon counts (generally variance
+ * @param photon_count_error error of photon counts (generally variance
  * error is used)
  * @param incident_intensity incident intensity
  * @param scale_factor scale factor to scale everything to a reasonable scale

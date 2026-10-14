@@ -13,12 +13,7 @@ void define_AngularConversion_binding(py::module &m) {
 
     py::class_<AngularConversion>(m, "AngularConversion")
         .def(py::init<std::shared_ptr<MythenDetector>>(),
-             py::arg("MythenDetector"), R"(
-             Parameters
-             ----------
-             MythenDetector: MythenDetector
-                storing all mythen specific parameters
-             )")
+             py::arg("MythenDetector"))
 
         .def(py::init<std::shared_ptr<MythenDetector>, double,
                       std::tuple<double, double>>(),
@@ -140,19 +135,5 @@ void define_AngularConversion_binding(py::module &m) {
             py::arg("incident_intensity"), py::arg("exposure_time"), R"(
             convert a frame to a diffraction pattern. The photon counts are corrected for flatfield, rate, incident intensity and solid angle, redistributed to fixed angle width bins and averaged
 
-            Parameters
-            ----------
-            photon_counts: numpy.ndarray of uint32, shape (n_channels,)
-                photon counts of the frame
-            detector_angle: float
-                detector angle of the frame [degrees]
-            incident_intensity: uint64
-                incident intensity of the frame
-            exposure_time: float
-                exposure time for the frame [s]
-
-            Returns
-            -------
-            numpy.ndarray (num_fixed_angle_width_bins, 2)
-                diffraction pattern in the range [min_angle, max_angle], first dimension photon counts redistributed to fixed angle width bins, second dimension respective standard deviation, values of -1.0 denote bins with insufficient coverage or which are denoted by a bad channel)");
+            )");
 }

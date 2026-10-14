@@ -64,6 +64,7 @@ struct MythenFrame : public aare::Frame {
     /**
      * @brief photon counts at specfic channel
      * @param col channel index
+     * @param row row index (default: 0)
      */
     uint32_t photon_counts(size_t col, size_t row = 0) const {
         return *reinterpret_cast<uint32_t *>(this->pixel_ptr(row, col));
@@ -242,8 +243,9 @@ class EpicsMythenFileReader : public HDF5FileReader, public MythenFileReader {
 
     /**
      * @brief Constructor
-     * @param incident_intensities path to file storing incident intensities of
-     * the acquisitions (need to be stored as binary file of uint64_t)
+     * @param incident_intensity_filename_ path to file storing incident
+     * intensities of the acquisitions (need to be stored as binary file of
+     * uint64_t)
      */
     EpicsMythenFileReader(
         const std::filesystem::path &incident_intensity_filename_)

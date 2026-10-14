@@ -205,6 +205,7 @@ class MythenDetector {
 
     /** @brief calculates diffraction angle from DG module parameters (used in
      * Beer's Law)
+     * @param module_index index of module
      * @param detector_angle detector position [degrees]
      * @param strip_index local strip index of module e.g. 0-1279
      * @param distance_to_strip distance to strip [given in strips]
@@ -216,6 +217,7 @@ class MythenDetector {
 
     /** @brief calculates diffraction angle from BC (best computing) module
      * parameters (used in Beer's Law)
+     * @param module_index index of module
      * @param detector_angle detector position [degrees]
      * @param strip_index local strip index of module e.g. 0-1279
      * @param distance_to_strip distance to strip [given in strips]
@@ -227,6 +229,11 @@ class MythenDetector {
 
     /** @brief calculates diffraction angle from EE module parameters (used in
      * Beer's Law)
+     * @param module_center_distance distance between start of module and
+     * orthogonal projection of sample onto detector (D)
+     * @param normal_distance normal distance between sample and detector (R)
+     * @param angle angle between undiffracted beam and orthogonal sample
+     * projection on detector (phi) [degrees]
      * @param detector_angle detector position [degrees]
      * @param strip_index local strip index of module
      * @param distance_to_strip distance to strip [given in strips]
@@ -239,8 +246,8 @@ class MythenDetector {
 
     /** @brief calculated the strip width expressed as angle from DG
      * module parameters
-     * @param moudle_index index of module
-     * @param strip_index local strip index of module e.g. 0-1279
+     * @param module_index index of module
+     * @param local_strip_index local strip index of module e.g. 0-1279
      * @return strip width in angles [degrees]
      */
     double
@@ -249,8 +256,8 @@ class MythenDetector {
 
     /** @brief calculated the strip width expressed as angle from BC
      * module parameters
-     * @param moudle_index index of module
-     * @param strip_index local strip index of module e.g. 0-1279
+     * @param module_index index of module
+     * @param local_strip_index local strip index of module e.g. 0-1279
      * @return strip width in angles [degrees]
      */
     double angular_strip_width_from_BC_parameters(
@@ -258,8 +265,12 @@ class MythenDetector {
 
     /** @brief calculated the strip width expressed as angle from EE
      * module parameters
-     * @param moudle_index index of module
-     * @param strip_index local strip index of module e.g. 0-1279
+     * @param module_center_distance distance between start of module and
+     * orthogonal projection of sample onto detector (D)
+     * @param normal_distance normal distance between sample and detector (R)
+     * @param angle angle between undiffracted beam and orthogonal sample
+     * projection on detector (phi) [degrees]
+     * @param local_strip_index local strip index of module e.g. 0-1279
      * @return strip width in angles [degrees]
      */
     double angular_strip_width_from_EE_parameters(

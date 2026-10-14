@@ -40,6 +40,10 @@ extensions = ['breathe',
 breathe_default_project = "angle_calibration"
 napoleon_use_ivar = True
 
+# members are already listed by autodoc (:members:) - avoid numpydoc creating
+# additional autosummary tables which require stub files
+numpydoc_show_class_members = False
+
 master_doc = 'index'
 
 # Add any paths that contain templates here, relative to this directory.
