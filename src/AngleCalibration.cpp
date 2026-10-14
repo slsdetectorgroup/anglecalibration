@@ -23,10 +23,8 @@ struct SignalHandler {
 
 AngleCalibration::AngleCalibration(
     std::shared_ptr<MythenDetector> mythen_detector_,
-    std::shared_ptr<FlatField> flat_field_,
-    std::shared_ptr<MythenFileReader> mythen_file_reader_)
-    : m_mythen_detector(mythen_detector_), flat_field(flat_field_),
-      mythen_file_reader(mythen_file_reader_) {
+    std::shared_ptr<FlatField> flat_field_)
+    : m_mythen_detector(mythen_detector_), flat_field(flat_field_) {
 
     bad_channels = NDArray<bool, 1>(std::array<ssize_t, 1>{static_cast<ssize_t>(
                                         m_mythen_detector->num_strips())},

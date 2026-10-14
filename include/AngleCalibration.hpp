@@ -37,11 +37,9 @@ class AngleCalibration {
      parameters and methods to calculate diffraction angles
      * @param flat_field_ ptr to FlatField class storing inverse normalized flat
      field
-     * @param mythen_file_reader file reader to read mythen acquisition files
      */
     AngleCalibration(std::shared_ptr<MythenDetector> mythen_detector_,
-                     std::shared_ptr<FlatField> flat_field_,
-                     std::shared_ptr<MythenFileReader> mythen_file_reader_);
+                     std::shared_ptr<FlatField> flat_field_);
 
     /** @brief set the histogram bin width [degrees]
      * default '0.0036°'
@@ -81,20 +79,6 @@ class AngleCalibration {
     /// @brief set base peak angle
     /// @param base_peak_angle_ angle of base peak [degrees]
     void set_base_peak_angle(const double base_peak_angle_);
-
-    /// @brief set vector of acquisitions files for calibration or conversion
-    /// @param file_list
-    void set_calibration_files(const std::vector<std::string> &file_list);
-
-    /// @brief get vector of acquisition files for calibration or conversion
-    /// @return vector of file names
-    const std::vector<std::string> &get_calibration_files() const;
-
-    /// @brief get file reader to read mythen acquisition files
-    /// @return shared pointer to MythenFileReader
-    const std::shared_ptr<MythenFileReader> get_file_reader() const {
-        return mythen_file_reader;
-    }
 
     /// @brief get detector geometry used for angular conversion
     /// @return shared pointer to MythenDetector
@@ -463,11 +447,6 @@ class AngleCalibration {
 
     /// @brief  maximum angle for angular conversion [degrees]
     double m_max_angle = 180.0;
-
-    /**
-     * file reader to read mythen acquisition files
-     */
-    std::shared_ptr<MythenFileReader> mythen_file_reader{};
 };
 
 template <bool visualize_calibration>

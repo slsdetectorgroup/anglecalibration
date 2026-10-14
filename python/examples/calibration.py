@@ -37,7 +37,7 @@ flatfield.normalized_flatfield = np.loadtxt(my_path / "Flatfield_EkeV22p0_T11000
 mythenfilereader = EpicsMythenFileReader()
 
 # setup angle calibration - has everything to do conversion and calibration 
-anglecalibration = AngleCalibration(mythen_detector, flatfield, mythenfilereader)
+anglecalibration = AngleCalibration(mythen_detector, flatfield)
 
 anglecalibration.read_bad_channels_from_file(str(my_path / "bc2025_001_RING.chans"))
 

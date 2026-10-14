@@ -66,8 +66,7 @@ int main() {
 
     auto mythen_file_reader = std::make_shared<EpicsMythenFileReader>();
 
-    AngleCalibration anglecalibration(mythen_detector_ptr, flat_field_ptr,
-                                      mythen_file_reader);
+    AngleCalibration anglecalibration(mythen_detector_ptr, flat_field_ptr);
 
     LOG(TLogLevel::logINFO) << "read initial parameters from file";
 

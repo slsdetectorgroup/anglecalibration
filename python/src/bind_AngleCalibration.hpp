@@ -16,17 +16,14 @@ void define_AngleCalibration_binding(py::module &m) {
 
     py::class_<AngleCalibration>(m, "AngleCalibration")
         .def(py::init<std::shared_ptr<MythenDetector>,
-                      std::shared_ptr<FlatField>,
-                      std::shared_ptr<MythenFileReader>>(),
-             py::arg("MythenDetector"), py::arg("FlatField"),
-             py::arg("MythenFileReader"), R"(
+                      std::shared_ptr<FlatField>>(),
+             py::arg("MythenDetector"), py::arg("FlatField"), R"(
              Parameters
              ----------
              MythenDetector: MythenDetector 
                 storing all mythen specific parameters
              FlatField: FlatField 
                 class storing inverse normalized flatfield
-             MythenFileReader: File Reader to read Mythen acquisition files
              )")
 
         .def_property("histogram_bin_width",
