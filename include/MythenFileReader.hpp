@@ -139,6 +139,10 @@ class EpicsMythenFileReader : public HDF5FileReader {
     /**
      * @brief reads the value of an NDAttributes dataset for frame_index
      * @param dataset_name name of dataset in /entry/instrument/NDAttributes/
+     * @param frame_index index of the frame to read the attribute for
+     * @return value of the attribute
+     * @note throws if the dataset does not exist or if the data type of the
+     * dataset does not match T
      */
     template <typename T>
     T read_attribute(const std::string &dataset_name, size_t frame_index) const;
