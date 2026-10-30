@@ -17,7 +17,7 @@ namespace angcal {
  */
 EpicsMythenFileReader::EpicsMythenFileReader(
     const std::filesystem::path &fname,
-    std::optional<std::filesystem::path> incident_intensities_filename) {
+    std::optional<const std::filesystem::path> incident_intensities_filename) {
     if (!std::filesystem::exists(fname)) {
         throw std::runtime_error(LOCATION +
                                  "File does not exist: " + fname.string());

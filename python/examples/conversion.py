@@ -38,14 +38,14 @@ angularconversion.flatfield = np.loadtxt(my_path / "Flatfield_E17p5keV_T12500eV_
 angularconversion.bad_channels = np.load(str(my_path / "bad_channels.npy"))
 
 # setup mythen data file reader to read EPICS mythen hdf5 files
-mythenfilereader = EpicsMythenFileReader()
-
-print("mythen file reader setup")
+mythenfilereader = EpicsMythenFileReader(str(my_path / "Fructose_0p2_60_0060.h5"))
 
 #set scale factor to get reasonable scales 
-frame = mythenfilereader.read_frame(str(my_path / "Fructose_0p2_60_0060.h5"))
+header = mythenfilereader.read_header(0)
 
-incident_intensity_per_second = frame.incident_intensity / frame.exposure_time
+exposure_time = header.exposure_time
+
+incident_intensity_per_second = header.incident_intensity / exposure_time
 
 scale_factor = 1280.0*round(incident_intensity_per_second/1280.0) # whatever is the same chosen in Antonios code 
 
@@ -55,26 +55,12 @@ angularconversion.scale_factor = scale_factor
 
 print("scale Factor: " ,angularconversion.scale_factor)
 
-file_list = [str(my_path / f"Fructose_0p2_60_006{i}.h5") for i in range(0,4)] 
+num_files = 4
 
-num_files = len(file_list)
+mythenfilereader.seek(0)
+headers, frames = mythenfilereader.read_n(num_files)
 
-detector_angles = np.empty(shape = (num_files), dtype = np.double)
-incident_intensities = np.empty(shape = (num_files), dtype = np.uint64)
-
-frames = np.empty(shape=(num_files, mythen_detector.num_strips), dtype=np.uint32)
-
-exposure_time = frame.exposure_time
-
-for frame in range(num_files):
-    file_name = str(my_path / f"Fructose_0p2_60_006{frame}.h5")
-    detector_angles[frame] = mythenfilereader.read_detector_angle(file_name)
-    incident_intensities[frame] = mythenfilereader.read_incident_intensity(file_name)
-    mythenfilereader.read_into(frames[frame, :], file_name)
-
-print("incident intensities: ", incident_intensities)
-
-redistributed_photon_counts = angularconversion.convert(frames, detector_angles, incident_intensities, exposure_time)
+redistributed_photon_counts = angularconversion.convert(frames, headers["detector_angle"], headers["incident_intensity"], exposure_time)
 
 print("conversion is done")
 

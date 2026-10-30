@@ -64,9 +64,7 @@ int main() {
     EpicsMythenFileReader mythen_file_reader(file_path /
                                              "Fructose_0p2_60_0060.h5");
 
-    NDArray<EpicsMythenHeader, 1> headers;
-    NDArray<uint32_t, 2> frames;
-    std::tie(headers, frames) = mythen_file_reader.read_n(4);
+    auto [headers, frames] = mythen_file_reader.read_n(4);
 
     double exposure_time = headers[0].exposure_time;
 

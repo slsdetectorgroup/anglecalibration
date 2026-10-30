@@ -142,9 +142,8 @@ int main() {
                            anglecalibration.get_base_peak_ROI_width());
 
     mythen_file_reader.seek(0); // reset to first frame
-    NDArray<EpicsMythenHeader, 1> headers;
-    NDArray<uint32_t, 2> frames;
-    std::tie(headers, frames) = mythen_file_reader.read_n(
+
+    auto [headers, frames] = mythen_file_reader.read_n(
         num_files); // TODO: maybe read_all would be great
     NDArray<double, 1> detector_angles(
         std::array<ssize_t, 1>{static_cast<ssize_t>(num_files)});

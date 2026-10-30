@@ -91,7 +91,7 @@ struct MythenFrame : public aare::Frame {
 class EpicsMythenFileReader : public HDF5FileReader {
   public:
     EpicsMythenFileReader(const std::filesystem::path &fname,
-                          std::optional<std::filesystem::path>
+                          std::optional<const std::filesystem::path>
                               incident_intensities_filename = std::nullopt);
 
     std::tuple<EpicsMythenHeader, MythenFrame>
