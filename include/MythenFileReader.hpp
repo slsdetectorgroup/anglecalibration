@@ -7,7 +7,10 @@
 
 #include <bitset>
 #include <filesystem>
+#include <fstream>
+#include <optional>
 #include <string>
+#include <vector>
 
 #include "aare/Frame.hpp"
 #include "aare/NDArray.hpp"
@@ -34,6 +37,16 @@ counter_mask_to_channel_indices(uint8_t counter_mask) {
                                   binary_channel_numbers[1],
                                   binary_channel_numbers[2]};
 }
+
+struct EpicsMythenHeader {
+    double detector_angle{};
+    uint64_t incident_intensity{}; // I_0
+    /// @brief exposure time in seconds
+    double exposure_time{}; // in seconds
+    /// @brief counter mask given as binary representation (counter 0 is most
+    /// significant bit)
+    std::array<uint8_t, 3> channel_mask{};
+};
 
 struct MythenFrame : public aare::Frame {
     /// @brief detector angle in degrees
@@ -229,197 +242,66 @@ class RawMythenFileReader : public MythenFileReader {
 };
 
 /**
- * @brief class to read MythenFiles following Epics file format
+ * @brief class to read a series of MythenFiles following Epics file format
+ * (e.g. base_name_0000.h5, base_name_0001.h5, ...). Frames are indexed
+ * consecutively over all files of the series, when all frames of a file are
+ * read the next file is opened.
  */
-class EpicsMythenFileReader : public HDF5FileReader, public MythenFileReader {
-
+class EpicsMythenFileReader : public HDF5FileReader {
   public:
-    /**
-     * @brief Default Constructor
-     * @note incident intensities not initialized will take the ones written by
-     * epics in the hdf5 file. For newer versions this will be garbage.
-     */
-    EpicsMythenFileReader() = default;
+    EpicsMythenFileReader(const std::filesystem::path &fname,
+                          std::optional<std::filesystem::path>
+                              incident_intensities_filename = std::nullopt);
 
-    /**
-     * @brief Constructor
-     * @param incident_intensity_filename_ path to file storing incident
-     * intensities of the acquisitions (need to be stored as binary file of
-     * uint64_t)
-     */
-    EpicsMythenFileReader(
-        const std::filesystem::path &incident_intensity_filename_)
-        : incident_intensities_filename(incident_intensity_filename_) {
-        // TODO maybe directly read into NDArray faster than always reading from
-        // filesystem
-        try {
-            incident_intensities_file.open(incident_intensities_filename,
-                                           std::ios_base::in);
-            if (!incident_intensities_file.is_open()) {
-                throw std::runtime_error(fmt::format(
-                    "Could not open file {}\n", incident_intensities_filename));
-            }
-        } catch (const std::exception &error) {
-            LOG(TLogLevel::logERROR) << error.what();
-        }
-    }
+    MythenFrame read_frame();                   // current frame, advances
+    MythenFrame read_frame(size_t frame_index); // seek + read_frame()
+    std::vector<MythenFrame> read_n(size_t n_frames);
+    void read_into(std::byte *buffer); // photon counts only, advances
+    void read_into(std::byte *buffer, size_t n_frames);
 
-    ~EpicsMythenFileReader() {
-        if (incident_intensities_file.is_open())
-            incident_intensities_file.close();
-    }
-
-    /**
-     * @brief read the detector monitor position
-     * @return detector position [degrees]
-     */
     double
-    read_detector_angle(const std::filesystem::path &file_name) override {
-        if (!std::filesystem::exists(file_name)) {
-            throw std::runtime_error(
-                fmt::format("File {} does not exist\n", file_name.string()));
-        }
+    read_detector_angle(size_t frame_index) const; // does NOT move cursor
+    uint64_t
+    read_incident_intensity(size_t frame_index); // does NOT move cursor
 
-        open_file(file_name);
-
-        auto dataset_detector_angle =
-            get_dataset("/entry/instrument/NDAttributes/DetectorAngle");
-
-        double detector_angle{};
-        dataset_detector_angle.read_into_buffer(
-            reinterpret_cast<std::byte *>(&detector_angle));
-
-        return detector_angle;
-    }
-
-    uint64_t read_incident_intensity(const std::filesystem::path &file_name) {
-        if (!std::filesystem::exists(file_name)) {
-            throw std::runtime_error(
-                fmt::format("File {} does not exist\n", file_name.string()));
-        }
-
-        open_file(file_name);
-
-        uint64_t incident_intensity{};
-        read_incident_intensity_from_hdf5(incident_intensity);
-
-        return incident_intensity;
-    }
-
-    void read_into(std::byte *buffer, const std::filesystem::path &file_name) {
-
-        if (!std::filesystem::exists(file_name)) {
-            throw std::runtime_error(
-                fmt::format("File {} does not exist\n", file_name.string()));
-        }
-
-        open_file(file_name);
-
-        auto dataset_photon_count =
-            get_dataset("/entry/instrument/detector/data");
-
-        dataset_photon_count.read_into_buffer(buffer);
-
-        close_file();
-    }
-
-    /**
-     * @brief read acquisition file from hdf5
-     * @return MythenFrame storing the photon counts, channel mask,
-     * detector position [degrees]
-     */
-    MythenFrame read_frame(const std::filesystem::path &file_name) override {
-
-        if (!std::filesystem::exists(file_name)) {
-            throw std::runtime_error(
-                fmt::format("File {} does not exist\n", file_name.string()));
-        }
-
-        open_file(file_name);
-
-        auto dataset_photon_count =
-            get_dataset("/entry/instrument/detector/data");
-
-        MythenFrame frame(dataset_photon_count.store_as_frame());
-
-        auto dataset_detector_angle =
-            get_dataset("/entry/instrument/NDAttributes/DetectorAngle");
-
-        dataset_detector_angle.read_into_buffer(
-            reinterpret_cast<std::byte *>(&frame.detector_angle));
-
-        if (incident_intensities_file.is_open()) {
-            const size_t acquisition_index = get_acquisition_index(file_name);
-            read_incident_intensity(acquisition_index,
-                                    frame.incident_intensity);
-        } else {
-            read_incident_intensity_from_hdf5(frame.incident_intensity);
-        }
-
-        auto dataset_channel_number =
-            get_dataset("/entry/instrument/NDAttributes/CounterMask");
-
-        uint32_t channel_number;
-
-        dataset_channel_number.read_into_buffer(
-            reinterpret_cast<std::byte *>(&channel_number));
-
-        frame.channel_mask = counter_mask_to_channel_indices(channel_number);
-
-        auto dataset_exposure_time =
-            get_dataset("/entry/instrument/NDAttributes/AcquireTime");
-
-        dataset_exposure_time.read_into_buffer(
-            reinterpret_cast<std::byte *>(&frame.exposure_time));
-
-        close_file();
-
-        return frame;
-    }
-
-    /**
-     * @brief reads the incident intensity from seperate file
-     */
-    void read_incident_intensity(const size_t acquisition_index,
-                                 uint64_t &incident_intensity) {
-        // TODO: add a contract check that it is a binary file of uint64_t
-        incident_intensities_file.seekg(
-            acquisition_index *
-            sizeof(uint64_t)); // what if its not stored as a double
-        incident_intensities_file.read(
-            reinterpret_cast<char *>(&incident_intensity), sizeof(uint64_t));
-    }
-
-    /**
-     * @brief reads the incident intensity from epics hdf5 files
-     */
-    void read_incident_intensity_from_hdf5(uint64_t &incident_intensity) {
-        auto dataset_incident_intensity =
-            get_dataset("/entry/instrument/NDAttributes/Izero");
-
-        double temp_value = 0.0;
-        dataset_incident_intensity.read_into_buffer(
-            reinterpret_cast<std::byte *>(&temp_value));
-        incident_intensity = static_cast<uint64_t>(std::lround(temp_value));
-    }
+    void seek(size_t frame_index);
+    size_t tell() const;
+    size_t total_frames() const;
+    size_t n_files() const;
+    size_t pixels_per_frame() const;
+    size_t bytes_per_frame() const;
+    std::filesystem::path current_file() const;
+    std::string base_name() const;
 
   private:
-    /**
-     * @brief get the acquisition index from the filename
-     */
-    size_t get_acquisition_index(const std::filesystem::path &file_name) {
-        std::string base_name = file_name.stem();
-        try {
-            auto pos = base_name.rfind('_');
-            return static_cast<size_t>(std::stoi(base_name.substr(pos + 1)));
-        } catch (const std::invalid_argument &e) {
-            throw std::runtime_error(LOCATION +
-                                     "Could not parse acquisition index");
-        }
-    }
+    void parse_fname(const std::filesystem::path &fname);
+    void scan_files();
+    void open_file(size_t file_index);
+    std::filesystem::path fpath(size_t file_index) const;
 
-  private:
-    std::string incident_intensities_filename{};
+    /// @brief index of the file in the series storing frame_index
+    size_t get_file_index(size_t frame_index) const;
+
+    /// @brief index of frame_index within its file
+    size_t frame_index_in_file(size_t frame_index) const;
+
+    /**
+     * @brief reads the value of an NDAttributes dataset for frame_index
+     * @param dataset_name name of dataset in /entry/instrument/NDAttributes/
+     */
+    template <typename T>
+    T read_attribute(const std::string &dataset_name, size_t frame_index) const;
+
+    std::filesystem::path m_path{};
+    std::string m_base_name{};
+    size_t m_max_digits_file_index{};
+    size_t m_offset{0};
+    size_t m_current_file_index{0};
+    size_t m_current_frame_index{0};
+    std::vector<size_t> m_last_frame_in_file{};
+    size_t m_total_frames{0};
+    size_t m_cols{};                        ///< number of strips per frame
+    const std::type_info *m_dtype{nullptr}; ///< data type of photon counts
     std::ifstream incident_intensities_file{};
 };
 

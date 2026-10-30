@@ -191,6 +191,7 @@ set(SourceFiles
     ${CMAKE_CURRENT_SOURCE_DIR}/src/FlatField.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Parameters.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MythenDetector.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/MythenFileReader.cpp
 )
 
 add_library(angle_calibration STATIC ${SourceFiles})  

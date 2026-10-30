@@ -189,6 +189,8 @@ class HDF5FileReader {
   public:
     HDF5FileReader() = default;
 
+    ~HDF5FileReader() { close_file(); }
+
     void open_file(const std::string &filename_) {
         filename = filename_;
         try {
