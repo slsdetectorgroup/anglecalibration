@@ -31,17 +31,17 @@ int main() {
 
     assert(std::filesystem::exists(initial_angles_filename));
 
+    const size_t num_modules = 48;
+
+    DGParameters dgparameters(num_modules);
+    read_csv(initial_angles_filename, dgparameters.parameters.view(), true);
+
     // create MythenDetector with all detector specifications and geometry
     std::shared_ptr<MythenDetector> mythen_detector_ptr =
-        std::make_shared<MythenDetector>();
+        std::make_shared<MythenDetector>(dgparameters);
 
     mythen_detector_ptr->elastic_correction_factor(0.0045);
     mythen_detector_ptr->detector_vertical_axis_offset(24.8);
-
-    DGParameters dgparameters(mythen_detector_ptr->num_modules());
-    read_csv(initial_angles_filename, dgparameters.parameters.view(), true);
-    mythen_detector_ptr->set_DGparameters(
-        dgparameters); // set detector parameters
 
     // FileaReader to read Mythen Files
     auto mythen_file_reader = std::make_shared<EpicsMythenFileReader>();

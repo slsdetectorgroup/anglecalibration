@@ -17,9 +17,17 @@ class MythenDetector {
   public:
     /**
      * @brief Constructor for MythenDetector class
-     * @param num_modules_ number of modules in detector
+     * @param dgparameters DGParameters object containing the detector group
+     * parameters
      */
-    explicit MythenDetector(const size_t num_modules_ = 48);
+    MythenDetector(const DGParameters &dgparameters);
+
+    /**
+     * @brief Constructor for MythenDetector class
+     * @param bcparameters BCParameters object containing the detector group
+     * parameters
+     */
+    MythenDetector(const BCParameters &bcparameters);
 
     ~MythenDetector() = default;
 
@@ -374,6 +382,8 @@ class MythenDetector {
     /// disconnected)
     aare::NDArray<bool, 1> m_disconnected_modules{};
 
+    /// @brief mythen detector DG parameters (detector group) for current
+    /// detector geometry
     DGParameters DGparameters;
 
     /// @brief mythen detector BC parameters (best computing) for current

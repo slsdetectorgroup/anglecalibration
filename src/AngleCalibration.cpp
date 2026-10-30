@@ -29,11 +29,6 @@ AngleCalibration::AngleCalibration(
     bad_channels = NDArray<bool, 1>(std::array<ssize_t, 1>{static_cast<ssize_t>(
                                         m_mythen_detector->num_strips())},
                                     false);
-
-    BCParameters temp_bc_parameters(m_mythen_detector->num_modules());
-    m_mythen_detector->get_DGparameters().convert_to_BCParameters(
-        temp_bc_parameters); // initialize BC parameters
-    m_mythen_detector->set_BCparameters(temp_bc_parameters);
 }
 
 void AngleCalibration::set_histogram_bin_width(double bin_width) {

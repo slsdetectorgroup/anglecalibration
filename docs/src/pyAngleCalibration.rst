@@ -1,7 +1,7 @@
 AngleCalibration
 =================
 
-Class to perform angular conversionand to calibrate the mythen detector parameters used for conversion. For the calibration the "Best computing" parameters are used. However, as initial parameters or for conversion it expects the "historic detector group" parameters. 
+Class to calibrate the mythen detector parameters used for conversion. For the calibration the "Best computing" parameters are used. However, as initial parameters or for conversion it expects the "historic detector group" parameters. 
 See :ref:`parametersets` for a more detail description of the different detector parameters. 
 
 ..

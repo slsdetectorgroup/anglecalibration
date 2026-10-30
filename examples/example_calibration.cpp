@@ -32,19 +32,17 @@ int main() {
 
     const size_t num_files = 1501;
 
-    auto output_filename =
-        file_path / "angcal_Jul2025_P12_0p0105_new_calibrated.off";
+    // auto output_filename =
+    // file_path / "angcal_Jul2025_P12_0p0105_new_calibrated.csv";
 
     const size_t num_modules = 48;
-    std::shared_ptr<MythenDetector> mythen_detector_ptr =
-        std::make_shared<MythenDetector>(num_modules);
 
-    DGParameters dgparameters(mythen_detector_ptr->num_modules());
+    DGParameters dgparameters(num_modules);
 
     read_csv(initial_angles_filename, dgparameters.parameters.view(), true);
 
-    mythen_detector_ptr->set_DGparameters(
-        dgparameters); // set initial parameters
+    std::shared_ptr<MythenDetector> mythen_detector_ptr =
+        std::make_shared<MythenDetector>(dgparameters);
 
     assert(std::filesystem::exists(bad_channels_filename));
 

@@ -5,25 +5,47 @@
 
 #include "np_helpers.hpp"
 
+#include <optional>
+#include <string>
+
 namespace py = pybind11;
 
 using namespace angcal;
 
-using DGParametersArray =
-    py::array_t<double, py::array::c_style | py::array::forcecast>;
+using DGParametersArray = py::array_t<double, py::array::c_style>;
 
-inline void set_DGparameters_from_array(MythenDetector &self,
-                                        DGParametersArray dgparameters) {
+using BCParametersArray = py::array_t<double, py::array::c_style>;
+
+inline DGParameters
+DGparameters_from_array(DGParametersArray dgparameters,
+                        std::optional<size_t> num_modules = std::nullopt) {
     auto view = make_view_2d(dgparameters);
-    if (view.shape(0) != static_cast<ssize_t>(self.num_modules()) ||
+    if ((num_modules && view.shape(0) != static_cast<ssize_t>(*num_modules)) ||
         view.shape(1) != 3) {
-        throw py::value_error(
-            fmt::format("Expected array of shape ({}, 3), got ({}, {})",
-                        self.num_modules(), view.shape(0), view.shape(1)));
+        throw py::value_error(fmt::format(
+            "Expected array of shape ({}, 3), got ({}, {})",
+            num_modules ? std::to_string(*num_modules) : "num_modules",
+            view.shape(0), view.shape(1)));
     }
     DGParameters parameters;
     parameters.parameters = NDArray<double, 2>(view);
-    self.set_DGparameters(parameters);
+    return parameters;
+}
+
+inline BCParameters
+BCParameters_from_array(BCParametersArray bcparameters,
+                        std::optional<size_t> num_modules = std::nullopt) {
+    auto view = make_view_2d(bcparameters);
+    if ((num_modules && view.shape(0) != static_cast<ssize_t>(*num_modules)) ||
+        view.shape(1) != 3) {
+        throw py::value_error(fmt::format(
+            "Expected array of shape ({}, 3), got ({}, {})",
+            num_modules ? std::to_string(*num_modules) : "num_modules",
+            view.shape(0), view.shape(1)));
+    }
+    BCParameters parameters;
+    parameters.parameters = NDArray<double, 2>(view);
+    return parameters;
 }
 
 void define_MythenDetector_binding(py::module &m) {
@@ -44,7 +66,31 @@ void define_MythenDetector_binding(py::module &m) {
             Read-only static. Strips per module for Mythen detector (1280)
         )")
 
-        .def(py::init<size_t>(), py::arg("num_modules") = 48)
+        .def(py::init<const DGParameters &>(), py::arg("dgparameters"), R"(
+             Constructor for MythenDetector class
+             Parameters
+             ----------
+             dgparameters : DGParameters or numpy.ndarray of float, shape (num_modules, 3)
+                 Each row corresponds to a module, columns are (center, conversion, offset)
+             )")
+
+        .def(py::init<const BCParameters &>(), py::arg("bcparameters"), R"(
+             Constructor for MythenDetector class
+             Parameters
+             ----------
+             bcparameters : BCParameters or numpy.ndarray of float, shape (num_modules, 3)
+                 Each row corresponds to a module, columns are (angle_center_module_normal, module_center_sample_distances, angle_center_beam)
+             )")
+
+        .def(py::init([](DGParametersArray dgparameters) {
+                 return MythenDetector(DGparameters_from_array(dgparameters));
+             }),
+             py::arg("dgparameters"))
+
+        .def(py::init([](BCParametersArray bcparameters) {
+                 return MythenDetector(BCParameters_from_array(bcparameters));
+             }),
+             py::arg("bcparameters"))
 
         .def_property_readonly_static(
             "pitch", [](py::object) { return MythenDetector::pitch(); })
@@ -126,8 +172,10 @@ void define_MythenDetector_binding(py::module &m) {
                 if (py::isinstance<DGParameters>(dgparameters)) {
                     self.set_DGparameters(dgparameters.cast<DGParameters &>());
                 } else {
-                    set_DGparameters_from_array(
-                        self, dgparameters.cast<DGParametersArray>());
+                    auto temp_dgparameters = DGparameters_from_array(
+                        dgparameters.cast<DGParametersArray>(),
+                        self.num_modules());
+                    self.set_DGparameters(temp_dgparameters);
                 }
             },
             R"(
@@ -144,9 +192,6 @@ void define_MythenDetector_binding(py::module &m) {
                 dgparameters : DGParameters or numpy.ndarray of float, shape (num_modules, 3)
                     Each row corresponds to a module, columns are (center, conversion, offset)
              )")
-
-        .def("set_DGparameters", &set_DGparameters_from_array,
-             py::arg("dgparameters"))
 
         .def("diffraction_angle_from_DG_parameters",
              &MythenDetector::diffraction_angle_from_DG_parameters,

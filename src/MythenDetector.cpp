@@ -5,8 +5,21 @@
 
 namespace angcal {
 
-MythenDetector::MythenDetector(const size_t num_modules_)
-    : m_num_modules(num_modules_) {
+MythenDetector::MythenDetector(const DGParameters &dgparameters)
+    : m_num_modules(dgparameters.num_modules()), DGparameters(dgparameters) {
+
+    BCparameters = BCParameters(m_num_modules);
+    dgparameters.convert_to_BCParameters(BCparameters);
+
+    m_disconnected_modules = aare::NDArray<bool, 1>(
+        std::array<ssize_t, 1>{static_cast<ssize_t>(m_num_modules)}, false);
+}
+
+MythenDetector::MythenDetector(const BCParameters &bcparameters)
+    : m_num_modules(bcparameters.num_modules()), BCparameters(bcparameters) {
+
+    DGparameters = DGParameters(m_num_modules);
+    bcparameters.convert_to_DGParameters(DGparameters);
 
     m_disconnected_modules = aare::NDArray<bool, 1>(
         std::array<ssize_t, 1>{static_cast<ssize_t>(m_num_modules)}, false);
@@ -192,18 +205,6 @@ double MythenDetector::elastic_correction(const double detector_angle) const {
 double MythenDetector::transverse_width(const size_t module_index,
                                         size_t strip_index,
                                         bool from_BC_parameters) const {
-
-    // TODO: add reasonable checks for BC parameters
-    /*
-    if (from_BC_parameters && BCparameters.num_modules() == 0) {
-        throw std::runtime_error("BC parameters are not set. Cannot calculate "
-                                 "transverse width from BC parameters.");
-    }
-    if (!from_BC_parameters && DGparameters.num_modules() == 0) {
-        throw std::runtime_error("DG parameters are not set. Cannot calculate "
-                                 "transverse width from DG parameters.");
-    }
-    */
 
     // convert to EE parameters
     const auto [normal_distance, module_center_distance, angle] =

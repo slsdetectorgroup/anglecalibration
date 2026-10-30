@@ -18,15 +18,14 @@ def env_data_path():
 
 my_path = env_data_path()
 
-num_modules = 48
+dgparameters = np.loadtxt(my_path / "Angcal_2E_Feb2023_P29.csv", delimiter=",", dtype=np.float64, skiprows=1) # initial DG parameters for calibration
+
 # setup mythen detector specifications - stores all relevant parameters of the detector setup
-mythen_detector = MythenDetector(num_modules) 
+mythen_detector = MythenDetector(dgparameters) 
 
 mythen_detector.elastic_correction_factor =  0.0045 
 mythen_detector.detector_vertical_axis_offset = 24.8 
 mythen_detector.offset = 0.0 # additional offset to sample detector offset 
-
-mythen_detector.DGparameters = np.loadtxt(my_path / "Angcal_2E_Feb2023_P29.csv", delimiter=",", dtype=np.float64, skiprows=1) # initial DG parameters for calibration
 
 print("mythen detector setup")
 

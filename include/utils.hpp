@@ -224,6 +224,79 @@ inline void read_csv(const std::filesystem::path &filename,
 }
 
 /**
+ * @brief reads a comma separated file into a newly allocated 2D array
+ * (rows x NumCols), the number of rows is determined from the file
+ * @tparam T type of the values in the csv file
+ * @tparam NumCols number of expected columns per row
+ * @param filename path to csv file
+ * @param skip_header if true the first line is skipped
+ * @return array of shape (num_rows, NumCols)
+ */
+template <typename T, ssize_t NumCols>
+NDArray<T, 2> read_csv(const std::filesystem::path &filename,
+                       const bool skip_header = true) {
+    static_assert(NumCols > 0, "NumCols must be positive");
+
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open file: " + filename.string());
+    }
+
+    std::string line;
+    if (skip_header) {
+        std::getline(file, line);
+    }
+
+    std::vector<T> values;
+    ssize_t row = 0;
+    while (std::getline(file, line)) {
+        if (line.empty() || line == "\r")
+            continue;
+
+        std::stringstream line_stream(line);
+        std::string value;
+        ssize_t col = 0;
+
+        while (std::getline(line_stream, value, ',')) {
+            if (col >= NumCols) {
+                throw std::runtime_error(
+                    "More columns in row " + std::to_string(row) + " of " +
+                    filename.string() + " than expected (" +
+                    std::to_string(NumCols) + ")");
+            }
+            if constexpr (std::is_floating_point_v<T>) {
+                values.push_back(static_cast<T>(std::stod(value)));
+            } else if constexpr (std::is_integral_v<T>) {
+                values.push_back(static_cast<T>(std::stoll(value)));
+            } else {
+                std::stringstream value_stream(value);
+                T parsed_value;
+                if (!(value_stream >> parsed_value)) {
+                    throw std::runtime_error("Could not parse value '" + value +
+                                             "' in row " + std::to_string(row) +
+                                             " of " + filename.string());
+                }
+                values.push_back(parsed_value);
+            }
+            ++col;
+        }
+
+        if (col != NumCols) {
+            throw std::runtime_error("Expected " + std::to_string(NumCols) +
+                                     " columns in row " + std::to_string(row) +
+                                     " of " + filename.string() + " but got " +
+                                     std::to_string(col));
+        }
+        ++row;
+    }
+
+    NDArray<T, 2> array(std::array<ssize_t, 2>{row, NumCols});
+    std::copy(values.begin(), values.end(), array.begin());
+
+    return array;
+}
+
+/**
  * @brief reads flatfield file (columns: strip_index, flatfield, error, ...)
  * @return array of shape (num_strips, 2) with flatfield value and error per
  * strip
