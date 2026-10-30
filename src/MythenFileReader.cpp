@@ -42,34 +42,26 @@ EpicsMythenFileReader::EpicsMythenFileReader(
 
 /**
  * @brief read current frame and advance to the next frame
- * @return MythenFrame storing the photon counts, channel mask,
- * detector position [degrees], incident intensity and exposure time
+ * @return tuple of header (channel mask, detector position [degrees],
+ * incident intensity and exposure time) and MythenFrame storing the photon
+ * counts
  */
-MythenFrame EpicsMythenFileReader::read_frame() {
-    if (m_current_frame_index >= m_total_frames) {
-        throw std::runtime_error(LOCATION + "No frames left to read");
-    }
-
+std::tuple<EpicsMythenHeader, MythenFrame> EpicsMythenFileReader::read_frame() {
     MythenFrame frame(aare::Frame(
         1, static_cast<uint32_t>(m_cols),
         Dtype(*m_dtype))); // TODO: take into account multiple frames
 
-    frame.detector_angle = read_detector_angle(m_current_frame_index);
-    frame.incident_intensity = read_incident_intensity(m_current_frame_index);
-    frame.channel_mask = counter_mask_to_channel_indices(
-        read_attribute<uint32_t>("CounterMask", m_current_frame_index));
-    frame.exposure_time =
-        read_attribute<double>("AcquireTime", m_current_frame_index);
+    EpicsMythenHeader header{};
+    read_into(frame.data(), &header);
 
-    read_into(frame.data());
-
-    return frame;
+    return {header, std::move(frame)};
 }
 
 /**
  * @brief read frame at frame_index and advance to the next frame
  */
-MythenFrame EpicsMythenFileReader::read_frame(size_t frame_index) {
+std::tuple<EpicsMythenHeader, MythenFrame>
+EpicsMythenFileReader::read_frame(size_t frame_index) {
     seek(frame_index);
     return read_frame();
 }
@@ -77,14 +69,20 @@ MythenFrame EpicsMythenFileReader::read_frame(size_t frame_index) {
 /**
  * @brief read the next n_frames frames, opens the next file if all frames of
  * the current file are read
+ * @return tuple of headers and frames
  */
-std::vector<MythenFrame> EpicsMythenFileReader::read_n(size_t n_frames) {
+std::tuple<std::vector<EpicsMythenHeader>, std::vector<MythenFrame>>
+EpicsMythenFileReader::read_n(size_t n_frames) {
+    std::vector<EpicsMythenHeader> headers;
     std::vector<MythenFrame> frames;
+    headers.reserve(n_frames);
     frames.reserve(n_frames);
     for (size_t i = 0; i < n_frames; ++i) {
-        frames.push_back(read_frame());
+        auto [header, frame] = read_frame();
+        headers.push_back(header);
+        frames.push_back(std::move(frame));
     }
-    return frames;
+    return {std::move(headers), std::move(frames)};
 }
 
 /**
@@ -92,10 +90,16 @@ std::vector<MythenFrame> EpicsMythenFileReader::read_n(size_t n_frames) {
  * next frame
  * @param buffer buffer to read the frame into (caller is responsible for
  * allocating bytes_per_frame() bytes)
+ * @param header optional header to fill with the meta data of the frame
  */
-void EpicsMythenFileReader::read_into(std::byte *buffer) {
+void EpicsMythenFileReader::read_into(std::byte *buffer,
+                                      EpicsMythenHeader *header) {
     if (m_current_frame_index >= m_total_frames) {
         throw std::runtime_error(LOCATION + "No frames left to read");
+    }
+
+    if (header) {
+        *header = read_header(m_current_frame_index);
     }
 
     auto dataset_photon_count = get_dataset("/entry/instrument/detector/data");
@@ -121,11 +125,25 @@ void EpicsMythenFileReader::read_into(std::byte *buffer) {
  * @brief read photon counts of the next n_frames frames into buffer
  * @param buffer buffer to read the frames into (caller is responsible for
  * allocating n_frames * bytes_per_frame() bytes)
+ * @param headers optional array of headers to fill with the meta data of the
+ * frames (caller is responsible for allocating n_frames headers)
  */
-void EpicsMythenFileReader::read_into(std::byte *buffer, size_t n_frames) {
+void EpicsMythenFileReader::read_into(std::byte *buffer, size_t n_frames,
+                                      EpicsMythenHeader *headers) {
     for (size_t i = 0; i < n_frames; ++i) {
-        read_into(buffer + i * bytes_per_frame());
+        read_into(buffer + i * bytes_per_frame(),
+                  headers ? headers + i : nullptr);
     }
+}
+
+EpicsMythenHeader EpicsMythenFileReader::read_header(size_t frame_index) {
+    EpicsMythenHeader header{};
+    header.detector_angle = read_detector_angle(frame_index);
+    header.incident_intensity = read_incident_intensity(frame_index);
+    header.exposure_time = read_attribute<double>("AcquireTime", frame_index);
+    header.channel_mask = counter_mask_to_channel_indices(
+        read_attribute<uint32_t>("CounterMask", frame_index));
+    return header;
 }
 
 /**
