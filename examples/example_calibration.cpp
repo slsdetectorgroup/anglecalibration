@@ -62,8 +62,6 @@ int main() {
 
     flat_field_ptr->read_normalized_flatfield_from_file(flatfield_filename);
 
-    auto mythen_file_reader = std::make_shared<EpicsMythenFileReader>();
-
     AngleCalibration anglecalibration(mythen_detector_ptr, flat_field_ptr);
 
     LOG(TLogLevel::logINFO) << "read initial parameters from file";
@@ -72,17 +70,10 @@ int main() {
 
     LOG(TLogLevel::logINFO) << "read bad channels";
 
-    std::vector<std::string> filelist(num_files); // 1501
+    EpicsMythenFileReader mythen_file_reader(
+        file_path / (acquisition_fileprefix + "0000.h5"));
 
-    size_t i = 0;
-    std::generate(filelist.begin(), filelist.end(),
-                  [&i, &file_path, &acquisition_fileprefix]() {
-                      return file_path / (acquisition_fileprefix +
-                                          fmt::format("{:04}", i++) + ".h5");
-                  });
-
-    auto [left_angle, right_angle] =
-        get_detector_range(mythen_file_reader, filelist);
+    auto [left_angle, right_angle] = get_detector_range(mythen_file_reader);
 
     LOG(TLogLevel::logINFO) << fmt::format("detector range [degrees]: [{},{}]",
                                            left_angle, right_angle);
@@ -94,10 +85,10 @@ int main() {
             mythen_detector_ptr->diffraction_angle_from_DG_parameters(
                 23, 0.0, 1279, +1.0));
 
-    auto first_frame = mythen_file_reader->read_frame(filelist[0]);
+    auto [first_header, first_frame] = mythen_file_reader.read_frame();
     LOG(TLogLevel::logINFO)
         << fmt::format("incident intensity of first frame: {}",
-                       first_frame.incident_intensity);
+                       first_header.incident_intensity);
 
     LOG(TLogLevel::logDEBUG) << "selecting base peak";
 
@@ -119,13 +110,11 @@ int main() {
                        anglecalibration.get_angular_range(),
                        anglecalibration.get_histogram_bin_width());
 
-    auto test_frame_name = file_path / (acquisition_fileprefix + "0209.h5");
-
-    auto test_frame = mythen_file_reader->read_frame(test_frame_name);
+    auto [test_header, test_frame] = mythen_file_reader.read_frame(209);
 
     // plot some stuff
     double test_frame_angle =
-        test_frame
+        test_header
             .detector_angle; // mythen_file_reader->read_detector_angle(test_frame_name);
 
     AngularConversion angularconversion(
@@ -137,12 +126,12 @@ int main() {
 
     angularconversion.set_bad_channels(anglecalibration.get_bad_channels());
 
-    angularconversion.set_scale_factor(first_frame.incident_intensity);
+    angularconversion.set_scale_factor(first_header.incident_intensity);
 
     // plot one module for fixed angle width bins
     auto module_redistributed_to_fixed_angle_bins = angularconversion.convert(
-        test_frame.photon_counts(), test_frame.detector_angle,
-        test_frame.incident_intensity, test_frame.exposure_time);
+        test_frame.photon_counts(), test_header.detector_angle,
+        test_header.incident_intensity, test_header.exposure_time);
 
     plotter.plot_diffraction_pattern(
         module_redistributed_to_fixed_angle_bins.view(), 1, test_frame_angle);
@@ -152,20 +141,16 @@ int main() {
                            base_peak_angle,
                            anglecalibration.get_base_peak_ROI_width());
 
-    // read all acquisitions into frames (rows: acquisitions, cols: channels)
-    NDArray<uint32_t, 2> frames(std::array<ssize_t, 2>{
-        static_cast<ssize_t>(filelist.size()), first_frame.size()});
+    mythen_file_reader.seek(0); // reset to first frame
+    NDArray<EpicsMythenHeader, 1> headers;
+    NDArray<uint32_t, 2> frames;
+    std::tie(headers, frames) = mythen_file_reader.read_n(
+        num_files); // TODO: maybe read_all would be great
     NDArray<double, 1> detector_angles(
-        std::array<ssize_t, 1>{static_cast<ssize_t>(filelist.size())});
-
-    for (size_t frame_index = 0; frame_index < filelist.size(); ++frame_index) {
-
-        mythen_file_reader->read_into(
-            frames.buffer() + frame_index * frames.byte_strides()[0],
-            filelist[frame_index]);
-        detector_angles[frame_index] =
-            mythen_file_reader->read_detector_angle(filelist[frame_index]);
-    }
+        std::array<ssize_t, 1>{static_cast<ssize_t>(num_files)});
+    std::transform(
+        headers.begin(), headers.end(), detector_angles.begin(),
+        [](const EpicsMythenHeader &header) { return header.detector_angle; });
 
     anglecalibration.calibrate<true>(frames.view(), detector_angles.view(),
                                      base_peak_angle, 1);

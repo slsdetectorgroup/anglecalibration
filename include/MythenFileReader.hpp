@@ -98,8 +98,10 @@ class EpicsMythenFileReader : public HDF5FileReader {
     read_frame(); // current frame, advances
     std::tuple<EpicsMythenHeader, MythenFrame>
     read_frame(size_t frame_index); // seek + read_frame()
-    std::tuple<std::vector<EpicsMythenHeader>, std::vector<MythenFrame>>
-    read_n(size_t n_frames);
+
+    std::tuple<NDArray<EpicsMythenHeader, 1>, NDArray<uint32_t, 2>>
+    read_n(size_t n_frames); // shape (n_frames, pixels_per_frame())
+
     void read_into(std::byte *buffer,
                    EpicsMythenHeader *header = nullptr); // advances
     void read_into(std::byte *buffer, size_t n_frames,
@@ -141,6 +143,9 @@ class EpicsMythenFileReader : public HDF5FileReader {
     template <typename T>
     T read_attribute(const std::string &dataset_name, size_t frame_index) const;
 
+    /// @brief throws if T does not match the data type of the photon counts
+    template <typename T> void check_dtype() const;
+
     std::filesystem::path m_path{};
     std::string m_base_name{};
     size_t m_max_digits_file_index{};
@@ -153,6 +158,14 @@ class EpicsMythenFileReader : public HDF5FileReader {
     const std::type_info *m_dtype{nullptr}; ///< data type of photon counts
     std::ifstream incident_intensities_file{};
 };
+
+template <typename T> void EpicsMythenFileReader::check_dtype() const {
+    if (typeid(T) != *m_dtype) {
+        throw std::runtime_error(
+            LOCATION + "Requested data type does not match data type " +
+            Dtype(*m_dtype).to_string() + " of photon counts");
+    }
+}
 
 /**
  * @brief store as array

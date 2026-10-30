@@ -16,28 +16,23 @@ inline auto data_path() {
 namespace angcal {
 
 inline std::pair<double, double>
-get_detector_range(std::shared_ptr<MythenFileReader> mythen_file_reader,
-                   const std::vector<std::string> &file_list) {
+get_detector_range(EpicsMythenFileReader &mythen_file_reader) {
 
     // Files are ordered by angle already
-    double min_detector_angle =
-        mythen_file_reader->read_detector_angle(file_list.front());
-    double max_detector_angle =
-        mythen_file_reader->read_detector_angle(file_list.back());
+    double min_detector_angle = mythen_file_reader.read_detector_angle(0);
+    double max_detector_angle = mythen_file_reader.read_detector_angle(
+        mythen_file_reader.total_frames() - 1);
 
     return std::make_pair(max_detector_angle, min_detector_angle);
 }
 
-inline void
-get_angle_range_of_module(std::shared_ptr<MythenFileReader> mythen_file_reader,
-                          const std::vector<std::string> &file_list,
-                          const MythenDetector &mythen_detector,
-                          const size_t module_index) {
+inline void get_angle_range_of_module(EpicsMythenFileReader &mythen_file_reader,
+                                      const MythenDetector &mythen_detector,
+                                      const size_t module_index) {
 
     constexpr size_t last_strip = MythenDetector::strips_per_module() - 1;
 
-    double detector_angle =
-        mythen_file_reader->read_detector_angle(file_list[0]);
+    double detector_angle = mythen_file_reader.read_detector_angle(0);
     double max_left_module_angle =
         mythen_detector.diffraction_angle_from_DG_parameters(
             module_index, detector_angle, 0, 0.0);
@@ -48,8 +43,8 @@ get_angle_range_of_module(std::shared_ptr<MythenFileReader> mythen_file_reader,
     double min_left_module_angle = max_left_module_angle;
     double min_right_module_angle = max_right_module_angle;
 
-    for (auto &frame : file_list) {
-        detector_angle = mythen_file_reader->read_detector_angle(frame);
+    for (size_t frame = 0; frame < mythen_file_reader.total_frames(); ++frame) {
+        detector_angle = mythen_file_reader.read_detector_angle(frame);
         double left_module_angle =
             mythen_detector.diffraction_angle_from_DG_parameters(
                 module_index, detector_angle, 0, 0.0);
@@ -77,15 +72,13 @@ get_angle_range_of_module(std::shared_ptr<MythenFileReader> mythen_file_reader,
         max_right_module_angle, module_index);
 }
 
-inline void
-get_module_angle_ranges(std::shared_ptr<MythenFileReader> mythen_file_reader,
-                        const std::vector<std::string> &file_list,
-                        const MythenDetector &mythen_detector) {
+inline void get_module_angle_ranges(EpicsMythenFileReader &mythen_file_reader,
+                                    const MythenDetector &mythen_detector) {
 
     for (size_t module_idx = 0; module_idx < mythen_detector.num_modules();
          ++module_idx) {
-        get_angle_range_of_module(mythen_file_reader, file_list,
-                                  mythen_detector, module_idx);
+        get_angle_range_of_module(mythen_file_reader, mythen_detector,
+                                  module_idx);
     }
 }
 
@@ -96,17 +89,15 @@ get_module_angle_ranges(std::shared_ptr<MythenFileReader> mythen_file_reader,
  * detector geometry parameters
  * @param angularconversion shared pointer to AngularConversion class for
  * accessing the angular range and histogram bin width
- * @param mythen_file_reader shared pointer to MythenFileReader for reading
+ * @param mythen_file_reader reference to EpicsMythenFileReader for reading
  * mythen acquisition files
- * @param filelist vector of acquisition files to select base peak from
  * @param module_index optional module index if only one module contributed to
  * diffraction pattern, default is 0.
  */
 inline void
 select_base_peak(std::shared_ptr<MythenDetector> mythen_detector_ptr,
                  std::shared_ptr<AngularConversion> angularconversion,
-                 std::shared_ptr<MythenFileReader> mythen_file_reader,
-                 const std::vector<std::string> &filelist,
+                 EpicsMythenFileReader &mythen_file_reader,
                  const size_t module_index = 0) {
 
     PlotHelper plotter(mythen_detector_ptr,
@@ -127,10 +118,10 @@ select_base_peak(std::shared_ptr<MythenDetector> mythen_detector_ptr,
         "adjusted detector angle range for module {}: {} to {}", module_index,
         detector_angle_range.first, detector_angle_range.second);
 
-    for (const auto &file : filelist) {
+    for (size_t frame = 0; frame < mythen_file_reader.total_frames(); ++frame) {
 
-        LOG(TLogLevel::logDEBUG) << fmt::format("reading file {}", file);
-        double detector_angle = mythen_file_reader->read_detector_angle(file);
+        LOG(TLogLevel::logDEBUG) << fmt::format("reading frame {}", frame);
+        double detector_angle = mythen_file_reader.read_detector_angle(frame);
 
         // -5.0, 5.0 adjust for movement
         if (detector_angle + left_module_strip_angle - 5.0 >
@@ -139,18 +130,18 @@ select_base_peak(std::shared_ptr<MythenDetector> mythen_detector_ptr,
                 detector_angle_range.second) {
 
             LOG(TLogLevel::logINFO)
-                << fmt::format("plotting file {} with detector angle {}", file,
-                               detector_angle);
+                << fmt::format("plotting frame {} with detector angle {}",
+                               frame, detector_angle);
 
-            auto frame = mythen_file_reader->read_frame(
-                file); // read frame to get photon counts for
+            auto [header, frame_data] = mythen_file_reader.read_frame(
+                frame); // read frame to get photon counts for
             // plot module
             auto module_redistributed_to_fixed_angle_bins =
                 angularconversion->convert(
-                    frame.photon_counts(), detector_angle,
-                    frame.incident_intensity,
-                    frame.exposure_time); // always plots diffraction pattern
-                                          // independant of detector location.
+                    frame_data.photon_counts(), detector_angle,
+                    header.incident_intensity,
+                    header.exposure_time); // always plots diffraction pattern
+                                           // independant of detector location.
 
             plotter.plot_diffraction_pattern(
                 module_redistributed_to_fixed_angle_bins.view(), module_index,

@@ -43,9 +43,6 @@ int main() {
     mythen_detector_ptr->elastic_correction_factor(0.0045);
     mythen_detector_ptr->detector_vertical_axis_offset(24.8);
 
-    // FileaReader to read Mythen Files
-    auto mythen_file_reader = std::make_shared<EpicsMythenFileReader>();
-
     NDArray<double, 2> flatfield =
         read_flatfield(flatfield_filename, mythen_detector_ptr->num_modules());
 
@@ -64,43 +61,32 @@ int main() {
 
     LOG(TLogLevel::logINFO) << "read bad channels";
 
-    std::vector<std::string> file_list(4);
-    std::generate(file_list.begin(), file_list.end(),
-                  [n = 60, &file_path]() mutable {
-                      std::string filename =
-                          fmt::format("Fructose_0p2_60_{:04d}.h5", n++);
-                      return (file_path / filename).string();
-                  });
+    EpicsMythenFileReader mythen_file_reader(file_path /
+                                             "Fructose_0p2_60_0060.h5");
 
-    const ssize_t num_frames = file_list.size();
+    NDArray<EpicsMythenHeader, 1> headers;
+    NDArray<uint32_t, 2> frames;
+    std::tie(headers, frames) = mythen_file_reader.read_n(4);
 
-    NDArray<uint32_t, 2> photon_counts(std::array<ssize_t, 2>{
-        num_frames, static_cast<ssize_t>(mythen_detector_ptr->num_strips())});
-    NDArray<double, 1> detector_angles(std::array<ssize_t, 1>{num_frames});
+    double exposure_time = headers[0].exposure_time;
+
+    NDArray<double, 1> detector_angles(
+        std::array<ssize_t, 1>{static_cast<ssize_t>(headers.shape(0))});
     NDArray<uint64_t, 1> incident_intensities(
-        std::array<ssize_t, 1>{num_frames});
+        std::array<ssize_t, 1>{static_cast<ssize_t>(headers.shape(0))});
+    for (ssize_t frame_index = 0; frame_index < headers.shape(0);
+         ++frame_index) {
 
-    double exposure_time =
-        mythen_file_reader->read_frame(file_list[0]).exposure_time;
+        detector_angles[frame_index] = headers[frame_index].detector_angle;
 
-    for (ssize_t frame_index = 0; frame_index < num_frames; ++frame_index) {
-
-        mythen_file_reader->read_into(photon_counts.buffer() +
-                                          frame_index *
-                                              photon_counts.byte_strides()[0],
-                                      file_list[frame_index]);
-
-        detector_angles[frame_index] =
-            mythen_file_reader->read_detector_angle(file_list[frame_index]);
-
-        incident_intensities(frame_index) =
-            mythen_file_reader->read_incident_intensity(file_list[frame_index]);
+        incident_intensities[frame_index] =
+            headers[frame_index].incident_intensity;
     }
 
     angularconversion.set_scale_factor(incident_intensities[0]);
 
     auto redistributed_photon_counts =
-        angularconversion.convert(photon_counts.view(), detector_angles.view(),
+        angularconversion.convert(frames.view(), detector_angles.view(),
                                   incident_intensities.view(), exposure_time);
 
     // plot

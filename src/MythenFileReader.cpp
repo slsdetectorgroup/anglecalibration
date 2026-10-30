@@ -69,20 +69,18 @@ EpicsMythenFileReader::read_frame(size_t frame_index) {
 /**
  * @brief read the next n_frames frames, opens the next file if all frames of
  * the current file are read
- * @return tuple of headers and frames
+ * @return tuple of 1d array of headers and 2d array of photon counts with
+ * shape (n_frames, pixels_per_frame())
  */
-std::tuple<std::vector<EpicsMythenHeader>, std::vector<MythenFrame>>
+std::tuple<NDArray<EpicsMythenHeader, 1>, NDArray<uint32_t, 2>>
 EpicsMythenFileReader::read_n(size_t n_frames) {
-    std::vector<EpicsMythenHeader> headers;
-    std::vector<MythenFrame> frames;
-    headers.reserve(n_frames);
-    frames.reserve(n_frames);
-    for (size_t i = 0; i < n_frames; ++i) {
-        auto [header, frame] = read_frame();
-        headers.push_back(header);
-        frames.push_back(std::move(frame));
-    }
-    return {std::move(headers), std::move(frames)};
+    NDArray<EpicsMythenHeader, 1> headers(
+        std::array<ssize_t, 1>{static_cast<ssize_t>(n_frames)});
+    NDArray<uint32_t, 2> photon_counts(std::array<ssize_t, 2>{
+        static_cast<ssize_t>(n_frames), static_cast<ssize_t>(m_cols)});
+    read_into(reinterpret_cast<std::byte *>(photon_counts.data()), n_frames,
+              headers.data());
+    return {std::move(headers), std::move(photon_counts)};
 }
 
 /**
