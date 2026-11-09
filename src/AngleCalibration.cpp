@@ -80,6 +80,102 @@ const BCParameters &AngleCalibration::get_BCparameters() const {
     return m_mythen_detector->get_BCparameters();
 }
 
+void AngleCalibration::set_calibration_observer(CalibrationObserver observer) {
+    m_calibration_observer = std::move(observer);
+}
+
+void AngleCalibration::notify_calibration_observer(
+    const CalibrationPhase phase, const size_t module_index,
+    const size_t iteration, const double similarity,
+    const NDView<uint32_t, 2> frames_bp_overlap,
+    const NDView<double, 1> detector_angles_bp_overlap,
+    const NDView<uint32_t, 2> frames_bp_overlap_prev_module,
+    const NDView<double, 1> detector_angles_bp_overlap_prev_module) {
+
+    if (!m_calibration_observer) {
+        return;
+    }
+
+    const ssize_t num_bins_in_ROI = get_base_peak_ROI_num_bins();
+
+    const ssize_t num_curves =
+        frames_bp_overlap.shape(0) + frames_bp_overlap_prev_module.shape(0);
+
+    const auto &BCparameters = m_mythen_detector->get_BCparameters();
+
+    CalibrationStep step;
+    step.module_index = module_index;
+    step.phase = phase;
+    step.iteration = iteration;
+    step.similarity = similarity;
+    step.parameters = {
+        BCparameters.module_center_sample_distances(module_index),
+        BCparameters.angle_center_module_normal(module_index),
+        BCparameters.angle_center_beam(module_index)};
+
+    step.bin_angles.resize(num_bins_in_ROI);
+    for (ssize_t bin_index = 0; bin_index < num_bins_in_ROI; ++bin_index) {
+        step.bin_angles[bin_index] = bin_index * histogram_bin_width -
+                                     base_peak_roi_width + base_peak_angle;
+    }
+
+    step.detector_angles.reserve(num_curves);
+    step.curve_modules.reserve(num_curves);
+    step.base_peak_curves =
+        NDArray<double, 2>(std::array<ssize_t, 2>{num_curves, num_bins_in_ROI},
+                           std::numeric_limits<double>::quiet_NaN());
+
+    ssize_t curve_index = 0;
+
+    auto add_curves = [&](const size_t mod_index,
+                          const NDView<uint32_t, 2> frames,
+                          const NDView<double, 1> detector_angles) {
+        for (ssize_t frame_index = 0; frame_index < frames.shape(0);
+             ++frame_index) {
+
+            const double detector_angle = detector_angles[frame_index];
+
+            step.detector_angles.push_back(detector_angle);
+            step.curve_modules.push_back(mod_index);
+
+            if (base_peak_is_in_module(mod_index, detector_angle)) {
+
+                NDArray<double, 2> weighted_sums(
+                    std::array<ssize_t, 2>{num_bins_in_ROI, 3},
+                    -1.0); // weighted moments of order 0-2 for each bin
+
+                NDArray<size_t, 1> num_contributing_photons(
+                    std::array<ssize_t, 1>{num_bins_in_ROI}, 0);
+
+                process_photon_counts(mod_index, frames.sub_view(frame_index),
+                                      detector_angle, weighted_sums.view(),
+                                      num_contributing_photons.view());
+
+                for (ssize_t i = 0; i < num_bins_in_ROI; ++i) {
+                    if (weighted_sums(i, 0) == -1.0) {
+                        continue;
+                    }
+                    step.base_peak_curves(curve_index, i) =
+                        weighted_sums(i, 0) <
+                                std::numeric_limits<double>::epsilon()
+                            ? 0.0
+                            : weighted_sums(i, 1) / weighted_sums(i, 0);
+                }
+            }
+            ++curve_index;
+        }
+    };
+
+    // previous module first (only passed for phase Offset)
+    if (frames_bp_overlap_prev_module.shape(0) > 0) {
+        add_curves(module_index - 1, frames_bp_overlap_prev_module,
+                   detector_angles_bp_overlap_prev_module);
+    }
+    add_curves(module_index, frames_bp_overlap, detector_angles_bp_overlap);
+
+    m_calibration_observer(step);
+}
+
 void AngleCalibration::set_angular_range(const double min_angle,
                                          const double max_angle) {
     m_min_angle = min_angle;
@@ -528,6 +624,12 @@ void AngleCalibration::optimize_offset_parameter(
         plot->show();
     }
 
+    notify_calibration_observer(CalibrationPhase::Offset, module_index, 0,
+                                previous_similarity_of_peaks, frames_bp_overlap,
+                                detector_angles_bp_overlap,
+                                frames_bp_overlap_prev_module,
+                                detector_angles_bp_overlap_prev_module);
+
     double next_similarity_of_peaks{};
 
     // define search direction
@@ -593,6 +695,12 @@ void AngleCalibration::optimize_offset_parameter(
                                next_difference_in_peaks);
 
             ++iteration_index;
+
+            notify_calibration_observer(
+                CalibrationPhase::Offset, module_index, iteration_index,
+                next_similarity_of_peaks, frames_bp_overlap,
+                detector_angles_bp_overlap, frames_bp_overlap_prev_module,
+                detector_angles_bp_overlap_prev_module);
 
             if (plot) {
                 calculate_similarity_of_peaks_between_modules<true>(
@@ -697,6 +805,12 @@ void AngleCalibration::optimize_offset_parameter(
 
             ++iteration_index;
 
+            notify_calibration_observer(
+                CalibrationPhase::Offset, module_index, iteration_index,
+                next_similarity_of_peaks, frames_bp_overlap,
+                detector_angles_bp_overlap, frames_bp_overlap_prev_module,
+                detector_angles_bp_overlap_prev_module);
+
             if (plot) {
                 calculate_similarity_of_peaks_between_modules<true>(
                     module_index, frames_bp_overlap, detector_angles_bp_overlap,
@@ -787,6 +901,11 @@ void AngleCalibration::optimize_coupled_parameters(
 
     LOG(logDEBUG) << fmt::format("initial similarity of peaks: {}",
                                  previous_similarity_of_peaks);
+
+    notify_calibration_observer(CalibrationPhase::CoupledParameters,
+                                module_index, 0, previous_similarity_of_peaks,
+                                frames_with_base_peak_overlap,
+                                detector_angles_bp_overlap);
 
     auto objective_function1 = [this, &module_index,
                                 &frames_with_base_peak_overlap,
@@ -894,6 +1013,12 @@ void AngleCalibration::optimize_coupled_parameters(
                                 optimality_criterion < 1.0e-4;
 
         ++iteration_index;
+
+        notify_calibration_observer(CalibrationPhase::CoupledParameters,
+                                    module_index, iteration_index,
+                                    optimized_similarity,
+                                    frames_with_base_peak_overlap,
+                                    detector_angles_bp_overlap);
     }
 }
 

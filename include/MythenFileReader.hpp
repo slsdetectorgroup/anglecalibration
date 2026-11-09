@@ -181,10 +181,10 @@ NDArray<T> store_as_array(const std::filesystem::path &filename) {
     std::ifstream file;
     file.open(filename); // do i need to open with std::ios::ate?
 
-    size_t lineCount = std::count(std::istreambuf_iterator<char>(file),
-                                  std::istreambuf_iterator<char>(), '\n') +
-                       1; // TODO: buggy, think about other filesystem - raw,
-                          // binary file easier
+    ssize_t lineCount = std::count(std::istreambuf_iterator<char>(file),
+                                   std::istreambuf_iterator<char>(), '\n') +
+                        1; // TODO: buggy, think about other filesystem - raw,
+                           // binary file easier
 
     NDArray<T, 1> array{std::array<ssize_t, 1>{lineCount}};
 

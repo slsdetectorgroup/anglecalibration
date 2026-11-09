@@ -31,6 +31,9 @@ set( PYTHON_FILES
     angcal/__init__.py
     angcal/PlotHelper.py
     angcal/utils.py
+    angcal/steps.py
+    angcal/worker.py
+    angcal/gui.py
 )
 
 # Copy the python files to the build directory

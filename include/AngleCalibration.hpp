@@ -14,6 +14,7 @@
 #include <thread>
 #include <vector>
 
+#include "CalibrationStep.hpp"
 #include "FlatField.hpp"
 #include "MythenDetector.hpp"
 #include "MythenFileReader.hpp"
@@ -165,6 +166,15 @@ class AngleCalibration {
      * @brief check if a module only has bad channels
      */
     bool module_is_disconnected(const size_t module_index) const;
+
+    /**
+     * @brief set a function which is called with the state of the calibration
+     * after each optimization step e.g. to record or visualize the
+     * calibration process
+     * @param observer function called with each CalibrationStep, pass nullptr
+     * to disable
+     */
+    void set_calibration_observer(CalibrationObserver observer);
 
     /**
      * @brief sets the angular range for the diffraction pattern e.g.
@@ -400,6 +410,34 @@ class AngleCalibration {
         std::shared_ptr<PlotCalibrationProcess> plot = nullptr,
         double delta_parameter = 0.005);
 
+    /**
+     * @brief passes the current state of the calibration of a module to the
+     * calibration observer
+     * @param phase part of the calibration the step belongs to
+     * @param module_index index of module being calibrated
+     * @param iteration index of optimization step
+     * @param similarity similarity criterion of the current state
+     * @param frames_with_base_peak_overlap frames with base peak overlap for
+     * module
+     * @param detector_angles_with_base_peak_overlap 1D NDView of monitor
+     * positions for acquisitions for the module
+     * @param frames_with_base_peak_overlap_prev_module frames with base peak
+     * overlap for previous module (only for phase Offset)
+     * @param detector_angles_with_base_peak_overlap_prev_module 1D NDView of
+     * monitor positions for acquisitions for the previous module (only for
+     * phase Offset)
+     */
+    void notify_calibration_observer(
+        const CalibrationPhase phase, const size_t module_index,
+        const size_t iteration, const double similarity,
+        const NDView<uint32_t, 2> frames_with_base_peak_overlap,
+        const NDView<double, 1> detector_angles_with_base_peak_overlap,
+        const NDView<uint32_t, 2> frames_with_base_peak_overlap_prev_module =
+            NDView<uint32_t, 2>{},
+        const NDView<double, 1>
+            detector_angles_with_base_peak_overlap_prev_module =
+                NDView<double, 1>{});
+
     /*
     void plot_calibration_step_coupled_parameters(
         const size_t module_index,
@@ -450,6 +488,11 @@ class AngleCalibration {
 
     /// @brief  maximum angle for angular conversion [degrees]
     double m_max_angle = 180.0;
+
+    /**
+     * function called after each optimization step of the calibration
+     */
+    CalibrationObserver m_calibration_observer{};
 };
 
 template <bool visualize_calibration>

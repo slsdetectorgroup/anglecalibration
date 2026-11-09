@@ -17,6 +17,14 @@ dependencies = [
     "matplotlib",
 ] # is aare a dependency? 
 
+[project.optional-dependencies]
+gui = [
+    "nicegui",
+    "plotly",
+    "pyzmq",
+    "h5py",
+]
+
 
 [tool.cibuildwheel.linux]
 build = "cp{312,313,314}-manylinux_x86_64"

@@ -1,5 +1,6 @@
 #include "bind_AngleCalibration.hpp"
 #include "bind_AngleConversion.hpp"
+#include "bind_CalibrationStep.hpp"
 #include "bind_FlatField.hpp"
 #include "bind_MythenDetector.hpp"
 #include "bind_MythenFileReader.hpp"
@@ -22,4 +23,5 @@ PYBIND11_MODULE(_angcal, m) {
     define_MythenFrame_bindings(m);
     define_MythenFileReader_bindings(m);
     define_Parameters_binding(m);
+    define_CalibrationStep_binding(m);
 }

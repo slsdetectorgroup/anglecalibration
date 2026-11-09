@@ -24,7 +24,8 @@ message(STATUS "Found Python3: ${Python3_EXECUTABLE}, include dirs: ${Python3_IN
 
 FetchContent_Declare(matplotlib_cpp
     GIT_REPOSITORY https://github.com/lava/matplotlib-cpp
-    GIT_TAG master)
+    GIT_TAG master
+    EXCLUDE_FROM_ALL) # don't build matplotlib-cpp's examples (they fail on macOS), requires CMake >= 3.28
 FetchContent_MakeAvailable(matplotlib_cpp)
 
 if(TARGET matplotlib_cpp)
@@ -52,7 +53,11 @@ target_include_directories(angle_calibration SYSTEM PUBLIC
     $<BUILD_INTERFACE:${matplotlib_cpp_SOURCE_DIR}>
 )
 
-target_link_libraries(angle_calibration PUBLIC Python3::Python Python3::NumPy)
+# executables embed the interpreter and need libpython, the python extension must not link it:
+# the importing interpreter already provides the symbols and a second copy segfaults on macOS
+target_link_libraries(angle_calibration PUBLIC
+    $<IF:$<STREQUAL:$<TARGET_PROPERTY:TYPE>,MODULE_LIBRARY>,Python3::Module,Python3::Python>
+    Python3::NumPy)
 
 
 

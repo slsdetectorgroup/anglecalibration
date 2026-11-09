@@ -1,6 +1,7 @@
 
 #include "AngleCalibration.hpp"
 #include <filesystem>
+#include <pybind11/functional.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -223,5 +224,17 @@ void define_AngleCalibration_binding(py::module &m) {
                 angle of base peak center [degree]
             plot_calibration_process: bool, default: false
                 Whether to plot the calibration process
-            )");
+            )")
+
+        .def("set_calibration_observer",
+             &AngleCalibration::set_calibration_observer,
+             py::arg("observer"),
+             R"(
+             set a function which is called after each optimization step of the calibration e.g. to record or visualize the calibration process
+
+             Parameters
+             ----------
+             observer: Callable[[CalibrationStep], None] or None
+                function called with each CalibrationStep, None disables it
+             )");
 }
