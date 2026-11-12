@@ -1,5 +1,6 @@
 #pragma once
 #include "AngleCalibration.hpp"
+#include "AngularConversion.hpp"
 #include "MythenDetector.hpp"
 #include "PlotHelpers.hpp"
 #include "logger.hpp"
@@ -87,8 +88,11 @@ inline void get_module_angle_ranges(EpicsMythenFileReader &mythen_file_reader,
  * module and clicking through frames where module is within range of [6°, 33°]
  * @param mythen_detector_ptr shared pointer to MythenDetector holding the
  * detector geometry parameters
- * @param angularconversion shared pointer to AngularConversion class for
- * accessing the angular range and histogram bin width
+ * @param histogram_meta_data angular range and bin width of fixed angle width
+ * histogram
+ * @param bad_channels bad channels of detector (num_strips,)
+ * @param flatfield normalized flatfield (num_strips, 2)
+ * @param scale_factor scale factor for incident intensity correction
  * @param mythen_file_reader reference to EpicsMythenFileReader for reading
  * mythen acquisition files
  * @param module_index optional module index if only one module contributed to
@@ -96,13 +100,15 @@ inline void get_module_angle_ranges(EpicsMythenFileReader &mythen_file_reader,
  */
 inline void
 select_base_peak(std::shared_ptr<MythenDetector> mythen_detector_ptr,
-                 std::shared_ptr<AngularConversion> angularconversion,
+                 const HistogramMetaData &histogram_meta_data,
+                 const NDView<const bool, 1> bad_channels,
+                 const NDView<const double, 2> flatfield,
+                 const double scale_factor,
                  EpicsMythenFileReader &mythen_file_reader,
                  const size_t module_index = 0) {
 
-    PlotHelper plotter(mythen_detector_ptr,
-                       angularconversion->get_angular_range(),
-                       angularconversion->get_histogram_bin_width());
+    PlotHelper plotter(mythen_detector_ptr, histogram_meta_data.angular_range,
+                       histogram_meta_data.bin_width);
     plotter.overwrite_plot();
 
     auto detector_angle_range = std::make_pair(
@@ -137,11 +143,12 @@ select_base_peak(std::shared_ptr<MythenDetector> mythen_detector_ptr,
                 frame); // read frame to get photon counts for
             // plot module
             auto module_redistributed_to_fixed_angle_bins =
-                angularconversion->convert(
-                    frame_data.photon_counts(), detector_angle,
-                    header.incident_intensity,
-                    header.exposure_time); // always plots diffraction pattern
-                                           // independant of detector location.
+                convert(*mythen_detector_ptr, histogram_meta_data,
+                        frame_data.photon_counts(), detector_angle,
+                        header.incident_intensity, header.exposure_time,
+                        bad_channels, flatfield,
+                        scale_factor); // always plots diffraction pattern
+                                       // independant of detector location.
 
             plotter.plot_diffraction_pattern(
                 module_redistributed_to_fixed_angle_bins.view(), module_index,

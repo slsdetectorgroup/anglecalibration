@@ -1,18 +1,39 @@
 #include "AngularConversion.hpp"
 #include "PhotonCountProcessing.hpp"
+#include "logger.hpp"
+
+#include <limits>
+#include <stdexcept>
 
 namespace angcal {
 
-ssize_t AngularConversion::num_fixed_angle_width_bins() const {
-    ssize_t num_fixed_angle_width_bins =
-        std::ceil(m_max_angle / histogram_bin_width) -
-        std::floor(m_min_angle / histogram_bin_width);
-    return num_fixed_angle_width_bins;
+namespace {
+
+void check_calibration_inputs(const MythenDetector &mythen_detector,
+                              const NDView<const bool, 1> bad_channels,
+                              const NDView<const double, 2> flatfield) {
+    if (bad_channels.shape(0) != mythen_detector.num_strips()) {
+        throw std::runtime_error(fmt::format(
+            "bad_channels must have {} entries (one per strip), got {}",
+            mythen_detector.num_strips(), bad_channels.shape(0)));
+    }
+    if (flatfield.shape(0) != mythen_detector.num_strips() ||
+        flatfield.shape(1) != 2) {
+        throw std::runtime_error(fmt::format(
+            "flatfield must have shape ({}, 2), got ({}, {})",
+            mythen_detector.num_strips(), flatfield.shape(0),
+            flatfield.shape(1)));
+    }
 }
 
-inline std::pair<double, double> AngularConversion::photon_count_correction(
-    double photon_counts, const double exposure_time, const uint64_t I0,
-    const size_t global_strip_index) const {
+} // namespace
+
+std::pair<double, double>
+photon_count_correction(const MythenDetector &mythen_detector,
+                        const NDView<const double, 2> flatfield,
+                        const double scale_factor, double photon_counts,
+                        const double exposure_time, const uint64_t I0,
+                        const size_t global_strip_index) {
 
     if (photon_counts < std::numeric_limits<double>::epsilon()) {
         return std::pair(0.0, 0.0); // sanity check
@@ -24,15 +45,14 @@ inline std::pair<double, double> AngularConversion::photon_count_correction(
     auto [rate_corrected_photon_counts, rate_corrected_photon_counts_error] =
         rate_correction(
             photon_counts, photon_counts, exposure_time,
-            m_mythen_detector
-                ->dead_time()); // same variance as poisson distributed
-                                // - maybe sqaured?
+            mythen_detector.dead_time()); // same variance as poisson
+                                          // distributed - maybe sqaured?
 
     auto [incident_intensity_corrected_photon_counts,
           incident_intensity_corrected_photon_counts_variance] =
         incident_intensity_correction(rate_corrected_photon_counts,
                                       rate_corrected_photon_counts_error, I0,
-                                      m_scale_factor);
+                                      scale_factor);
 
     const size_t module_index =
         global_strip_index / MythenDetector::strips_per_module();
@@ -40,7 +60,7 @@ inline std::pair<double, double> AngularConversion::photon_count_correction(
         global_strip_index % MythenDetector::strips_per_module();
 
     const double transverse_width =
-        m_mythen_detector->transverse_width(module_index, strip_index, false);
+        mythen_detector.transverse_width(module_index, strip_index, false);
 
     auto [transverse_width_corrected_photon_counts,
           transverse_width_corrected_photon_counts_variance] =
@@ -64,14 +84,22 @@ inline std::pair<double, double> AngularConversion::photon_count_correction(
         flatfield_normalized_photon_counts_variance};
 }
 
-void AngularConversion::process_photon_counts(
-    const size_t module_index, const NDView<uint32_t, 1> frame,
-    const double detector_angle, const double exposure_time,
-    const uint64_t incident_intensity, NDView<double, 2> weighted_moments,
-    NDView<size_t, 1> num_contributing_photons) {
+void process_photon_counts(const MythenDetector &mythen_detector,
+                           const HistogramMetaData &histogram_meta_data,
+                           const NDView<const bool, 1> bad_channels,
+                           const NDView<const double, 2> flatfield,
+                           const double scale_factor, const size_t module_index,
+                           const NDView<uint32_t, 1> frame,
+                           const double detector_angle,
+                           const double exposure_time,
+                           const uint64_t incident_intensity,
+                           NDView<double, 2> weighted_moments,
+                           NDView<size_t, 1> num_contributing_photons) {
 
-    double left_boundary_roi_base_peak = m_min_angle;  // dummy values
-    double right_boundary_roi_base_peak = m_max_angle; // dummy values
+    const auto [min_angle, max_angle] = histogram_meta_data.angular_range;
+
+    double left_boundary_roi_base_peak = min_angle;  // dummy values
+    double right_boundary_roi_base_peak = max_angle; // dummy values
 
     // iterate over all strips of module
     for (ssize_t strip_index = 0;
@@ -85,31 +113,32 @@ void AngularConversion::process_photon_counts(
         }
 
         double left_strip_boundary_angle =
-            m_mythen_detector->diffraction_angle_from_DG_parameters(
+            mythen_detector.diffraction_angle_from_DG_parameters(
                 module_index, detector_angle, strip_index,
                 0.0); // left strip boundary in angles [degrees]
 
         double right_strip_boundary_angle =
-            m_mythen_detector->diffraction_angle_from_DG_parameters(
+            mythen_detector.diffraction_angle_from_DG_parameters(
                 module_index, detector_angle, strip_index,
                 +1.0); // right strip boundary in angles [degrees]
 
         // skip strip if not in ROI
-        if (left_strip_boundary_angle > m_max_angle ||
-            right_strip_boundary_angle < m_min_angle) {
+        if (left_strip_boundary_angle > max_angle ||
+            right_strip_boundary_angle < min_angle) {
             LOG(TLogLevel::logDEBUG1) << fmt::format(
                 "strip {} of module {} covers an angle of [{}, {}] and is "
                 "outside "
                 "of the given angular range of [{}, "
                 "{}] and will be skipped",
                 strip_index, module_index, left_strip_boundary_angle,
-                right_strip_boundary_angle, m_min_angle, m_max_angle);
+                right_strip_boundary_angle, min_angle, max_angle);
             continue;
         }
 
         // get flatfield corrected photon counts and propagate error
         auto [corrected_photon_counts, corrected_photon_counts_variance] =
-            photon_count_correction(frame(global_strip_index), exposure_time,
+            photon_count_correction(mythen_detector, flatfield, scale_factor,
+                                    frame(global_strip_index), exposure_time,
                                     incident_intensity, global_strip_index);
 
         double inverse_corrected_photon_counts_variance =
@@ -120,7 +149,7 @@ void AngularConversion::process_photon_counts(
 
         redistribute_photon_count_to_fixed_angle_width_bins(
             left_strip_boundary_angle, right_strip_boundary_angle,
-            histogram_bin_width,
+            histogram_meta_data.bin_width,
             std::make_tuple(left_boundary_roi_base_peak,
                             right_boundary_roi_base_peak),
             corrected_photon_counts, inverse_corrected_photon_counts_variance,
@@ -128,11 +157,15 @@ void AngularConversion::process_photon_counts(
     }
 }
 
-NDArray<double, 2>
-AngularConversion::convert(const NDView<uint32_t, 2> photon_counts,
+NDArray<double, 2> convert(const MythenDetector &mythen_detector,
+                           const HistogramMetaData &histogram_meta_data,
+                           const NDView<uint32_t, 2> photon_counts,
                            const NDView<double, 1> detector_angles,
                            const NDView<uint64_t, 1> incident_intensities,
-                           const double exposure_time) {
+                           const double exposure_time,
+                           const NDView<const bool, 1> bad_channels,
+                           const NDView<const double, 2> flatfield,
+                           const double scale_factor) {
 
     if (photon_counts.shape(0) != detector_angles.shape(0) ||
         photon_counts.shape(0) != incident_intensities.shape(0)) {
@@ -140,7 +173,10 @@ AngularConversion::convert(const NDView<uint32_t, 2> photon_counts,
             "Input arrays must have the same number of frames");
     }
 
-    const ssize_t new_num_bins = num_fixed_angle_width_bins();
+    check_calibration_inputs(mythen_detector, bad_channels, flatfield);
+
+    const ssize_t new_num_bins =
+        histogram_meta_data.num_fixed_angle_width_bins();
 
     // weighted photon counts of order 0-2 eg. order k: sum of
     // photon_count_i^k*weight_i counts for fixed angle width bin
@@ -156,16 +192,18 @@ AngularConversion::convert(const NDView<uint32_t, 2> photon_counts,
 
         auto frame_photon_counts = photon_counts.sub_view(frame_index);
         for (size_t module_index = 0;
-             module_index < m_mythen_detector->num_modules(); ++module_index) {
+             module_index < mythen_detector.num_modules(); ++module_index) {
 
-            if (m_mythen_detector->disconnected_modules()(module_index)) {
+            if (mythen_detector.disconnected_modules()(module_index)) {
                 continue;
             }
 
             process_photon_counts(
-                module_index, frame_photon_counts, detector_angles(frame_index),
-                exposure_time, incident_intensities(frame_index),
-                weighted_moments.view(), num_contributing_photons.view());
+                mythen_detector, histogram_meta_data, bad_channels, flatfield,
+                scale_factor, module_index, frame_photon_counts,
+                detector_angles(frame_index), exposure_time,
+                incident_intensities(frame_index), weighted_moments.view(),
+                num_contributing_photons.view());
         }
     }
 
@@ -173,11 +211,20 @@ AngularConversion::convert(const NDView<uint32_t, 2> photon_counts,
                                num_contributing_photons.view());
 }
 
-NDArray<double, 2> AngularConversion::convert(
-    const NDView<uint32_t, 1> photon_counts, const double detector_angle,
-    const uint64_t incident_intensity, const double exposure_time) {
+NDArray<double, 2> convert(const MythenDetector &mythen_detector,
+                           const HistogramMetaData &histogram_meta_data,
+                           const NDView<uint32_t, 1> photon_counts,
+                           const double detector_angle,
+                           const uint64_t incident_intensity,
+                           const double exposure_time,
+                           const NDView<const bool, 1> bad_channels,
+                           const NDView<const double, 2> flatfield,
+                           const double scale_factor) {
 
-    const ssize_t new_num_bins = num_fixed_angle_width_bins();
+    check_calibration_inputs(mythen_detector, bad_channels, flatfield);
+
+    const ssize_t new_num_bins =
+        histogram_meta_data.num_fixed_angle_width_bins();
 
     // weighted photon counts of order 0-2 eg. order k: sum of
     // photon_count_i^k*weight_i counts for fixed angle width bin
@@ -188,14 +235,16 @@ NDArray<double, 2> AngularConversion::convert(
     NDArray<size_t, 1> num_contributing_photons(
         std::array<ssize_t, 1>{new_num_bins}, 0);
 
-    for (size_t module_index = 0;
-         module_index < m_mythen_detector->num_modules(); ++module_index) {
+    for (size_t module_index = 0; module_index < mythen_detector.num_modules();
+         ++module_index) {
 
-        if (m_mythen_detector->disconnected_modules()(module_index)) {
+        if (mythen_detector.disconnected_modules()(module_index)) {
             continue;
         }
 
-        process_photon_counts(module_index, photon_counts, detector_angle,
+        process_photon_counts(mythen_detector, histogram_meta_data,
+                              bad_channels, flatfield, scale_factor,
+                              module_index, photon_counts, detector_angle,
                               exposure_time, incident_intensity,
                               weighted_moments.view(),
                               num_contributing_photons.view());
@@ -205,11 +254,11 @@ NDArray<double, 2> AngularConversion::convert(
                                num_contributing_photons.view());
 }
 
-NDArray<double, 2> AngularConversion::computeErrorandMean(
-    const NDView<double, 2> weighted_moments,
-    const NDView<size_t, 1> num_contributing_photons) const {
+NDArray<double, 2>
+computeErrorandMean(const NDView<double, 2> weighted_moments,
+                    const NDView<size_t, 1> num_contributing_photons) {
 
-    const ssize_t new_num_bins = num_fixed_angle_width_bins();
+    const ssize_t new_num_bins = weighted_moments.shape(0);
 
     NDArray<double, 2> fixed_angle_width_bins_photon_counts(
         std::array<ssize_t, 2>{new_num_bins, 2},

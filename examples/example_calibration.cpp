@@ -117,21 +117,18 @@ int main() {
         test_header
             .detector_angle; // mythen_file_reader->read_detector_angle(test_frame_name);
 
-    AngularConversion angularconversion(
-        mythen_detector_ptr, anglecalibration.get_histogram_bin_width(),
-        anglecalibration.get_angular_range());
+    HistogramMetaData histogram_meta_data{
+        anglecalibration.get_angular_range(),
+        anglecalibration.get_histogram_bin_width()};
 
-    angularconversion.set_FlatField(
-        flat_field_ptr->get_normalized_flatfield_view());
-
-    angularconversion.set_bad_channels(anglecalibration.get_bad_channels());
-
-    angularconversion.set_scale_factor(first_header.incident_intensity);
+    const double scale_factor = first_header.incident_intensity;
 
     // plot one module for fixed angle width bins
-    auto module_redistributed_to_fixed_angle_bins = angularconversion.convert(
-        test_frame.photon_counts(), test_header.detector_angle,
-        test_header.incident_intensity, test_header.exposure_time);
+    auto module_redistributed_to_fixed_angle_bins = convert(
+        *mythen_detector_ptr, histogram_meta_data, test_frame.photon_counts(),
+        test_header.detector_angle, test_header.incident_intensity,
+        test_header.exposure_time, anglecalibration.get_bad_channels(),
+        flat_field_ptr->get_normalized_flatfield_view(), scale_factor);
 
     plotter.plot_diffraction_pattern(
         module_redistributed_to_fixed_angle_bins.view(), 1, test_frame_angle);

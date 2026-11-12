@@ -386,45 +386,6 @@ void AngleCalibration::process_photon_counts(
     }
 }
 
-NDArray<double, 2> AngleCalibration::computeErrorandMean(
-    const NDView<double, 2> weighted_sums,
-    const NDView<size_t, 1> num_contributing_photons) const {
-
-    const ssize_t new_num_bins = num_fixed_angle_width_bins();
-
-    NDArray<double, 2> fixed_angle_width_bins_photon_counts(
-        std::array<ssize_t, 2>{new_num_bins, 2},
-        -1.0); // first dimension photon counts, second dimension error
-
-    // divide by statistial weight
-    for (ssize_t i = 0; i < weighted_sums.shape(0); ++i) {
-
-        if (weighted_sums(i, 1) > -1.0 && num_contributing_photons(i) > 0) {
-            fixed_angle_width_bins_photon_counts(i, 0) =
-                weighted_sums(i, 0) < std::numeric_limits<double>::epsilon()
-                    ? 0.0
-                    : weighted_sums(i, 1) /
-                          weighted_sums(i, 0); // weighted mean
-
-            double inverse_weights = 1. / weighted_sums(i, 0);
-
-            double goodness_of_fit =
-                num_contributing_photons(i) == 1
-                    ? 0.0
-                    : (weighted_sums(i, 2) - weighted_sums(i, 1) *
-                                                 weighted_sums(i, 1) *
-                                                 inverse_weights) /
-                          (num_contributing_photons(i) -
-                           1); // calculates chi value for optimal
-
-            fixed_angle_width_bins_photon_counts(i, 1) = std::sqrt(
-                goodness_of_fit * inverse_weights); // scale by variance
-        }
-    }
-
-    return fixed_angle_width_bins_photon_counts;
-}
-
 void AngleCalibration::optimize_offset_parameter(
     const size_t module_index, const NDView<uint32_t, 2> frames_bp_overlap,
     const NDView<double, 1> detector_angles_bp_overlap,

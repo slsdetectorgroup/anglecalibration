@@ -48,16 +48,12 @@ int main() {
 
     LOG(TLogLevel::logINFO) << "read normalized flatfield from file";
 
-    // create AngleCalibration class
-    AngularConversion angularconversion(mythen_detector_ptr, 0.0036,
-                                        std::make_tuple(0.0, 90.5)); // 130
+    HistogramMetaData histogram_meta_data{std::make_tuple(0.0, 90.5),
+                                          0.0036};
 
     NDArray<bool, 1> bad_channels = read_bad_channels(
         bad_channels_filename, mythen_detector_ptr->num_strips());
 
-    angularconversion.set_bad_channels(bad_channels.view());
-
-    angularconversion.set_scale_factor(5050880.0);
 
     LOG(TLogLevel::logINFO) << "read bad channels";
 
@@ -81,16 +77,17 @@ int main() {
             headers[frame_index].incident_intensity;
     }
 
-    angularconversion.set_scale_factor(incident_intensities[0]);
+    const double scale_factor = incident_intensities[0];
 
     auto redistributed_photon_counts =
-        angularconversion.convert(frames.view(), detector_angles.view(),
-                                  incident_intensities.view(), exposure_time);
+        convert(*mythen_detector_ptr, histogram_meta_data, frames.view(),
+                detector_angles.view(), incident_intensities.view(),
+                exposure_time, bad_channels.view(), flatfield.view(),
+                scale_factor);
 
     // plot
-    PlotHelper plotter(mythen_detector_ptr,
-                       angularconversion.get_angular_range(),
-                       angularconversion.get_histogram_bin_width());
+    PlotHelper plotter(mythen_detector_ptr, histogram_meta_data.angular_range,
+                       histogram_meta_data.bin_width);
 
     plotter.plot_diffraction_pattern(redistributed_photon_counts.view());
 }

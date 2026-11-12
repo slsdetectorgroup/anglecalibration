@@ -187,6 +187,10 @@ class MythenDetector {
         return m_disconnected_modules.view();
     }
 
+    aare::NDView<const bool, 1> disconnected_modules() const {
+        return m_disconnected_modules.view();
+    }
+
     /**
      * @brief get the historic DG parameters
      */

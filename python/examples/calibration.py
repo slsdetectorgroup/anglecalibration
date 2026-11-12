@@ -1,5 +1,5 @@
 
-from angcal import MythenDetector, FlatField, AngleCalibration, AngularConversion, EpicsMythenFileReader, MythenFrame, PlotHelper
+from angcal import MythenDetector, FlatField, AngleCalibration, HistogramMetaData, convert, EpicsMythenFileReader, MythenFrame, PlotHelper
 
 from angcal.utils import select_base_peak
 
@@ -56,18 +56,14 @@ plotter = PlotHelper(mythen_detector, anglecalibration.angular_range, anglecalib
 
 test_header, test_frame = mythenfilereader.read_frame(209)
 
-angularconversion = AngularConversion(mythen_detector, anglecalibration.histogram_bin_width, anglecalibration.angular_range)
-
-angularconversion.flatfield = flatfield.normalized_flatfield
-angularconversion.bad_channels = anglecalibration.bad_channels
+histogram_meta_data = HistogramMetaData(anglecalibration.angular_range, anglecalibration.histogram_bin_width)
 
 first_header, first_frame = mythenfilereader.read_frame(0)
-scale_factor = first_header.incident_intensity
+scale_factor = first_header.incident_intensity #set scale factor to get reasonable scales 
 
-angularconversion.scale_factor = scale_factor #set scale factor to get reasonable scales 
-
+print("type detector angle_ ", type(test_header.detector_angle))
 # plot one module for fixed angle width bins
-module_redistributed_to_fixed_angle_bins = angularconversion.convert(test_frame.photon_counts, test_header.detector_angle, test_header.incident_intensity, test_header.exposure_time)
+module_redistributed_to_fixed_angle_bins = convert(mythen_detector, histogram_meta_data, test_frame.photon_counts, test_header.detector_angle, test_header.incident_intensity, test_header.exposure_time, anglecalibration.bad_channels, flatfield.normalized_flatfield, scale_factor)
 
 plotter.plot_diffraction_pattern(module_redistributed_to_fixed_angle_bins[:,0].view(), 1, test_header.detector_angle)
 

@@ -333,21 +333,6 @@ class AngleCalibration {
         const NDView<size_t, 1> num_contributing_photons) const;
 
     /**
-     * @brief averages redistributed photon counts and calculates error
-     * based on weighted average and goodness of fit
-     * @param weighted_sums weighted photon counts of order 0-2 eg. order k: sum
-     * of photon_count_i^k*weight_i
-     * @param num_contributing_photons number of photons contributing to the
-     * fixed angle width bin
-     * @return ndarray of size (num_bins_in_ROI, 2) where first dimension
-     * corresponds to average redistributed photon counts and second dimension
-     * corresponds to error of average redistributed photon counts
-     */
-    NDArray<double, 2>
-    computeErrorandMean(const NDView<double, 2> weighted_sums,
-                        const NDView<size_t, 1> num_contributing_photons) const;
-
-    /**
      * @brief optimizes module center distance L and angle center module
      * normal delta of BC parameters of given module based on chi similarity
      * criterion

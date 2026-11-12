@@ -1,5 +1,5 @@
 
-from angcal import MythenDetector, FlatField, AngularConversion, EpicsMythenFileReader, MythenFrame
+from angcal import MythenDetector, FlatField, HistogramMetaData, convert, EpicsMythenFileReader, MythenFrame
 from angcal import PlotHelper
 
 from pathlib import Path
@@ -31,11 +31,11 @@ print("mythen detector setup")
 
 angular_range = (0.0, 90.5)  # in degrees
 bin_width = 0.0036  # in degrees (dfeault value)
-angularconversion = AngularConversion(mythen_detector, bin_width, angular_range)
+histogram_meta_data = HistogramMetaData(angular_range, bin_width)
 
-angularconversion.flatfield = np.loadtxt(my_path / "Flatfield_E17p5keV_T12500eV_up_AUGCAL2_Sep2023_open_WS_C_X_X.raw", dtype=np.double, usecols=[1,2])
+flatfield = np.loadtxt(my_path / "Flatfield_E17p5keV_T12500eV_up_AUGCAL2_Sep2023_open_WS_C_X_X.raw", dtype=np.double, usecols=[1,2])
 
-angularconversion.bad_channels = np.load(str(my_path / "bad_channels.npy"))
+bad_channels = np.load(str(my_path / "bad_channels.npy"))
 
 # setup mythen data file reader to read EPICS mythen hdf5 files
 mythenfilereader = EpicsMythenFileReader(str(my_path / "Fructose_0p2_60_0060.h5"))
@@ -51,21 +51,17 @@ scale_factor = 1280.0*round(incident_intensity_per_second/1280.0) # whatever is 
 
 print("scale factor: ", scale_factor)
 
-angularconversion.scale_factor = scale_factor
-
-print("scale Factor: " ,angularconversion.scale_factor)
-
 num_files = 4
 
 mythenfilereader.seek(0)
 headers, frames = mythenfilereader.read_n(num_files)
 
-redistributed_photon_counts = angularconversion.convert(frames, headers["detector_angle"], headers["incident_intensity"], exposure_time)
+redistributed_photon_counts = convert(mythen_detector, histogram_meta_data, frames, headers["detector_angle"], headers["incident_intensity"], exposure_time, bad_channels, flatfield, scale_factor)
 
 print("conversion is done")
 
 #plot the converted diffraction pattern
-plotter = PlotHelper(mythen_detector, angularconversion.angular_range, angularconversion.histogram_bin_width)
+plotter = PlotHelper(mythen_detector, histogram_meta_data.angular_range, histogram_meta_data.bin_width)
 
 plotter.plot_diffraction_pattern(redistributed_photon_counts[:,0].view())
 

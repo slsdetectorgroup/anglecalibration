@@ -2,7 +2,7 @@ from . import _angcal
 
 from ._angcal import AngleCalibration
 
-from ._angcal import AngularConversion
+from ._angcal import HistogramMetaData, convert
 
 from ._angcal import EpicsMythenFileReader 
 
