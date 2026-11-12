@@ -402,6 +402,8 @@ the error :math:`\sigma_i` for bin :math:`i` is given by:
     \sigma_i = \sqrt{av\_res_{i}^{2} * \frac{1}{\sum_{j=0}^{M} w_{i,j}}}.
 
 
+.. _parametercalibration:
+
 Parameter Calibration
 ----------------------
 

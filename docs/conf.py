@@ -38,7 +38,10 @@ extensions = ['breathe',
 
 breathe_default_project = "angle_calibration"
 napoleon_use_ivar = True
-napolean_numpy_docstring = True
+napoleon_numpy_docstring = True
+# docstrings are numpy style; the google parser would re-split property
+# docstrings on the first ':' (e.g. inside '(default: ...)')
+napoleon_google_docstring = False
 
 # members are already listed by autodoc (:members:) - avoid numpydoc creating
 # additional autosummary tables which require stub files
@@ -67,5 +70,20 @@ html_static_path = ['static']
 
 numfig = True
 
+def _property_type_first(app, what, name, obj, options, lines):
+    """Move napoleon's ':type:' field above the description of properties."""
+    if what not in ("property", "attribute"):
+        return
+    type_lines = [l for l in lines if l.startswith(":type:")]
+    if not type_lines:
+        return
+    rest = [l for l in lines if not l.startswith(":type:")]
+    while rest and not rest[-1].strip():
+        rest.pop()
+    lines[:] = type_lines + [""] + rest
+
+
 def setup(app):
-    app.add_css_file("extr.css") 
+    app.add_css_file("extr.css")
+    # priority > 500 so it runs after napoleon has produced ':type:'
+    app.connect("autodoc-process-docstring", _property_type_first, priority=600) 

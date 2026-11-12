@@ -57,12 +57,7 @@ void define_AngleCalibration_binding(py::module &m) {
                 self.set_angular_range(angle_range.first, angle_range.second);
             },
             R"(
-            angular range for conversion [degrees]
-
-            Returns
-            -------
-            tuple of float
-                (min_angle, max_angle)
+            tuple of float (min_angle, max_angle): angular range for conversion [degrees]
             )")
 
         .def_property_readonly(
@@ -146,9 +141,7 @@ void define_AngleCalibration_binding(py::module &m) {
                     temp_array); // second copy TODO im copying twice
             },
             R"(
-            bad_channels : numpy.ndarray of bool, shape (n_channels,)
-                Expected size: number of channels/strips in the detector.
-                Each element is ``True`` if the channel is bad, otherwise ``False``.
+            numpy.ndarray of bool, shape (n_channels,) : Each element is ``True`` if the channel is bad, otherwise ``False``. Expected size is the number of channels/strips in the detector.
             )")
 
         .def(
@@ -173,6 +166,9 @@ void define_AngleCalibration_binding(py::module &m) {
             py::arg("plot_calibration_process") = false,
             R"(
             calibrates BC parameters for respective module
+
+            Parameters
+            ----------
 
             frames: numpy.ndarray of uint32, shape (n_frames, n_channels)
                 Array of photon counts for each acquisition frame and channel. (acquisitions need to be ordered by motor position)
@@ -208,7 +204,9 @@ void define_AngleCalibration_binding(py::module &m) {
             py::arg("plot_calibration_process") = false,
             R"(
             calibrates BC parameters for all modules
-            
+
+            Parameters
+            ----------
             frames : numpy.ndarray of uint32, shape (n_frames, n_channels)
                 Array of photon counts for each acquisition frame and channel. (acquisitions need to be ordered by motor position)
             detector_angles : numpy.ndarray of double, shape (n_frames,)

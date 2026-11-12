@@ -10,30 +10,43 @@ namespace py = pybind11;
 using namespace angcal;
 
 void define_EpicsMythenHeader_bindings(py::module &m) {
-    py::class_<EpicsMythenHeader>(m, "EpicsMythenHeader")
+    py::class_<EpicsMythenHeader>(m, "EpicsMythenHeader",
+                                  R"(Header information of a single frame read by EpicsMythenFileReader)")
+
         .def_readonly("detector_angle", &EpicsMythenHeader::detector_angle,
-                      R"(float: Detector angle in degrees)")
+                      R"(
+                      float: Detector angle in degrees
+                      )")
         .def_readonly("incident_intensity",
                       &EpicsMythenHeader::incident_intensity,
-                      R"(int: Incident intensity)")
+                      R"(
+                      int: Incident intensity
+                      )")
         .def_readonly("exposure_time", &EpicsMythenHeader::exposure_time,
-                      R"(float: Exposure time in seconds)")
+                      R"(
+                      float: Exposure time in seconds
+                      )")
         .def_readonly("channel_mask", &EpicsMythenHeader::channel_mask,
-                      R"(list: Channel mask)");
+                      R"(
+                      list: Channel mask
+                      )");
 
     PYBIND11_NUMPY_DTYPE(EpicsMythenHeader, detector_angle, incident_intensity,
                          exposure_time, channel_mask);
 }
 
 void define_MythenFrame_bindings(py::module &m) {
-    py::class_<MythenFrame>(m, "MythenFrame")
+    py::class_<MythenFrame>(m, "MythenFrame",
+                            R"(Photon counts of a single Mythen frame)")
 
         .def_property_readonly(
             "photon_counts",
             [](MythenFrame &self) {
                 return return_view_data(self.photon_counts(), py::cast(self));
             },
-            R"(ndarray: Photon counts stored as 2D array with shape (counters, num_strips))")
+            R"(
+            ndarray: Photon counts stored as 2D array with shape (counters, num_strips)
+            )")
 
         .def(
             "photon_count",
@@ -41,7 +54,21 @@ void define_MythenFrame_bindings(py::module &m) {
                 return self.photon_counts(row, col);
             },
             py::arg("row"), py::arg("col") = 0,
-            R"(Get photon count for a specific strip index (row))");
+            R"(
+            Get photon count for a specific strip index (row)
+            
+            Parameters
+            ----------
+            row : int
+                index of the strip (row)
+            col : int, optional
+                index of the counter (column), default is 0
+
+            Returns
+            -------
+            int
+                photon count for the specified strip and counter
+            )");
 }
 
 void define_MythenFileReader_bindings(py::module &m) {
@@ -84,12 +111,12 @@ void define_MythenFileReader_bindings(py::module &m) {
         .def(
             "read_frame",
             [](EpicsMythenFileReader &self) { return self.read_frame(); },
-            R"(read the frame at the current index from file.
+            R"(
+            read the frame at the current index from file.
             The current frame index advances to the next frame.
 
             Returns
             -------
-
             tuple of (EpicsMythenHeader, MythenFrame)
                 header and photon counts of the frame
             )")
@@ -114,7 +141,7 @@ void define_MythenFileReader_bindings(py::module &m) {
 
             Returns
             -------
-            tuple of (ndarray, ndarray)
+            tuple of (np.ndarray, np.ndarray)
                 structured array of EpicsMythenHeader with shape (n_frames,) and
                 photon counts (uint32) with shape (n_frames, pixels_per_frame)
             )")

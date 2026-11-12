@@ -5,8 +5,8 @@ MythenFileReader
 ================
 
 File reader to read mythen hdf5 files written by ``Epics``. 
-The ``EpicsMythenFileReader`` inherits from a wrapper class based on the C++ API of the HDF5 C Library. The provided dataset need to have fields `data` storing the photon counts, 
-`DetectorAngle` storing the detector position in degrees and `CounterMask` storing which counters are active. The field `CounterMask` stores an integer representation of a 3-digit bit string, where each bit is set to 1 if the counter is active. 
+The ``EpicsMythenFileReader`` inherits from a wrapper class based on the C++ API of the HDF5 C Library. The provided dataset need to have fields ``data`` storing the photon counts, 
+``DetectorAngle`` storing the detector position in degrees and ``CounterMask`` storing which counters are active. The field ``CounterMask`` stores an integer representation of a 3-digit bit string, where each bit is set to 1 if the counter is active. 
 
 Example
 ^^^^^^^

@@ -49,7 +49,6 @@ void define_AngularConversion_binding(py::module &m) {
            py::array_t<bool, py::array::c_style> bad_channels,
            py::array_t<double, py::array::c_style> flatfield,
            const double scale_factor) {
-            std::cout << "in this overload" << std::endl;
             auto result = new NDArray<double, 2>(convert(
                 mythen_detector, histogram_meta_data,
                 make_view_1d(photon_counts), detector_angle, incident_intensity,
@@ -76,7 +75,6 @@ void define_AngularConversion_binding(py::module &m) {
             detector angle of the frame [degrees]
         incident_intensity: int
             incident intensity of the frame
-        see the multi-frame overload for the remaining parameters
         exposure_time: float
             exposure time for the frame [s]
         bad_channels: numpy.ndarray of bool, shape (n_channels,)
