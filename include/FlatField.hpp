@@ -4,25 +4,10 @@
  */
 
 #pragma once
-#include <cmath>
-#include <cstdint>
 
-#include <algorithm>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <optional>
-#include <sstream>
-#include <string>
-
-#include "CustomFiles.hpp"
 #include "MythenDetector.hpp"
-#include "MythenFileReader.hpp"
-#include "Parameters.hpp"
-#include "aare/File.hpp"
 #include "aare/NDArray.hpp"
-#include "helpers/FileInterface.hpp"
+#include <memory>
 // #include "helpers/LogFiles.hpp"
 
 using namespace aare;
@@ -75,32 +60,6 @@ class FlatField {
      * @brief normalizes the accumulated flatfield
      */
     void normalize_flatfield();
-
-    // TODO: maybe dont support reading at all
-    // caveat user has to pass by value or move otherwise copied twice from
-    // filesystem and then into member variable !!!!
-    /**
-     * @brief read normalized flatfield and std from file
-     * @param filename name of file
-     * @param file_reader custom file_reader to read flatfield file default:
-     * ascii file with
-     */
-    void read_normalized_flatfield_from_file(
-        const std::string &filename,
-        const std::shared_ptr<SimpleFileInterface> file_reader =
-            std::make_shared<CustomFlatFieldFile>());
-
-    /**
-     * @brief reads bad channels from file
-     * @param filename bad channels filename
-     * @param file_reader file_reader to read bad channels file (default:
-     * CustomBadChannelsFile: following format line by line either single strip
-     * index or block of strip indices seperated by '-' e.g. 0-10)
-     */
-    void read_bad_channels_from_file(
-        const std::filesystem::path &filename,
-        const std::shared_ptr<SimpleFileInterface> file_reader =
-            std::make_shared<CustomBadChannelsFile>());
 
     void set_bad_channels(const NDArray<bool, 1> &bad_channels_);
 

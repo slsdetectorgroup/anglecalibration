@@ -6,10 +6,19 @@
 
 /** How To use
  * set environmnet variable to where youre test data is located
- *  export ANGCAL_TEST_DATA=/path/to/local/mythenangleconversiontestdata
+ *  export ANGCAL_CONVERSION_DATA=/path/to/local/mythenangleconversiontestdata
  */
 
 using namespace angcal;
+
+inline auto data_path() {
+    if (const char *env_p = std::getenv("ANGCAL_CONVERSION_DATA")) {
+        return std::filesystem::path(env_p);
+    } else {
+        throw std::runtime_error(
+            "Path to test data: $ANGCAL_CONVERSION_DATA not set");
+    }
+}
 
 int main() {
 
@@ -48,12 +57,10 @@ int main() {
 
     LOG(TLogLevel::logINFO) << "read normalized flatfield from file";
 
-    HistogramMetaData histogram_meta_data{std::make_tuple(0.0, 90.5),
-                                          0.0036};
+    HistogramMetaData histogram_meta_data{std::make_tuple(0.0, 90.5), 0.0036};
 
     NDArray<bool, 1> bad_channels = read_bad_channels(
         bad_channels_filename, mythen_detector_ptr->num_strips());
-
 
     LOG(TLogLevel::logINFO) << "read bad channels";
 
@@ -79,11 +86,10 @@ int main() {
 
     const double scale_factor = incident_intensities[0];
 
-    auto redistributed_photon_counts =
-        convert(*mythen_detector_ptr, histogram_meta_data, frames.view(),
-                detector_angles.view(), incident_intensities.view(),
-                exposure_time, bad_channels.view(), flatfield.view(),
-                scale_factor);
+    auto redistributed_photon_counts = convert(
+        *mythen_detector_ptr, histogram_meta_data, frames.view(),
+        detector_angles.view(), incident_intensities.view(), exposure_time,
+        bad_channels.view(), flatfield.view(), scale_factor);
 
     // plot
     PlotHelper plotter(mythen_detector_ptr, histogram_meta_data.angular_range,

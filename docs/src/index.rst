@@ -35,7 +35,6 @@ Library for angle calibration of CPS Mythen detector.
     :caption: C++ API 
 
     MythenFileReader
-    SimpleFileInterface
     MythenDetector
     FlatField
     AngleCalibration

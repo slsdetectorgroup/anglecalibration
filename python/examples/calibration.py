@@ -9,12 +9,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def env_data_path():
-    env_value = os.environ.get("ANGCAL_TEST_DATA")
+    env_value = os.environ.get("ANGCAL_CALIBRATION_DATA")
     if not env_value:
-        raise RuntimeError("Environment variable ANGCAL_TEST_DATA is not set or is empty")
+        raise RuntimeError("Environment variable ANGCAL_CALIBRATION_DATA is not set or is empty")
     
-    print("Environment variable ANGCAL_TEST_DATA: ", env_value)
-
+    print("Environment variable ANGCAL_CALIBRATION_DATA: ", env_value)
     return Path(env_value)
 
 my_path = env_data_path()
@@ -31,17 +30,15 @@ mythen_detector.offset = 0.0 # additional offset to sample detector offset
 # setup flatfield 
 flatfield = FlatField(mythen_detector)
 
-flatfield.normalized_flatfield = np.loadtxt(my_path / "Flatfield_EkeV22p0_T11000eV_up_TESTFF1_clean_Jun2025_open_WS.raw", dtype=np.double, usecols=[1,2])
-
+flatfield.normalized_flatfield = np.load(my_path / "Flatfield_EkeV22p0_T11000eV_up_TESTFF1_clean_Jun2025_open_WS.npy")
 
 # setup angle calibration - has everything to do conversion and calibration 
 anglecalibration = AngleCalibration(mythen_detector, flatfield)
 
-anglecalibration.read_bad_channels_from_file(str(my_path / "bc2025_001_RING.chans"))
+anglecalibration.bad_channels = np.load(str(my_path / "bc2025_001_RING.npy"))
 
 # setup mythen data file reader to read EPICS mythen hdf5 files
 mythenfilereader = EpicsMythenFileReader(str(my_path / "ang1up_22keV_MIX_0p5mm_48M_a_0000.h5"))
-
 
 # click through frames to select base peak for calibration
 # select_base_peak(anglecalibration, mythenfilereader, module_index=0)

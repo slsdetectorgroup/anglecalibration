@@ -8,11 +8,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def env_data_path():
-    env_value = os.environ.get("ANGCAL_TEST_DATA")
+    env_value = os.environ.get("ANGCAL_CONVERSION_DATA")
     if not env_value:
-        raise RuntimeError("Environment variable ANGCAL_TEST_DATA is not set or is empty")
+        raise RuntimeError("Environment variable ANGCAL_CONVERSION_DATA is not set or is empty")
 
-    print("Environment variable ANGCAL_TEST_DATA: ", env_value)
+    print("Environment variable ANGCAL_CONVERSION_DATA: ", env_value)
     return Path(env_value)
 
 
@@ -33,7 +33,7 @@ angular_range = (0.0, 90.5)  # in degrees
 bin_width = 0.0036  # in degrees (dfeault value)
 histogram_meta_data = HistogramMetaData(angular_range, bin_width)
 
-flatfield = np.loadtxt(my_path / "Flatfield_E17p5keV_T12500eV_up_AUGCAL2_Sep2023_open_WS_C_X_X.raw", dtype=np.double, usecols=[1,2])
+flatfield = np.load(my_path / "Flatfield_E17p5keV_T12500eV_up_AUGCAL2_Sep2023_open_WS_C_X_X.npy")
 
 bad_channels = np.load(str(my_path / "bad_channels.npy"))
 

@@ -1,5 +1,4 @@
 from angcal import FlatField, MythenDetector, EpicsMythenFileReader
-from angcal._angcal import MythenFileReader
 import numpy as np
 from pathlib import Path
 import os
@@ -14,19 +13,20 @@ def env_data_path():
 
 num_modules = 48
 
-mythen_detector = MythenDetector(num_modules)
+dgparameters = np.loadtxt(env_data_path() / "angcal_Jul2025_P12_0p0105.csv", delimiter=",", dtype=np.float64, skiprows=1) # initial DG parameters for calibration
 
-mythen_detector.DGparameters = np.loadtxt(env_data_path() / "angcal_Jul2025_P12_0p0105.csv", delimiter=",", dtype=np.float64, skiprows=1)
+# setup mythen detector specifications - stores all relevant parameters of the detector setup
+mythen_detector = MythenDetector(dgparameters) 
 
 flatfield = FlatField(mythen_detector)
 
-flatfield.read_bad_channels_from_file(str(env_data_path() / "bc2025_001_RING.chans"))
+flatfield.bad_channels = np.load(str(env_data_path() / "bc2025_001_RING.npy"))
 
 bad_channels_array = flatfield.bad_channels
 
-file_reader = EpicsMythenFileReader() 
+mythenfilereader = EpicsMythenFileReader(str(env_data_path() / "opff_up_STRAIGHT_E22p0_T11000_0000.h5"))
 
-incident_intensity_first_frame = file_reader.read_frame(str(env_data_path() / f"opff_up_STRAIGHT_E22p0_T11000_{0:04d}.h5")).incident_intensity
+incident_intensity_first_frame = mythenfilereader.read_header(0).incident_intensity
 
 flatfield.scale_factor = 78000607.0 #incident_intensity_first_frame
 
@@ -35,9 +35,8 @@ print("incident intensity first frame: ", incident_intensity_first_frame)
 flatfield.soft_window = (3.0, 30.0)
 
 for file_idx in range(0, 1601): 
-    file_name = env_data_path() / f"opff_up_STRAIGHT_E22p0_T11000_{file_idx:04d}.h5"
-    frame = file_reader.read_frame(str(file_name))
-    flatfield.add_flatfield(frame.photon_counts, frame.incident_intensity, frame.detector_angle)
+    header, frame = mythenfilereader.read_frame(file_idx)
+    flatfield.add_flatfield(frame.photon_counts, header.incident_intensity, header.detector_angle)
 
 flatfield.normalize_flatfield()
 

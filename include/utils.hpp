@@ -5,15 +5,6 @@
 #include "PlotHelpers.hpp"
 #include "logger.hpp"
 
-inline auto data_path() {
-    if (const char *env_p = std::getenv("ANGCAL_TEST_DATA")) {
-        return std::filesystem::path(env_p);
-    } else {
-        throw std::runtime_error(
-            "Path to test data: $ANGCAL_TEST_DATA not set");
-    }
-}
-
 namespace angcal {
 
 inline std::pair<double, double>
@@ -98,14 +89,12 @@ inline void get_module_angle_ranges(EpicsMythenFileReader &mythen_file_reader,
  * @param module_index optional module index if only one module contributed to
  * diffraction pattern, default is 0.
  */
-inline void
-select_base_peak(std::shared_ptr<MythenDetector> mythen_detector_ptr,
-                 const HistogramMetaData &histogram_meta_data,
-                 const NDView<const bool, 1> bad_channels,
-                 const NDView<const double, 2> flatfield,
-                 const double scale_factor,
-                 EpicsMythenFileReader &mythen_file_reader,
-                 const size_t module_index = 0) {
+inline void select_base_peak(
+    std::shared_ptr<MythenDetector> mythen_detector_ptr,
+    const HistogramMetaData &histogram_meta_data,
+    const NDView<const bool, 1> bad_channels,
+    const NDView<const double, 2> flatfield, const double scale_factor,
+    EpicsMythenFileReader &mythen_file_reader, const size_t module_index = 0) {
 
     PlotHelper plotter(mythen_detector_ptr, histogram_meta_data.angular_range,
                        histogram_meta_data.bin_width);

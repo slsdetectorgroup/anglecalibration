@@ -55,13 +55,6 @@ void define_FlatField_binding(py::module &m) {
                 Normalize the accumulated flatfield
                 )")
 
-        /*
-        .def("read_flatfield_from_file",
-             [](FlatField &self, const std::string &filename) {
-                 self.read_flatfield_from_file(filename);
-             })
-        */
-
         .def_property(
             "normalized_flatfield",
             [](FlatField &self) {
@@ -120,20 +113,5 @@ void define_FlatField_binding(py::module &m) {
             },
             R"(
             numpy.ndarray of bool, shape (n_channels,) : Each element is ``True`` if the channel is bad, otherwise ``False``.
-            )")
-
-        .def(
-            "read_bad_channels_from_file",
-            [](FlatField &self, const std::filesystem::path &filename) {
-                self.read_bad_channels_from_file(filename);
-            },
-            R"(
-             read bad channels from file 
-
-             Parameters
-             ----------
-             
-             filename: str
-                path to file containing bad channels
-                )");
+            )");
 }

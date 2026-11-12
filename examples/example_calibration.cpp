@@ -9,10 +9,19 @@
 /**
  * How to run: All data for this example can be found on
  * https://zenodo.org/records/20645666. Before running execute: export
- * ANGCAL_TEST_PATH=Path/to/mythenanglecalibrationtestdata
+ * ANGCAL_CALIBRATION_DATA=Path/to/mythenanglecalibrationtestdata
  */
 
 using namespace angcal;
+
+inline auto data_path() {
+    if (const char *env_p = std::getenv("ANGCAL_CALIBRATION_DATA")) {
+        return std::filesystem::path(env_p);
+    } else {
+        throw std::runtime_error(
+            "Path to test data: $ANGCAL_CALIBRATION_DATA not set");
+    }
+}
 
 int main() {
 
@@ -44,8 +53,6 @@ int main() {
     std::shared_ptr<MythenDetector> mythen_detector_ptr =
         std::make_shared<MythenDetector>(dgparameters);
 
-    assert(std::filesystem::exists(bad_channels_filename));
-
     /*
     std::string unconnected_modules_filename = file_path / "ModOut.txt";
 
@@ -60,15 +67,17 @@ int main() {
 
     LOG(TLogLevel::logINFO) << "read normalized flatfield from file";
 
-    flat_field_ptr->read_normalized_flatfield_from_file(flatfield_filename);
+    flat_field_ptr->set_normalized_flatfield(
+        read_flatfield(flatfield_filename, num_modules));
 
     AngleCalibration anglecalibration(mythen_detector_ptr, flat_field_ptr);
 
-    LOG(TLogLevel::logINFO) << "read initial parameters from file";
-
-    anglecalibration.read_bad_channels_from_file(bad_channels_filename);
-
     LOG(TLogLevel::logINFO) << "read bad channels";
+
+    anglecalibration.set_bad_channels(
+        read_bad_channels(bad_channels_filename,
+                          mythen_detector_ptr->num_strips())
+            .view());
 
     EpicsMythenFileReader mythen_file_reader(
         file_path / (acquisition_fileprefix + "0000.h5"));

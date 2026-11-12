@@ -94,29 +94,6 @@ bool AngleCalibration::module_is_disconnected(const size_t module_index) const {
     return m_mythen_detector->disconnected_modules()(module_index);
 }
 
-void AngleCalibration::read_bad_channels_from_file(
-    const std::string &filename,
-    std::shared_ptr<SimpleFileInterface> file_reader) {
-
-    file_reader->open(filename);
-    file_reader->read_into(reinterpret_cast<std::byte *>(bad_channels.data()));
-
-    // update unconnected module
-
-    for (size_t module_index = 0;
-         module_index < m_mythen_detector->num_modules(); ++module_index) {
-
-        if (std::all_of(
-                bad_channels.begin() +
-                    module_index * m_mythen_detector->strips_per_module(),
-                bad_channels.begin() +
-                    (module_index + 1) * m_mythen_detector->strips_per_module(),
-                [](const auto &elem) { return elem; })) {
-            m_mythen_detector->disconnected_modules()(module_index) = true;
-        }
-    }
-}
-
 NDView<bool, 1> AngleCalibration::get_bad_channels() {
     return bad_channels.view();
 }

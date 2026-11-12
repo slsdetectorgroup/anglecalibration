@@ -82,16 +82,10 @@ void define_AngleCalibration_binding(py::module &m) {
                 [center, conversion, offset]
             )")
 
-        .def(
-            "read_bad_channels_from_file",
-            [](AngleCalibration &self, const std::string &filename) {
-                self.read_bad_channels_from_file(filename);
-            },
-            py::arg("filename"), R"(reads bad channels from file)")
-
         .def_property("base_peak_angle", &AngleCalibration::get_base_peak_angle,
                       &AngleCalibration::set_base_peak_angle,
-                      R"(center of chosen base peak for calibration [degrees])")
+                      R"(center of chosen base peak for calibration [degrees])
+            )")
 
         .def(
             "base_peak_is_in_module",

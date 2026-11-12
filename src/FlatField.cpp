@@ -217,27 +217,6 @@ void FlatField::normalize_flatfield() {
     }
 }
 
-void FlatField::read_normalized_flatfield_from_file(
-    const std::string &filename,
-    const std::shared_ptr<SimpleFileInterface> file_reader) {
-    flat_field = NDArray<double, 2>(std::array<ssize_t, 2>{
-        static_cast<ssize_t>(mythen_detector->num_strips()), 2});
-    file_reader->open(filename);
-    file_reader->read_into(reinterpret_cast<std::byte *>(flat_field.data()),
-                           8); // TODO: should be int though !!!
-
-    file_reader->close();
-}
-
-void FlatField::read_bad_channels_from_file(
-    const std::filesystem::path &filename,
-    const std::shared_ptr<SimpleFileInterface> file_reader) {
-
-    file_reader->open(filename);
-    file_reader->read_into(reinterpret_cast<std::byte *>(bad_channels.data()));
-    file_reader->close();
-}
-
 void FlatField::set_bad_channels(const NDArray<bool, 1> &bad_channels_) {
     bad_channels = bad_channels_;
 }
@@ -253,7 +232,6 @@ void FlatField::set_normalized_flatfield(NDArray<double, 2> &&flat_field_) {
     flat_field = std::move(flat_field_);
 }
 
-// TODO: should it be view? or copy?
 NDArray<double, 2> FlatField::get_normalized_flatfield() const {
     return flat_field;
 }
