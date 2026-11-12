@@ -52,13 +52,13 @@ void define_MythenFileReader_bindings(py::module &m) {
              py::arg("fname"),
              py::arg("incident_intensities_filename") = std::nullopt, R"(
 
-            Parameters:
-            -----------
+            Parameters
+            ----------
             
             fname : path 
                 path to any hdf5 file of the series storing the acquisitions,
                 the series starts at this file
-            incident_intensities_filename: str (optional)
+            incident_intensities_filename : str, optional
                 path to file containing incident intensities (I0) values need to be stored as uint64_t in binary format. 
             )")
         .def(
@@ -69,16 +69,16 @@ void define_MythenFileReader_bindings(py::module &m) {
             py::arg("frame_index"), R"(
             read a MythenFrame from file at the given frame index (current frame index advances to the next frame).
 
-            Parameters:
-            -----------
+            Parameters
+            ----------
 
             frame_index : int
                 index of the frame to read
 
-            Returns:
-            --------
-            tuple : (EpicsMythenHeader, MythenFrame)
-                tuple of EpicsMythenHeader and MythenFrame
+            Returns
+            -------
+            tuple of (EpicsMythenHeader, MythenFrame)
+                header and photon counts of the frame
             )")
 
         .def(
@@ -87,11 +87,11 @@ void define_MythenFileReader_bindings(py::module &m) {
             R"(read the frame at the current index from file.
             The current frame index advances to the next frame.
 
-            Returns:
-            --------
+            Returns
+            -------
 
-            tuple : (EpicsMythenHeader, MythenFrame)
-                tuple of EpicsMythenHeader and MythenFrame
+            tuple of (EpicsMythenHeader, MythenFrame)
+                header and photon counts of the frame
             )")
 
         .def(
@@ -107,15 +107,16 @@ void define_MythenFileReader_bindings(py::module &m) {
             py::arg("n_frames"), R"(
             read n MythenFrames from file starting at the current frame index (current frame index advances to the next frame).
 
-            Parameters:
-            -----------
+            Parameters
+            ----------
             n_frames : int
                 number of frames to read
 
-            Returns:
-            --------
-            tuple : (NDArray<EpicsMythenHeader, 1>, NDArray<uint32_t, 2>)
-                tuple of NDArray of EpicsMythenHeader and NDArray of photon counts
+            Returns
+            -------
+            tuple of (ndarray, ndarray)
+                structured array of EpicsMythenHeader with shape (n_frames,) and
+                photon counts (uint32) with shape (n_frames, pixels_per_frame)
             )")
 
         .def(
@@ -126,14 +127,15 @@ void define_MythenFileReader_bindings(py::module &m) {
             py::arg("frame_index"), R"(
             read header from file at the given frame index. (does not advance the current frame index)
 
-            Parameters:
-            -----------
+            Parameters
+            ----------
             frame_index : int
                 index of the frame to read
                 
-            Returns:
-            --------
-            EpicsMythenHeader : header of the frame at the given index
+            Returns
+            -------
+            EpicsMythenHeader
+                header of the frame at the given index
             )")
 
         .def(
@@ -144,14 +146,15 @@ void define_MythenFileReader_bindings(py::module &m) {
             py::arg("frame_index"), R"(
             read detector angle from file at the given frame index. (does not advance the current frame index)
 
-            Parameters:
-            -----------
+            Parameters
+            ----------
             frame_index : int
                 index of the frame to read
 
-            Returns:
-            --------
-            float : detector angle at the given frame index [degrees]
+            Returns
+            -------
+            float
+                detector angle at the given frame index [degrees]
             )")
 
         .def(
@@ -162,14 +165,15 @@ void define_MythenFileReader_bindings(py::module &m) {
             py::arg("frame_index"), R"(
             read incident intensity from file at the given frame index. (does not advance the current frame index)
 
-            Parameters:
-            -----------
+            Parameters
+            ----------
             frame_index : int
                 index of the frame to read
 
-            Returns:
-            --------
-            float : incident intensity at the given frame index
+            Returns
+            -------
+            float
+                incident intensity at the given frame index
             )")
 
         .def(

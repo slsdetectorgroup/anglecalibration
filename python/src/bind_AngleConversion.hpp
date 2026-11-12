@@ -66,6 +66,10 @@ void define_AngularConversion_binding(py::module &m) {
 
         Parameters
         ----------
+        mythen_detector: MythenDetector
+            storing all mythen specific parameters
+        histogram_meta_data: HistogramMetaData
+            angular range and bin width of fixed angle width histogram
         photon_counts: numpy.ndarray of uint32, shape (n_channels,)
             photon counts of the frame
         detector_angle: float
@@ -73,7 +77,19 @@ void define_AngularConversion_binding(py::module &m) {
         incident_intensity: int
             incident intensity of the frame
         see the multi-frame overload for the remaining parameters
-        )");
+        exposure_time: float
+            exposure time for the frame [s]
+        bad_channels: numpy.ndarray of bool, shape (n_channels,)
+            ``True`` if the channel is bad, otherwise ``False``
+        flatfield: numpy.ndarray of float, shape (n_channels, 2)
+            first column normalized flatfield value, second column its standard deviation
+        scale_factor: float
+            scale factor to scale correction to reasonable values (default: 1.0)
+
+        Returns
+        -------
+        numpy.ndarray (num_fixed_angle_width_bins, 2)
+            diffraction pattern in the range [min_angle, max_angle], first dimension photon counts redistributed to fixed angle width bins, second dimension respective standard deviation, values of -1.0 denote bins with insufficient coverage or which are denoted by a bad channel)");
 
     m.def(
         "convert",

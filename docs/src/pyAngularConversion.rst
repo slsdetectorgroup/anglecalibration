@@ -1,7 +1,7 @@
 AngularConversion
 =================
 
-Class to perform angular conversion. As conversion parameters it expects the "historic detector group" DG parameters. 
+Utilities to perform angular conversion. As conversion parameters it expects the "historic detector group" DG parameters. 
 See :ref:`parametersets` for a more detailed description of the different detector parameters. 
 
 ..
@@ -10,8 +10,14 @@ See :ref:`parametersets` for a more detailed description of the different detect
 
 .. py:currentmodule:: angcal  
     
-.. autoclass:: angcal._angcal.AngularConversion
+.. autoclass:: angcal._angcal.HistogramMetaData
     :special-members: __init__
     :show-inheritance:
     :inherited-members:
     :member-order: groupwise
+
+
+
+.. autofunction:: angcal._angcal.convert
+   
+

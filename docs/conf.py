@@ -13,9 +13,7 @@
 import os
 import textwrap
 import sys
-sys.path.insert(0, os.path.abspath('..'))
-
-print(sys.path)
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__))) # finds pybind_overloads.py 
 
 # -- Project information -----------------------------------------------------
 
@@ -23,6 +21,7 @@ project = 'angle_calibration'
 copyright = '2024, CPS Detector Group'
 author = 'CPS Detector Group'
 version = '@PROJECT_VERSION@'
+release = '@PROJECT_VERSION@'
 
 # -- General configuration ---------------------------------------------------
 
@@ -33,18 +32,17 @@ extensions = ['breathe',
               'sphinx.ext.autodoc',
               'sphinx.ext.napoleon',
               'sphinx.ext.autosummary',
-              'numpydoc'
+              'numpydoc',
+              'pybind_overloads']
               #'sphinx.ext.mathjax'
-             ]
 
 breathe_default_project = "angle_calibration"
 napoleon_use_ivar = True
+napolean_numpy_docstring = True
 
 # members are already listed by autodoc (:members:) - avoid numpydoc creating
 # additional autosummary tables which require stub files
 numpydoc_show_class_members = False
-
-master_doc = 'src/index'
 
 # Add any paths that contain templates here, relative to this directory.
 #templates_path = ['_templates']
@@ -53,7 +51,6 @@ master_doc = 'src/index'
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 #exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -69,9 +66,6 @@ html_static_path = ['static']
 
 
 numfig = True
-#def setup(app):
-    #app.add_css_file('css/extra.css')  # may also be an URL
-
 
 def setup(app):
     app.add_css_file("extr.css") 
