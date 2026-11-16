@@ -42,7 +42,8 @@ counter_mask_to_channel_indices(uint8_t counter_mask) {
 struct EpicsMythenHeader {
     /// @brief detector angle of the acquisition [degrees]
     double detector_angle{};
-    /// @brief incident intensity of the acquisition
+    /// @brief incident intensity of the acquisition (0 if not stored in the
+    /// file)
     uint64_t incident_intensity{}; // I_0
     /// @brief exposure time in seconds
     double exposure_time{}; // in seconds
@@ -90,9 +91,7 @@ struct MythenFrame : public aare::Frame {
  */
 class EpicsMythenFileReader : public HDF5FileReader {
   public:
-    EpicsMythenFileReader(const std::filesystem::path &fname,
-                          std::optional<const std::filesystem::path>
-                              incident_intensities_filename = std::nullopt);
+    explicit EpicsMythenFileReader(const std::filesystem::path &fname);
 
     std::tuple<EpicsMythenHeader, MythenFrame>
     read_frame(); // current frame, advances
@@ -112,8 +111,13 @@ class EpicsMythenFileReader : public HDF5FileReader {
 
     double
     read_detector_angle(size_t frame_index) const; // does NOT move cursor
+
+    /**
+     * @brief read the incident intensity of frame at frame_index from the epics
+     * hdf5 file (dataset NDAttributes/Izero)
+     */
     uint64_t
-    read_incident_intensity(size_t frame_index); // does NOT move cursor
+    read_incident_intensity(size_t frame_index) const; // does NOT move cursor
 
     void seek(size_t frame_index);
     size_t tell() const;
@@ -160,7 +164,6 @@ class EpicsMythenFileReader : public HDF5FileReader {
     size_t m_total_frames{0};
     size_t m_cols{};                        ///< number of strips per frame
     const std::type_info *m_dtype{nullptr}; ///< data type of photon counts
-    std::ifstream incident_intensities_file{};
 };
 
 template <typename T> void EpicsMythenFileReader::check_dtype() const {

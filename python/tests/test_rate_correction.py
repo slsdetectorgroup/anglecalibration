@@ -1,7 +1,7 @@
 import math
 import sys
 import pytest 
-from angcal import EpicsMythenFileReader, AngleCalibration, MythenDetectorSpecifications, FlatField
+from angcal import EpicsMythenFileReader, AngleCalibration, MythenDetector, FlatField
 
 from conftest import test_data_path
 
@@ -52,7 +52,7 @@ def test_rate_correction(test_data_path):
 
     filereader = EpicsMythenFileReader()
 
-    anglecalibration = AngleCalibration(MythenDetectorSpecifications(), FlatField(MythenDetectorSpecifications()), filereader)
+    anglecalibration = AngleCalibration(MythenDetector(), FlatField(MythenDetector()), filereader)
 
     frame = filereader.read_frame(str(test_data_path / "Fructose_0p2_60_0060.h5")) 
 

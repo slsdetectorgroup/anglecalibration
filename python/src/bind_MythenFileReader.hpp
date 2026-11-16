@@ -74,10 +74,7 @@ void define_MythenFrame_bindings(py::module &m) {
 void define_MythenFileReader_bindings(py::module &m) {
 
     py::class_<EpicsMythenFileReader>(m, "EpicsMythenFileReader")
-        .def(py::init<const std::filesystem::path &,
-                      std::optional<const std::filesystem::path>>(),
-             py::arg("fname"),
-             py::arg("incident_intensities_filename") = std::nullopt, R"(
+        .def(py::init<const std::filesystem::path &>(), py::arg("fname"), R"(
 
             Parameters
             ----------
@@ -85,8 +82,12 @@ void define_MythenFileReader_bindings(py::module &m) {
             fname : path 
                 path to any hdf5 file of the series storing the acquisitions,
                 the series starts at this file
-            incident_intensities_filename : str, optional
-                path to file containing incident intensities (I0) values need to be stored as uint64_t in binary format. 
+
+            Notes
+            -----
+            The incident intensities (I0) are read from the hdf5 dataset
+            /entry/instrument/NDAttributes/Izero. If it does not exist the
+            incident intensity is set to 0.
             )")
         .def(
             "read_frame",
@@ -190,7 +191,7 @@ void define_MythenFileReader_bindings(py::module &m) {
                 return self.read_incident_intensity(frame_index);
             },
             py::arg("frame_index"), R"(
-            read incident intensity from file at the given frame index. (does not advance the current frame index)
+            read incident intensity (NDAttributes/Izero) from file at the given frame index, 0 if not stored in the file. (does not advance the current frame index)
 
             Parameters
             ----------
@@ -199,7 +200,7 @@ void define_MythenFileReader_bindings(py::module &m) {
 
             Returns
             -------
-            float
+            int
                 incident intensity at the given frame index
             )")
 

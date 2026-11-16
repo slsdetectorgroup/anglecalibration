@@ -8,16 +8,9 @@ namespace angcal {
  * @brief Constructor for EpicsMythenFileReader class
  * @param fname path to any hdf5 file of the series storing the acquisitions,
  * the series starts at this file
- * @param incident_intensities_filename optional path to file storing incident
- * intensities of the acquisitions (need to be stored as binary file of
- * uint64_t)
- * @note if no incident intensities file is given the incident intensities
- * written by epics in the hdf5 file are taken. For newer versions this will be
- * garbage.
  */
 EpicsMythenFileReader::EpicsMythenFileReader(
-    const std::filesystem::path &fname,
-    std::optional<const std::filesystem::path> incident_intensities_filename) {
+    const std::filesystem::path &fname) {
     if (!std::filesystem::exists(fname)) {
         throw std::runtime_error(LOCATION +
                                  "File does not exist: " + fname.string());
@@ -26,18 +19,6 @@ EpicsMythenFileReader::EpicsMythenFileReader(
     scan_files();
     open_file(m_current_file_index);
     // TODO: maybe read meta data here instead of in scan_files
-
-    if (incident_intensities_filename) {
-        // TODO maybe directly read into NDArray faster than always reading
-        // from filesystem
-        incident_intensities_file.open(incident_intensities_filename.value(),
-                                       std::ios_base::in);
-        if (!incident_intensities_file.is_open()) {
-            throw std::runtime_error(
-                LOCATION + "Could not open file " +
-                incident_intensities_filename.value().string());
-        }
-    }
 }
 
 /**
@@ -152,25 +133,10 @@ double EpicsMythenFileReader::read_detector_angle(size_t frame_index) const {
     return read_attribute<double>("DetectorAngle", frame_index);
 }
 
-/**
- * @brief read the incident intensity of frame at frame_index either from
- * seperate file or from the epics hdf5 file
- */
-uint64_t EpicsMythenFileReader::read_incident_intensity(size_t frame_index) {
-    uint64_t incident_intensity{};
-    if (incident_intensities_file.is_open()) {
-        // acquisition index is the file number for files storing one frame
-        const size_t acquisition_index = m_offset + frame_index;
-        // TODO: add a contract check that it is a binary file of uint64_t
-        incident_intensities_file.clear();
-        incident_intensities_file.seekg(acquisition_index * sizeof(uint64_t));
-        incident_intensities_file.read(
-            reinterpret_cast<char *>(&incident_intensity), sizeof(uint64_t));
-    } else {
-        incident_intensity = static_cast<uint64_t>(
-            std::lround(read_attribute<double>("Izero", frame_index)));
-    }
-    return incident_intensity;
+uint64_t
+EpicsMythenFileReader::read_incident_intensity(size_t frame_index) const {
+    return static_cast<uint64_t>(
+        std::lround(read_attribute<double>("Izero", frame_index)));
 }
 
 /**
