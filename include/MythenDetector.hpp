@@ -317,7 +317,6 @@ class MythenDetector {
      */
     double solid_angle(const size_t module_index, size_t strip_index) const;
 
-  private:
     /**
      * @brief calculates the correction of the diffraction angle due to
      * sample displacement in the x and y direction of the horizontal sample
@@ -329,7 +328,8 @@ class MythenDetector {
      */
     double sample_displacement_correction(const double diffraction_angle) const;
 
-    // memebers
+  private:
+    // members
 
     /// @brief number of strips/channels per module
     static constexpr size_t m_strips_per_module = 1280;

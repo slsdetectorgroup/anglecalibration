@@ -1,0 +1,56 @@
+# build the library with tests and python bindings and run the tests
+# tests requiring external data files ([.files] in catch2, marker "files" in pytest) are skipped
+name: Build and test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-latest, ]
+        python-version: ["3.14", ]
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install python dependencies
+        run: python -m pip install --upgrade pip numpy matplotlib pytest
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libhdf5-dev
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DANGCAL_TESTS=ON \
+            -DANGCAL_PYTHON_BINDINGS=ON \
+            -DANGCAL_FETCH_AARE=ON \
+
+      - name: Build
+        run: cmake --build build -j 4
+
+      - name: Run C++ tests
+        working-directory: build
+        run: ./run_tests "~[.files]"

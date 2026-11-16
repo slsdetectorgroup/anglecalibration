@@ -216,15 +216,9 @@ endif()
 
 add_subdirectory(examples)
 
-
 if(ANGCAL_TESTS)
     enable_testing()
     add_subdirectory(tests)
-    set(TestSources 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/AngleCalibration.test.cpp 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Hdf5FileReader.test.cpp 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/MythenFileReader.test.cpp)
-    target_sources(tests PRIVATE ${TestSources})
 endif()
 
 if(ANGCAL_PYTHON_BINDINGS)

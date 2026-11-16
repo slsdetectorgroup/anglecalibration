@@ -334,17 +334,13 @@ inline NDArray<bool, 1> read_bad_channels(const std::filesystem::path &filename,
             fmt::format("File {} does not exist\n", filename.string()));
     }
 
-    NDArray<bool, 1> bad_channels({num_strips});
+    NDArray<bool, 1> bad_channels({num_strips}, false);
 
     std::ifstream file(filename);
 
     if (!file.is_open()) {
         throw std::runtime_error("Could not open file: " + filename.string());
     }
-
-    const size_t data_type_bytes = sizeof(bool);
-
-    auto buffer = bad_channels.buffer();
 
     std::string line;
 
@@ -355,20 +351,38 @@ inline NDArray<bool, 1> read_bad_channels(const std::filesystem::path &filename,
             std::size_t pos = line.find("-");
 
             if (pos == std::string::npos) {
-                index = std::stoi(line) * data_type_bytes;
-                buffer[index] = static_cast<std::byte>(true);
+                index = std::stoi(line);
+                if (index >= static_cast<size_t>(num_strips)) {
+                    throw std::runtime_error(
+                        fmt::format("strip index {} in {} out of range (num "
+                                    "strips {})",
+                                    index, filename.string(), num_strips));
+                }
+                bad_channels[index] = true;
             } else {
                 size_t line_size = line.size();
-                for (int i = std::stoi(line.substr(0, pos));
-                     i <= std::stoi(line.substr(pos + 1, line_size - pos));
-                     ++i) {
-                    index = i * data_type_bytes;
-                    buffer[index] = static_cast<std::byte>(true);
+                size_t start_index = std::stoi(line.substr(0, pos));
+                size_t end_index =
+                    std::stoi(line.substr(pos + 1, line_size - pos));
+                if (start_index >= static_cast<size_t>(num_strips) ||
+                    end_index >= static_cast<size_t>(num_strips) ||
+                    start_index > end_index) {
+                    throw std::runtime_error(fmt::format(
+                        "strip index range {}-{} in {} out of range "
+                        "(num strips {})",
+                        start_index, end_index, filename.string(), num_strips));
+                }
+                for (size_t i = start_index; i <= end_index; ++i) {
+                    bad_channels[i] = true;
                 }
             }
         }
     } catch (const std::exception &e) {
+        file.close();
         LOG(TLogLevel::logERROR) << e.what();
+        throw std::runtime_error(
+            fmt::format("Error reading bad channels from file {} at line: {}",
+                        filename.string(), line));
     }
 
     file.close();

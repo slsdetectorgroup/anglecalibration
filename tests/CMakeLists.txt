@@ -25,10 +25,16 @@ include(CTest)
 include(Catch)
 catch_discover_tests(tests TEST_SPEC "*")
 
-target_sources(tests PRIVATE ${TestSources} )
+set(TestSources 
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_sources/MythenDetector.test.cpp 
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_sources/Hdf5FileReader.test.cpp 
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_sources/MythenFileReader.test.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_sources/utils.test.cpp)
+
+target_sources(tests PRIVATE ${TestSources})
 
 #configure a header to pass test file paths
-get_filename_component(TEST_FILE_PATH ${PROJECT_SOURCE_DIR}/data ABSOLUTE)
+#get_filename_component(TEST_FILE_PATH ${PROJECT_SOURCE_DIR}/data ABSOLUTE)
 configure_file(test_config.hpp.in test_config.hpp)
-target_include_directories(tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
