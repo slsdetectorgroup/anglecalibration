@@ -186,7 +186,8 @@ NDArray<T> store_as_array(const std::filesystem::path &filename) {
                        1; // TODO: buggy, think about other filesystem - raw,
                           // binary file easier
 
-    NDArray<T, 1> array{std::array<ssize_t, 1>{lineCount}};
+    NDArray<T, 1> array{
+        std::array<ssize_t, 1>{static_cast<ssize_t>(lineCount)}};
 
     size_t index = 0;
     std::string line{};
