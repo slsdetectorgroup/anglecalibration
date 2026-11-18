@@ -101,7 +101,7 @@ import angcal
 
 A toy example of a calibration in python can be found in https://github.com/slsdetectorgroup/anglecalibration/blob/main/python/examples/calibration.py. 
 
-The example data can be found here https://zenodo.org/records/20645666 under mythenanglecalibrationtestdata.zip. It contains: 
+The example data can be found here https://zenodo.org/records/24165988 under mythenanglecalibrationtestdata.zip. It contains: 
 
 **Flatfield_EkeV22p0_T11000eV_up_TESTFF1_clean_Jun2025_open_WS.npy**
 Contains the already calculated normalized flatfield stored as a 2d numpy array of type ``np.float64``. 
@@ -125,7 +125,7 @@ export ANGCAL_CALIBRATION_DATA=/path/to/mythenanglecalibrationtestdata
 
 An example conversion can be found in https://github.com/slsdetectorgroup/anglecalibration/blob/main/python/examples/conversion.py. 
 
-The example data can be found here https://zenodo.org/records/20645666 under mythenangleconversiontestdata.zip. It contains: 
+The example data can be found here https://zenodo.org/records/24165988 under mythenangleconversiontestdata.zip. It contains: 
 
 **Flatfield_E17p5keV_T12500eV_up_AUGCAL2_Sep2023_open_WS_C_X_X.npy**
 Contains the already calculated normalized flatfield stored as a 2d numpy array of type ``np.float64``. 
@@ -149,7 +149,7 @@ export ANGCAL_CONVERSION_DATA=/path/to/mythenangleconversiontestdata
 
 An example of calculating the flatfield can be found in https://github.com/slsdetectorgroup/anglecalibration/blob/main/python/examples/flatfieldcalibration.py. 
 
-The respective example data can be found here https://zenodo.org/records/20645666 under MythenFlatFieldCalibrationData.zip.
+The respective example data can be found here https://zenodo.org/records/24165988 under MythenFlatFieldCalibrationData.zip.
 It contains: 
 
 **bc2025_001_RING.npy**
